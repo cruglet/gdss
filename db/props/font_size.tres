@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="GdssProp" format=3 uid="uid://yxypl7ibep8a"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_6fkai"]
+
+[resource]
+script = ExtResource("1_6fkai")
+name = "font_size"
+type = 0
+default_value = 12
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"

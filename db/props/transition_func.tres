@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="GdssProp" format=3 uid="uid://5sistwednw3k"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_m5h64"]
+
+[resource]
+script = ExtResource("1_m5h64")
+name = "transition_func"
+type = 6
+default_value = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
