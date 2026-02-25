@@ -4,8 +4,6 @@ extends Control
 
 static var _code_editor_ref: CodeEdit
 
-@export var style_objects: Array[GdssNode]
-
 @export_group("refs")
 @export var code_edit: CodeEdit
 @export var top_menu_bar: MenuBar

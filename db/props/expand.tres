@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_xf6mx")
 name = "expand"
-type = 4
+type = 5
 default_value = Vector4i(0, 0, 0, 0)
 composite_of = PackedStringArray("expand_left", "expand_right", "expand_top", "expand_bottom")
+category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

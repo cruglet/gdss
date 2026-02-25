@@ -7,12 +7,13 @@ extends Node
 var _highlighter: GdssCodeHighlighter
 var _nodes: Array[String] = []
 var _properties: Array[String] = []
-var _variants: Array[String] = []
+var _states: Array[String] = []
 var _property_meta: Dictionary = {}
 var _builtin_colors: Array[String] = [
 	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
 ]
+var _value_functions: Array[String] = []
 
 
 func _ready() -> void:
@@ -23,16 +24,17 @@ func _ready() -> void:
 func _build_from_objects() -> void:
 	_nodes.clear()
 	_properties.clear()
-	_variants.clear()
+	_states.clear()
 	_property_meta.clear()
+	_value_functions.clear()
 
-	for obj: GdssNode in get_parent().style_objects:
+	for obj: GdssNode in GDSS.get_gdss_nodes().values():
 		var style_name: String = obj.style_name
 		if not _nodes.has(style_name):
 			_nodes.append(style_name)
 
 		var props_dict: Dictionary = {}
-		for prop: GdssProp in obj.theme_properties:
+		for prop: GdssProp in obj.get_enabled_props():
 			props_dict[prop.name] = prop
 			if not _properties.has(prop.name):
 				_properties.append(prop.name)
@@ -42,21 +44,26 @@ func _build_from_objects() -> void:
 
 		_property_meta[style_name] = props_dict
 
-		for v: String in obj.variants:
-			if not _variants.has(v):
-				_variants.append(v)
+		for v: String in obj.states:
+			if not _states.has(v):
+				_states.append(v)
+
+	for method: GdssMethod in GDSS.get_gdss_methods().values():
+		if not _value_functions.has(method.method_name):
+			_value_functions.append(method.method_name)
 
 
 func _setup_highlighter() -> void:
 	_highlighter = GdssCodeHighlighter.new()
 	_highlighter.nodes = _nodes
 	_highlighter.properties = _properties
-	_highlighter.variants = _variants
+	_highlighter.states = _states
 	_highlighter.property_meta = _property_meta
 	_highlighter.builtin_colors = _builtin_colors
-	_highlighter._node_variants = {}
-	for obj: GdssNode in get_parent().style_objects:
-		_highlighter._node_variants[obj.style_name] = obj.variants
+	_highlighter.value_functions = _value_functions
+	_highlighter._node_states = {}
+	for obj: GdssNode in GDSS.get_gdss_nodes().values():
+		_highlighter._node_states[obj.style_name] = obj.states
 	_highlighter.refresh_colors()
 	editor.syntax_highlighter = _highlighter
 
@@ -64,12 +71,14 @@ func _setup_highlighter() -> void:
 class GdssCodeHighlighter extends SyntaxHighlighter:
 	var nodes: Array[String] = []
 	var properties: Array[String] = []
-	var variants: Array[String] = []
+	var states: Array[String] = []
 	var property_meta: Dictionary = {}
 	var builtin_colors: Array[String] = []
-	var _node_variants: Dictionary = {}
+	var _node_states: Dictionary = {}
 	var _brace_depth_cache: Array[int] = []
 	var _cache_dirty: bool = true
+	var value_functions: Array[String] = []
+	var col_function: Color
 
 	var col_keyword: Color
 	var col_type: Color
@@ -96,10 +105,12 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		col_annotation = s.get_setting("text_editor/theme/highlighting/gdscript/annotation_color")
 		col_comment = s.get_setting("text_editor/theme/highlighting/comment_color")
 		col_control_flow = s.get_setting("text_editor/theme/highlighting/control_flow_keyword_color")
+		col_string = s.get_setting("text_editor/theme/highlighting/string_color")
 		col_member = s.get_setting("text_editor/theme/highlighting/member_variable_color")
 		col_brace_mismatch = s.get_setting("text_editor/theme/highlighting/brace_mismatch_color")
 		col_enum = s.get_setting("text_editor/theme/highlighting/gdscript/node_path_color")
 		col_default = s.get_setting("text_editor/theme/highlighting/text_color")
+		col_function = s.get_setting("text_editor/theme/highlighting/gdscript/global_function_color")
 
 
 	func invalidate_cache() -> void:
@@ -116,11 +127,12 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		return (code >= 65 and code <= 90) or (code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95
 
 
-	func _node_has_variant(node_name: String, variant: String) -> bool:
-		if _node_variants.has(node_name):
-			var v: PackedStringArray = _node_variants[node_name]
-			return v.has(variant)
+	func _node_has_state(node_name: String, state: String) -> bool:
+		if _node_states.has(node_name):
+			var v: PackedStringArray = _node_states[node_name]
+			return v.has(state)
 		return false
+
 
 	func _get_line_syntax_highlighting(p_line: int) -> Dictionary:
 		var result: Dictionary = {}
@@ -142,12 +154,10 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		while i < len:
 			var c: String = text[i]
 
-			# Comment
 			if c == "/" and i + 1 < len and text[i + 1] == "/":
 				result[i] = {"color": col_comment}
 				break
 
-			# String
 			if c == "\"":
 				result[i] = {"color": col_string}
 				var j: int = i + 1
@@ -181,7 +191,6 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				i += 1
 				continue
 
-			# Parentheses and brackets — explicit symbol color so numbers don't bleed
 			if c in ["(", ")", "[", "]"]:
 				result[i] = {"color": col_symbol}
 				i += 1
@@ -217,47 +226,53 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				var before: String = text.substr(0, start)
 				var before_stripped: String = before.strip_edges()
 
-				var is_after_colon: bool = before_stripped.ends_with(":")
+				var trimmed_before: String = before.rstrip(" \t")
+				var is_after_colon: bool = trimmed_before.ends_with(":") and before.length() == trimmed_before.length()
 				var after: String = text.substr(i).strip_edges()
 				var is_before_brace: bool = after.begins_with("{") or (after.begins_with(":") and after.find("{") != -1)
-				var colon_idx: int = before_stripped.rfind(":")
-				var brace_idx: int = before_stripped.rfind("{")
+				var colon_idx: int = trimmed_before.rfind(":")
+				var brace_idx: int = trimmed_before.rfind("{")
 				var in_value: bool = colon_idx != -1 and colon_idx > brace_idx and not is_after_colon
 
-				if is_after_colon and variants.has(word):
-					var before_colon: String = before_stripped.substr(0, before_stripped.length() - 1).strip_edges()
+				if is_after_colon and states.has(word):
+					var before_colon: String = trimmed_before.substr(0, trimmed_before.length() - 1).strip_edges()
 					var valid: bool = false
 					if open_count > 0:
-						for style_name: String in _node_variants:
-							if _node_has_variant(style_name, word):
+						for style_name: String in _node_states:
+							if _node_has_state(style_name, word):
 								valid = true
 								break
 					else:
-						valid = _node_has_variant(before_colon, word)
+						valid = _node_has_state(before_colon, word)
 					result[start] = {"color": col_control_flow if valid else col_default}
 				elif nodes.has(word):
 					result[start] = {"color": col_type}
 				elif is_before_brace:
 					result[start] = {"color": col_user_type}
 				elif in_value:
-					var is_enum: bool = builtin_colors.has(word)
-					if not is_enum:
-						var colon_prop: int = before_stripped.rfind(":")
-						if colon_prop != -1:
-							var prop: String = before_stripped.substr(0, colon_prop).strip_edges()
-							for style_name: String in property_meta:
-								var meta: Dictionary = property_meta[style_name]
-								if meta.has(prop):
-									var pd: GdssProp = meta[prop]
-									if pd.type == GDSS.Type.CURSOR:
-										is_enum = true
-										break
-					result[start] = {"color": col_enum if is_enum else col_default}
+					if value_functions.has(word):
+						result[start] = {"color": col_function}
+					else:
+						var is_enum: bool = builtin_colors.has(word)
+						if not is_enum:
+							var colon_prop: int = trimmed_before.rfind(":")
+							if colon_prop != -1:
+								var prop: String = trimmed_before.substr(0, colon_prop).strip_edges()
+								for style_name: String in property_meta:
+									var meta: Dictionary = property_meta[style_name]
+									if meta.has(prop):
+										var pd: GdssProp = meta[prop]
+										if pd.type == GDSS.Type.CURSOR:
+											is_enum = true
+											break
+						result[start] = {"color": col_enum if is_enum else col_default}
 				elif word == "var":
+					result[start] = {"color": col_keyword}
+				elif word == "true" or word == "false":
 					result[start] = {"color": col_keyword}
 				elif properties.has(word):
 					result[start] = {"color": col_member}
-				elif variants.has(word):
+				elif states.has(word):
 					result[start] = {"color": col_control_flow}
 				else:
 					result[start] = {"color": col_default}

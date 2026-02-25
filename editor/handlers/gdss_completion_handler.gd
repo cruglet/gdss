@@ -7,9 +7,10 @@ extends Node
 
 var _nodes: Array[String] = []
 var _properties: Dictionary = {}
-var _variants: Dictionary = {}
+var _states: Dictionary = {}
 var _property_meta: Dictionary = {}
 var _user_variables: Array[String] = []
+var _methods: Array[GdssMethod] = []
 
 var _completion_color: Color
 
@@ -30,31 +31,37 @@ func _ready() -> void:
 func _build_from_objects() -> void:
 	_nodes.clear()
 	_properties.clear()
-	_variants.clear()
+	_states.clear()
 	_property_meta.clear()
-	
+	_methods.clear()
+
 	var prefixes: Array[String] = ["@", ":", "\t"]
 	
-	for obj: GdssNode in get_parent().style_objects:
+	for obj: GdssNode in GDSS.get_gdss_nodes().values():
 		var style_name: String = obj.style_name
 		_nodes.append(style_name)
-		
+
 		var props_dict: Dictionary = {}
-		for prop: GdssProp in obj.theme_properties:
+		for prop: GdssProp in obj.get_enabled_props():
 			props_dict[prop.name] = prop
 		_property_meta[style_name] = props_dict
 		_properties[style_name] = props_dict.keys()
-		_variants[style_name] = obj.variants
-		
+		_states[style_name] = obj.states
+
 		if style_name.length() > 0 and not prefixes.has(style_name[0]):
 			prefixes.append(style_name[0])
-		
+
 		for key: String in props_dict.keys():
 			for l: int in range(1, min(4, key.length()) + 1):
 				var pre: String = key.substr(0, l)
 				if not prefixes.has(pre):
 					prefixes.append(pre)
-	
+
+	for method: GdssMethod in GDSS.get_gdss_methods().values():
+		_methods.append(method)
+		if method.method_name.length() > 0 and not prefixes.has(method.method_name[0]):
+			prefixes.append(method.method_name[0])
+
 	editor.code_completion_prefixes = prefixes
 
 
@@ -89,17 +96,17 @@ func _update_completions(word: String) -> void:
 		"top_level":
 			if ":" in word:
 				var parts: PackedStringArray = word.split(":")
-				_complete_node_variants(parts[0], parts[1] if parts.size() > 1 else "")
+				_complete_node_states(parts[0], parts[1] if parts.size() > 1 else "")
 			else:
 				_complete_nodes(word)
 				_complete_at_directives(word)
 		"property_key":
 			if word.begins_with(":"):
-				_complete_variants(word.trim_prefix(":"), context.get("style", ""))
+				_complete_states(word.trim_prefix(":"), context.get("style", ""))
 			else:
 				_complete_properties(word, context.get("style", ""))
 		"variant_decl":
-			_complete_variants(word.trim_prefix(":"), context.get("style", ""))
+			_complete_states(word.trim_prefix(":"), context.get("style", ""))
 		"property_value":
 			_complete_values(word, context.get("style", ""), context.get("property", ""))
 		"variant_block":
@@ -114,9 +121,9 @@ func _complete_nodes(word: String) -> void:
 			editor.add_code_completion_option(CodeEdit.KIND_CLASS, node, node, _completion_color, _get_icon(node))
 
 
-func _complete_node_variants(node: String, partial: String) -> void:
-	var variants: PackedStringArray = _variants.get(node, PackedStringArray())
-	for v: String in variants:
+func _complete_node_states(node: String, partial: String) -> void:
+	var states: PackedStringArray = _states.get(node, PackedStringArray())
+	for v: String in states:
 		if partial.is_empty() or v.begins_with(partial):
 			editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, v, v + " ", _completion_color, _get_icon(&"Signal"))
 
@@ -152,10 +159,10 @@ func _complete_properties(word: String, style_name: String) -> void:
 				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, _get_icon(&"MemberProperty"))
 
 
-func _complete_variants(word: String, style_name: String) -> void:
-	var variants: PackedStringArray = _variants.get(style_name, PackedStringArray())
+func _complete_states(word: String, style_name: String) -> void:
+	var states: PackedStringArray = _states.get(style_name, PackedStringArray())
 	
-	for v: String in variants:
+	for v: String in states:
 		var display: String = ":" + v
 		if word.is_empty() or display.begins_with(word) or v.begins_with(word):
 			editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, display, v + " ", _completion_color, _get_icon(&"Signal"))
@@ -169,9 +176,10 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			if m.has(prop):
 				meta = m
 				break
-	
+
 	var prop_def: GdssProp = meta.get(prop, null)
-	
+	var effective_type: GDSS.Type = GDSS.Type.INT
+
 	if prop_def == null:
 		for key: String in meta:
 			var raw: Variant = meta[key]
@@ -191,7 +199,19 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			if idx < components.size():
 				var hint: String = str(components[idx])
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, hint, hint, _completion_color, _get_icon(&"MemberProperty"))
-			return
+			effective_type = GDSS.Type.INT
+			break
+	else:
+		effective_type = prop_def.type
+
+	for method: GdssMethod in _methods:
+		if not method.supported_types.has(effective_type):
+			continue
+		if word.is_empty() or method.method_name.begins_with(word):
+			var label: String = method.method_name + ("(…)" if method.parameters.size() > 0 else "()")
+			editor.add_code_completion_option(CodeEdit.KIND_FUNCTION, label, method.method_name + "(", _completion_color, _get_icon(&"MemberMethod"))
+
+	if prop_def == null:
 		return
 
 	match prop_def.type:
@@ -201,25 +221,30 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 					editor.add_code_completion_option(CodeEdit.KIND_CONSTANT, c, c, _completion_color, _get_icon(&"Color"))
 			for v: String in _user_variables:
 				if word.is_empty() or v.begins_with(word):
-					editor.add_code_completion_option(CodeEdit.KIND_VARIABLE, v, v)
+					editor.add_code_completion_option(CodeEdit.KIND_VARIABLE, v, v, _completion_color, _get_icon(&"LocalVariable"))
 		GDSS.Type.CURSOR:
 			for cursor_key: String in GDSS.CursorType:
 				if word.is_empty() or cursor_key.begins_with(word):
 					editor.add_code_completion_option(CodeEdit.KIND_ENUM, cursor_key, cursor_key, _completion_color, _get_icon(&"Mouse"))
-		GDSS.Type.TRANS:
+		GDSS.Type.TRANSITION_TYPE:
 			for trans_type: String in GDSS.TransitionType:
 				if word.is_empty() or trans_type.begins_with(word):
 					editor.add_code_completion_option(CodeEdit.KIND_ENUM, trans_type, trans_type, _completion_color, _get_icon(&"Curve"))
-		GDSS.Type.INT:
-			var default: Variant = prop_def.default_value
-			if default != null:
-				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, str(default), str(default), _completion_color, _get_icon(&"MemberProperty"))
+		GDSS.Type.TRANSITION_FUNC:
+			for trans_func: String in GDSS.TransitionFunc:
+				if word.is_empty() or trans_func.begins_with(word):
+					editor.add_code_completion_option(CodeEdit.KIND_ENUM, trans_func, trans_func, _completion_color, _get_icon(&"Curve"))
 		GDSS.Type.COMPOSITE4:
 			var default: Variant = prop_def.default_value
 			if default != null:
 				var v4: Vector4i = default
 				var hint: String = "%d %d %d %d" % [v4.x, v4.y, v4.z, v4.w]
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, hint, hint, _completion_color, _get_icon(&"MemberProperty"))
+		_:
+			var default: Variant = prop_def.default_value
+			if default != null:
+				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, str(default), str(default), _completion_color, _get_icon(&"MemberProperty"))
+
 
 
 func _complete_at_directives(word: String) -> void:
@@ -232,10 +257,10 @@ func _get_context() -> Dictionary:
 	var lines: PackedStringArray = editor.text.split("\n")
 	
 	var node_open_regex: RegEx = RegEx.new()
-	node_open_regex.compile(r"^(\w+)(?::(\w+))?\s*\{")
+	node_open_regex.compile(r"^([\w][\w\s,]*)(?::(\w+))?\s*\{")
 	
 	var variant_open_regex: RegEx = RegEx.new()
-	variant_open_regex.compile(r"^:(\w+)\s*\{")
+	variant_open_regex.compile(r"^:([\w][\w\s,:]*)?\s*\{")
 	
 	var stack: Array[Dictionary] = []
 	
@@ -246,26 +271,30 @@ func _get_context() -> Dictionary:
 			line = line.substr(0, comment_idx).strip_edges()
 		if line.is_empty():
 			continue
-		
+
 		var m: RegExMatch = node_open_regex.search(line)
 		if m:
+			var raw_selector: String = m.get_string(1)
+			var first_selector: String = raw_selector.split(",")[0].strip_edges()
 			stack.push_back({
-				"style": m.get_string(1),
+				"style": first_selector,
 				"variant": m.get_string(2),
 				"in_variant": m.get_string(2) != ""
 			})
 			continue
-		
+
 		var vm: RegExMatch = variant_open_regex.search(line)
 		if vm:
+			var raw_variant: String = vm.get_string(1)
+			var first_variant: String = raw_variant.split(",")[0].strip_edges().trim_prefix(":")
 			var top: Dictionary = stack.back() if stack.size() > 0 else {}
 			stack.push_back({
 				"style": top.get("style", ""),
-				"variant": vm.get_string(1),
+				"variant": first_variant,
 				"in_variant": true
 			})
 			continue
-		
+
 		if "}" in line:
 			if stack.size() > 0:
 				stack.pop_back()

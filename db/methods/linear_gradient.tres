@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="GdssMethod" format=3 uid="uid://cu127dhjen0tc"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_yjpyy"]
+[ext_resource type="Script" uid="uid://dwjolxl3ubtln" path="res://addons/gdss/db/methods/_base.gd" id="2_8t0iu"]
+
+[sub_resource type="Resource" id="Resource_q4n2y"]
+script = ExtResource("1_yjpyy")
+name = "color_start"
+type = 3
+default_value = Color(1, 1, 1, 1)
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[sub_resource type="Resource" id="Resource_q3wh2"]
+script = ExtResource("1_yjpyy")
+name = "color_end"
+type = 3
+default_value = null
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[sub_resource type="Resource" id="Resource_h0y3x"]
+script = ExtResource("1_yjpyy")
+name = "angle_degrees"
+type = 1
+default_value = null
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[resource]
+script = ExtResource("2_8t0iu")
+method_name = "linear_gradient"
+supported_types = Array[int]([3])
+parameters = Array[ExtResource("1_yjpyy")]([SubResource("Resource_q4n2y"), SubResource("Resource_q3wh2"), SubResource("Resource_h0y3x")])
+metadata/_custom_type_script = "uid://dwjolxl3ubtln"

@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="GdssMethod" format=3 uid="uid://bktwm0iff3ncf"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_oakwy"]
+[ext_resource type="Script" uid="uid://dwjolxl3ubtln" path="res://addons/gdss/db/methods/_base.gd" id="2_fl80c"]
+
+[sub_resource type="Resource" id="Resource_oakwy"]
+script = ExtResource("1_oakwy")
+name = "r"
+type = 1
+default_value = 255.0
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[sub_resource type="Resource" id="Resource_fl80c"]
+script = ExtResource("1_oakwy")
+name = "g"
+type = 1
+default_value = 255.0
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[sub_resource type="Resource" id="Resource_sagqx"]
+script = ExtResource("1_oakwy")
+name = "b"
+type = 1
+default_value = 255.0
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[sub_resource type="Resource" id="Resource_qo2hs"]
+script = ExtResource("1_oakwy")
+name = "a"
+type = 1
+default_value = 1.0
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[resource]
+script = ExtResource("2_fl80c")
+method_name = "rgba"
+supported_types = Array[int]([3])
+parameters = Array[ExtResource("1_oakwy")]([SubResource("Resource_oakwy"), SubResource("Resource_fl80c"), SubResource("Resource_sagqx"), SubResource("Resource_qo2hs")])
+metadata/_custom_type_script = "uid://dwjolxl3ubtln"

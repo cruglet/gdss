@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_skdsa")
 name = "cursor"
-type = 5
+type = 6
 default_value = 0
+category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

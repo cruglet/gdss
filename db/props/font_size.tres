@@ -7,4 +7,5 @@ script = ExtResource("1_6fkai")
 name = "font_size"
 type = 0
 default_value = 12
+category = 3
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

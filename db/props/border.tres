@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_b7sqg")
 name = "border"
-type = 4
+type = 5
 default_value = Vector4i(0, 0, 0, 0)
 composite_of = PackedStringArray("border_left", "border_right", "border_top", "border_bottom")
+category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

@@ -5,6 +5,7 @@
 [resource]
 script = ExtResource("1_73csj")
 name = "bg_color"
-type = 2
+type = 3
 default_value = Color(0, 0, 0, 0)
+category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

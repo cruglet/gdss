@@ -2,6 +2,13 @@
 class_name GdssProp
 extends Resource
 
+enum Category {
+	STYLE,
+	COLOR,
+	CONST,
+	FONT_SIZE,
+}
+
 var name: String = "":
 	set(n):
 		name = n.strip_edges().replace(" ", "_")
@@ -15,6 +22,7 @@ var type: GDSS.Type = GDSS.Type.INT:
 			composite_of = ("%s_left;%s_right;%s_top;%s_bottom" % [name, name, name, name]).split(";")
 		notify_property_list_changed()
 var default_value: Variant
+var category: Category = Category.STYLE
 var composite_of: PackedStringArray = []:
 	get():
 		if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE:
@@ -40,14 +48,23 @@ func _get_property_list() -> Array[Dictionary]:
 	match type:
 		GDSS.Type.INT: props.append({"name": "default_value", "type": TYPE_INT})
 		GDSS.Type.FLOAT: props.append({"name": "default_value", "type": TYPE_FLOAT})
+		GDSS.Type.BOOLEAN: props.append({"name": "default_value", "type": TYPE_BOOL})
 		GDSS.Type.COLOR: props.append({"name": "default_value", "type": TYPE_COLOR})
 		GDSS.Type.COMPOSITE4: props.append({"name": "default_value", "type": TYPE_VECTOR4I})
 		GDSS.Type.COMPOSITE: props.append({"name": "default_value", "type": TYPE_STRING})
 		GDSS.Type.CURSOR: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.CursorType.keys())})
-		GDSS.Type.TRANS: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionType.keys())})
+		GDSS.Type.TRANSITION_TYPE: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionType.keys())})
+		GDSS.Type.TRANSITION_FUNC: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionFunc.keys())})
 	
 	if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE:
 		props.append({"name": "composite_of", "type": TYPE_PACKED_STRING_ARRAY})
+	
+	props.append({
+		"name": "category",
+		"type": TYPE_INT,
+		"hint": PROPERTY_HINT_ENUM,
+		"hint_string": ",".join(Category.keys())
+	})
 	
 	return props
 
@@ -61,8 +78,50 @@ func get_type() -> GDSS.Type:
 
 
 func get_default_value() -> Variant:
+	if default_value != null:
+		return default_value
+	match type:
+		GDSS.Type.INT, GDSS.Type.CURSOR, GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
+			return 0
+		GDSS.Type.FLOAT:
+			return 0.0
+		GDSS.Type.BOOLEAN:
+			return false
+		GDSS.Type.COLOR:
+			return Color.TRANSPARENT
+		GDSS.Type.COMPOSITE4:
+			return Vector4i.ZERO
+		GDSS.Type.COMPOSITE:
+			return ""
 	return 0
 
 
 func is_composite() -> bool:
 	return composite_of.size() > 0
+
+
+func get_info() -> Dictionary:
+	var type_name: String = ""
+	
+	match type:
+		GDSS.Type.INT: type_name = "INT"
+		GDSS.Type.FLOAT: type_name = "FLOAT"
+		GDSS.Type.BOOLEAN: type_name = "BOOLEAN"
+		GDSS.Type.COLOR: type_name = "COLOR"
+		GDSS.Type.COMPOSITE: type_name = "COMPOSITE"
+		GDSS.Type.COMPOSITE4: type_name = "COMPOSITE4"
+		GDSS.Type.CURSOR: type_name = "CURSOR"
+		GDSS.Type.TRANSITION_TYPE: type_name = "TRANSITION_TYPE"
+		GDSS.Type.TRANSITION_FUNC: type_name = "TRANSITION_FUNC"
+		_:
+			type_name = "UNKNOWN"
+	
+	var info: Dictionary = {
+		"name": name,
+		"type": "%d (%s)" % [type, type_name],
+		"default_value": default_value,
+		"composite_of": composite_of,
+		"is_composite": is_composite()
+	}
+	
+	return info

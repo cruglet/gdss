@@ -7,5 +7,6 @@ resource_name = "transition_time"
 script = ExtResource("1_hqqn0")
 name = "transition_time"
 type = 1
-default_value = 0
+default_value = 0.0
+category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

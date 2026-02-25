@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_v07xf")
 name = "padding"
-type = 4
+type = 5
 default_value = Vector4i(0, 0, 0, 0)
 composite_of = PackedStringArray("padding_left", "padding_right", "padding_top", "padding_bottom")
+category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

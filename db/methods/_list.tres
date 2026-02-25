@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="GdssMethodList" format=3 uid="uid://b5cvdpn7uy7xt"]
+
+[ext_resource type="Script" uid="uid://dwjolxl3ubtln" path="res://addons/gdss/db/methods/_base.gd" id="1_yimfu"]
+[ext_resource type="Resource" uid="uid://c0g4hi458rf05" path="res://addons/gdss/db/methods/abs.tres" id="2_g1qt8"]
+[ext_resource type="Script" uid="uid://vep34xnjm5h7" path="res://addons/gdss/db/methods/_list.gd" id="2_n445l"]
+[ext_resource type="Resource" uid="uid://bvvowubwvk21u" path="res://addons/gdss/db/methods/clamp.tres" id="3_a0nre"]
+[ext_resource type="Resource" uid="uid://ccjgef0od0svc" path="res://addons/gdss/db/methods/float.tres" id="4_ibqny"]
+[ext_resource type="Resource" uid="uid://dpy8wyebfoixe" path="res://addons/gdss/db/methods/int.tres" id="5_xv6ed"]
+[ext_resource type="Resource" uid="uid://cu127dhjen0tc" path="res://addons/gdss/db/methods/linear_gradient.tres" id="6_tetpx"]
+[ext_resource type="Resource" uid="uid://cpwp44vlwe24d" path="res://addons/gdss/db/methods/max.tres" id="7_kpxoj"]
+[ext_resource type="Resource" uid="uid://buxht5rjovtdh" path="res://addons/gdss/db/methods/min.tres" id="8_edfuk"]
+[ext_resource type="Resource" uid="uid://bktwm0iff3ncf" path="res://addons/gdss/db/methods/rgba.tres" id="9_hi1ci"]
+[ext_resource type="Resource" uid="uid://bcey4qhby1tdv" path="res://addons/gdss/db/methods/round.tres" id="10_ksohb"]
+
+[resource]
+script = ExtResource("2_n445l")
+list = Dictionary[String, ExtResource("1_yimfu")]({
+"abs": ExtResource("2_g1qt8"),
+"clamp": ExtResource("3_a0nre"),
+"float": ExtResource("4_ibqny"),
+"int": ExtResource("5_xv6ed"),
+"linear_gradient": ExtResource("6_tetpx"),
+"max": ExtResource("7_kpxoj"),
+"min": ExtResource("8_edfuk"),
+"rgba": ExtResource("9_hi1ci"),
+"round": ExtResource("10_ksohb")
+})
+dir_path = "res://addons/gdss/db/methods"
+metadata/_custom_type_script = "uid://vep34xnjm5h7"

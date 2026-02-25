@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GdssNodeList" format=3 uid="uid://jw1xlcsh6exq"]
+
+[ext_resource type="Script" uid="uid://bn6wk7my78ce7" path="res://addons/gdss/db/nodes/_base.gd" id="1_r0mun"]
+[ext_resource type="Script" uid="uid://b8vr00vptx80a" path="res://addons/gdss/db/nodes/_list.gd" id="2_ilkrm"]
+[ext_resource type="Resource" uid="uid://dswljjkyn3bfd" path="res://addons/gdss/db/nodes/Button.tres" id="2_wk1uw"]
+
+[resource]
+script = ExtResource("2_ilkrm")
+list = Dictionary[String, ExtResource("1_r0mun")]({
+"Button": ExtResource("2_wk1uw")
+})
+dir_path = "res://addons/gdss/db/nodes"
+metadata/_custom_type_script = "uid://b8vr00vptx80a"

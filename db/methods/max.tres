@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="GdssMethod" format=3 uid="uid://cpwp44vlwe24d"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_0dmov"]
+[ext_resource type="Script" uid="uid://dwjolxl3ubtln" path="res://addons/gdss/db/methods/_base.gd" id="2_4je84"]
+
+[sub_resource type="Resource" id="Resource_g5vwi"]
+script = ExtResource("1_0dmov")
+name = "value"
+type = 1
+default_value = null
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[sub_resource type="Resource" id="Resource_ul7kc"]
+script = ExtResource("1_0dmov")
+name = "value2"
+type = 0
+default_value = null
+category = 0
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
+
+[resource]
+script = ExtResource("2_4je84")
+method_name = "max"
+supported_types = Array[int]([0, 1])
+parameters = Array[ExtResource("1_0dmov")]([SubResource("Resource_g5vwi"), SubResource("Resource_ul7kc")])
+metadata/_custom_type_script = "uid://dwjolxl3ubtln"

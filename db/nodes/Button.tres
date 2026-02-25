@@ -1,22 +1,30 @@
-[gd_resource type="Resource" script_class="GdssNode" format=3 uid="uid://blhrk1r7koelx"]
+[gd_resource type="Resource" script_class="GdssNode_Button" format=3 uid="uid://dswljjkyn3bfd"]
 
-[ext_resource type="Script" uid="uid://bn6wk7my78ce7" path="res://addons/gdss/db/nodes/_base.gd" id="1_gpu14"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_4qaue"]
-[ext_resource type="Resource" uid="uid://bw81w2ub4jtck" path="res://addons/gdss/db/props/bg_color.tres" id="3_4pffb"]
-[ext_resource type="Resource" uid="uid://baf7ce3gs2jv3" path="res://addons/gdss/db/props/border.tres" id="4_n0sbl"]
-[ext_resource type="Resource" uid="uid://q868h2lvtq21" path="res://addons/gdss/db/props/border_color.tres" id="5_e3pxm"]
-[ext_resource type="Resource" uid="uid://cyk5xlgeaiuwi" path="res://addons/gdss/db/props/corner_radius.tres" id="6_k4w5q"]
-[ext_resource type="Resource" uid="uid://c2w3chwnlgn3c" path="res://addons/gdss/db/props/cursor.tres" id="7_jkicl"]
-[ext_resource type="Resource" uid="uid://dmbeiejithhrk" path="res://addons/gdss/db/props/expand.tres" id="8_5pwh4"]
-[ext_resource type="Resource" uid="uid://yxypl7ibep8a" path="res://addons/gdss/db/props/font_size.tres" id="9_q13r0"]
-[ext_resource type="Resource" uid="uid://7rdt8cs04c00" path="res://addons/gdss/db/props/padding.tres" id="10_8l1os"]
-[ext_resource type="Resource" uid="uid://5sistwednw3k" path="res://addons/gdss/db/props/transition_func.tres" id="11_s3ir0"]
-[ext_resource type="Resource" uid="uid://dxljxuc70lfm1" path="res://addons/gdss/db/props/transition_time.tres" id="12_vlvgu"]
+[ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_tgyt4"]
 
 [resource]
-script = ExtResource("1_gpu14")
-variants = PackedStringArray("hover", "pressed", "hover_pressed", "disabled", "focused")
-theme_properties = Array[ExtResource("2_4qaue")]([ExtResource("3_4pffb"), ExtResource("4_n0sbl"), ExtResource("5_e3pxm"), ExtResource("6_k4w5q"), ExtResource("7_jkicl"), ExtResource("8_5pwh4"), ExtResource("9_q13r0"), ExtResource("10_8l1os"), ExtResource("11_s3ir0"), ExtResource("12_vlvgu")])
-base_type = "Button"
-style_name = "Button"
-metadata/_custom_type_script = "uid://bn6wk7my78ce7"
+script = ExtResource("1_tgyt4")
+states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
+theme_properties = Dictionary[String, bool]({
+"anti_aliasing": true,
+"bg_color": true,
+"border": true,
+"border_color": true,
+"corner_detail": true,
+"corner_radius": true,
+"cursor": true,
+"expand": true,
+"font_color": true,
+"font_size": true,
+"padding": true,
+"shadow": true,
+"shadow_color": true,
+"skew_x": true,
+"skew_y": true,
+"transition_func": true,
+"transition_time": true,
+"transition_type": true
+})
+base_type = &"Button"
+style_name = &"Button"
+metadata/_custom_type_script = "uid://bysui7kt6peex"
