@@ -46,7 +46,7 @@ var current_state: String = "":
 			return
 		_start_transition(current_state, s)
 		current_state = s
-		_apply_margins()
+		_apply_overrides()
 		if ref != null:
 			ref.queue_redraw()
 
@@ -68,16 +68,38 @@ func _notification(what: int) -> void:
 func _on_parsed_changed() -> void:
 	if ref == null:
 		return
-	_apply_margins()
+	_apply_overrides()
 	emit_changed()
 
 
-func _apply_margins() -> void:
-	var padding: Vector4 = Vector4(_get_val("padding", Vector4i.ZERO))
-	set_content_margin(SIDE_LEFT, padding.x)
-	set_content_margin(SIDE_RIGHT, padding.y)
-	set_content_margin(SIDE_TOP, padding.z)
-	set_content_margin(SIDE_BOTTOM, padding.w)
+func _apply_overrides() -> void:
+	if ref == null:
+		return
+	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(ref.get_class())
+	if gdss_node == null:
+		return
+	var control: Control = ref as Control
+	for prop: GdssProp in gdss_node.get_enabled_props():
+		var val: Variant = _get_val(prop.name, prop.get_default_value())
+		if val == null:
+			val = prop.get_default_value()
+		match prop.category:
+			GdssProp.Category.STYLE:
+				if prop.name == "padding":
+					var padding: Vector4 = Vector4(val)
+					set_content_margin(SIDE_LEFT, padding.x)
+					set_content_margin(SIDE_RIGHT, padding.y)
+					set_content_margin(SIDE_TOP, padding.z)
+					set_content_margin(SIDE_BOTTOM, padding.w)
+			GdssProp.Category.COLOR:
+				if val is Color:
+					control.add_theme_color_override(prop.name, val)
+			GdssProp.Category.CONST:
+				if val is int or val is float:
+					control.add_theme_constant_override(prop.name, int(val))
+			GdssProp.Category.FONT_SIZE:
+				if val is int or val is float:
+					control.add_theme_font_size_override(prop.name, int(val))
 
 
 func _get_animatable_props() -> Dictionary:
@@ -139,6 +161,7 @@ func _start_transition(from_state: String, to_state: String) -> void:
 
 	for prop_name: String in animatable:
 		var prop: GdssProp = animatable[prop_name]
+		var is_style: bool = prop.category == GdssProp.Category.STYLE
 		match prop.type:
 			GDSS.Type.COLOR:
 				var fallback: Color = prop.get_default_value() if prop.get_default_value() is Color else Color.TRANSPARENT
@@ -150,7 +173,10 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: Color) -> void:
 					_tweened_values[captured] = v
-					ref.queue_redraw()
+					if is_style:
+						ref.queue_redraw()
+					else:
+						_apply_overrides()
 				, from, to, transition_time)
 				tweener_count += 1
 
@@ -165,7 +191,10 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: Vector4) -> void:
 					_tweened_values[captured] = v
-					ref.queue_redraw()
+					if is_style:
+						ref.queue_redraw()
+					else:
+						_apply_overrides()
 				, from, to, transition_time)
 				tweener_count += 1
 
@@ -179,7 +208,10 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: float) -> void:
 					_tweened_values[captured] = v
-					ref.queue_redraw()
+					if is_style:
+						ref.queue_redraw()
+					else:
+						_apply_overrides()
 				, from, to, transition_time)
 				tweener_count += 1
 
@@ -193,7 +225,10 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: float) -> void:
 					_tweened_values[captured] = int(v)
-					ref.queue_redraw()
+					if is_style:
+						ref.queue_redraw()
+					else:
+						_apply_overrides()
 				, float(from), float(to), transition_time)
 				tweener_count += 1
 
@@ -206,6 +241,7 @@ func _start_transition(from_state: String, to_state: String) -> void:
 	_tween = pending_tween
 	_tween.finished.connect(func() -> void:
 		_tweened_values.clear()
+		_apply_overrides()
 		ref.queue_redraw()
 	)
 
