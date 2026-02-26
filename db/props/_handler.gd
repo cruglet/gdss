@@ -73,11 +73,11 @@ func _on_parsed_changed() -> void:
 
 
 func _apply_margins() -> void:
-	var padding: Vector4i = _get_val("padding", Vector4i.ZERO)
-	set_content_margin(SIDE_LEFT, float(padding.x))
-	set_content_margin(SIDE_RIGHT, float(padding.y))
-	set_content_margin(SIDE_TOP, float(padding.z))
-	set_content_margin(SIDE_BOTTOM, float(padding.w))
+	var padding: Vector4 = Vector4(_get_val("padding", Vector4i.ZERO))
+	set_content_margin(SIDE_LEFT, padding.x)
+	set_content_margin(SIDE_RIGHT, padding.y)
+	set_content_margin(SIDE_TOP, padding.z)
+	set_content_margin(SIDE_BOTTOM, padding.w)
 
 
 func _get_animatable_props() -> Dictionary:
@@ -156,14 +156,15 @@ func _start_transition(from_state: String, to_state: String) -> void:
 
 			GDSS.Type.COMPOSITE4:
 				var fallback: Vector4i = prop.get_default_value() if prop.get_default_value() is Vector4i else Vector4i.ZERO
-				var from: Vector4 = Vector4(_tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback)) as Vector4i)
+				var from_raw: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
+				var from: Vector4 = Vector4(from_raw) if from_raw is Vector4 else Vector4(from_raw as Vector4i)
 				var to: Vector4 = Vector4(_get_parsed_val(prop_name, to_state, fallback) as Vector4i)
 				if from == to:
 					continue
 				var captured: String = prop_name
-				_tweened_values[captured] = Vector4i(from)
+				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: Vector4) -> void:
-					_tweened_values[captured] = Vector4i(v)
+					_tweened_values[captured] = v
 					ref.queue_redraw()
 				, from, to, transition_time)
 				tweener_count += 1
@@ -208,9 +209,11 @@ func _start_transition(from_state: String, to_state: String) -> void:
 		ref.queue_redraw()
 	)
 
-# builds a merged entry dict by starting from parsed[ref.get_class()] and then
+
+# Builds a merged entry dict by starting from parsed[ref.get_class()] and then
 # layering each gdss_class in order (lowest to highest priority).
-# each name is looked up in the current entry's "_classes" for nesting.
+# Each name is looked up in the current entry's "_classes", allowing nesting.
+# Recursively searches a _classes tree for a given name, returning the entry or {}.
 func _find_class_in_tree(classes: Dictionary, name: String) -> Dictionary:
 	if classes.has(name):
 		return classes[name]
@@ -224,6 +227,7 @@ func _find_class_in_tree(classes: Dictionary, name: String) -> Dictionary:
 	return {}
 
 
+# Merges override state dicts on top of base, skipping "_classes".
 func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
 	var merged: Dictionary = {}
 	for state: String in base:
@@ -252,19 +256,19 @@ func _resolve_entry() -> Dictionary:
 	var selector: String = ref.get_class()
 	if not parsed.has(selector):
 		return {}
-	
+
 	var entry: Dictionary = parsed[selector]
-	
+
 	if not ref.has_meta("gdss_classes"):
 		return entry
-	
+
 	var gdss_classes: PackedStringArray = ref.get_meta("gdss_classes") as PackedStringArray
 	for gdss_class_name: String in gdss_classes:
 		var override: Dictionary = _find_class_in_tree(parsed[selector].get("_classes", {}), gdss_class_name)
 		if override.is_empty():
 			continue
 		entry = _merge_entries(entry, override)
-	
+
 	return entry
 
 
@@ -312,58 +316,44 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return
-	
+
 	var vals: Dictionary = {}
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		var v: Variant = _get_val(prop.name, prop.get_default_value())
 		vals[prop.name] = v if v != null else prop.get_default_value()
-	
-	var expand: Vector4i = vals.get("expand", Vector4i.ZERO)
-	rect = rect.grow_individual(
-		float(expand.x),
-		float(expand.z),
-		float(expand.y),
-		float(expand.w)
-	)
-	
+
+	var expand: Vector4 = Vector4(vals.get("expand", Vector4i.ZERO))
+	rect = rect.grow_individual(expand.x, expand.z, expand.y, expand.w)
+
 	if not rect.has_area():
 		return
-	
-	var corner_radius: Vector4i = vals.get("corner_radius", Vector4i.ZERO)
-	var corner_radii: Vector4 = Vector4(
-		float(corner_radius.x),
-		float(corner_radius.y),
-		float(corner_radius.z),
-		float(corner_radius.w)
-	)
-	
+
+	var corner_radius: Vector4 = Vector4(vals.get("corner_radius", Vector4i.ZERO))
+	var corner_radii: Vector4 = corner_radius
+
 	var anti_aliasing: bool = vals.get("anti_aliasing", true)
 	var aa_size: float = 1.0 if anti_aliasing else 0.0
 	var detail: int = max(1, int(vals.get("corner_detail", 8)))
 	var skew_x: float = vals.get("skew_x", 0.0)
 	var skew_y: float = vals.get("skew_y", 0.0)
-	
-	var shadow: Vector4i = vals.get("shadow", Vector4i.ZERO)
+
+	# Shadow
+	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
 	var shadow_color: Color = vals.get("shadow_color", Color(0, 0, 0, 0.4))
 	var shadow_size: float = float(shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
 	if shadow_size > 0.0:
 		var shadow_outer: Rect2 = rect.grow(shadow_size)
 		_draw_ring_raw(to_canvas_item, rect, shadow_outer, _fit_corners(corner_radii, rect), _fit_corners(corner_radii, shadow_outer), shadow_color, true, detail, skew_x, skew_y)
-	
+
 	var bg_color: Color = vals.get("bg_color", Color.TRANSPARENT)
 	if bg_color.a > 0.0:
 		_draw_rect(to_canvas_item, rect, bg_color, corner_radii, aa_size, detail, skew_x, skew_y)
-	
-	var border: Vector4i = vals.get("border", Vector4i.ZERO)
+
+	var border: Vector4 = Vector4(vals.get("border", Vector4i.ZERO))
 	var border_color: Color = vals.get("border_color", Color.TRANSPARENT)
 	var has_border: bool = border.x > 0 or border.y > 0 or border.z > 0 or border.w > 0
 	if has_border and border_color.a > 0.0:
-		var inner_rect: Rect2 = rect.grow_individual(
-			float(-border.x),
-			float(-border.z),
-			float(-border.y),
-			float(-border.w)
-		)
+		var inner_rect: Rect2 = rect.grow_individual(-border.x, -border.z, -border.y, -border.w)
 		if inner_rect.has_area():
 			_draw_ring(to_canvas_item, inner_rect, rect, corner_radii, border_color, aa_size, detail, skew_x, skew_y)
 
@@ -373,16 +363,16 @@ func _draw_rect(to_canvas_item: RID, rect: Rect2, color: Color, corner_radii: Ve
 		var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, corner_radii, detail), rect, skew_x, skew_y)
 		RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [color])
 		return
-	
+
 	var fitted: Vector4 = _fit_corners(corner_radii, rect)
-	
+
 	if aa > 0.0:
 		var inner_rect: Rect2 = rect.grow(-aa)
 		var inner_fitted: Vector4 = _fit_corners(corner_radii, inner_rect)
 		_draw_ring_raw(to_canvas_item, inner_rect, rect, inner_fitted, fitted, color, true, detail, skew_x, skew_y)
 		rect = inner_rect
 		fitted = inner_fitted
-	
+
 	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, fitted, detail), rect, skew_x, skew_y)
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [color])
 
@@ -398,7 +388,7 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 	var outer_points: PackedVector2Array = _apply_skew(_get_rounded_rect(outer_rect, outer_radii, detail), outer_rect, skew_x, skew_y)
 	var all_points: PackedVector2Array = inner_points + outer_points
 	var indices: PackedInt32Array = _triangulate_ring(inner_points.size(), outer_points.size())
-	
+
 	var colors: PackedColorArray
 	if fade:
 		colors.resize(all_points.size())
@@ -408,7 +398,7 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 			colors[inner_points.size() + i] = Color(color.r, color.g, color.b, 0.0)
 	else:
 		colors = [color]
-	
+
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, all_points, colors)
 
 
