@@ -9,16 +9,19 @@ var _nodes: Array[String] = []
 var _properties: Array[String] = []
 var _states: Array[String] = []
 var _property_meta: Dictionary = {}
+var _user_variables: Array[String] = []
 var _builtin_colors: Array[String] = [
 	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
 ]
 var _value_functions: Array[String] = []
+var _enum_values: Array[String] = []
 
 
 func _ready() -> void:
 	_build_from_objects()
 	_setup_highlighter()
+	_parse_user_variables.call_deferred()
 
 
 func _build_from_objects() -> void:
@@ -27,7 +30,17 @@ func _build_from_objects() -> void:
 	_states.clear()
 	_property_meta.clear()
 	_value_functions.clear()
-
+	_enum_values.clear()
+	
+	for key: String in GDSS.TransitionType:
+		_enum_values.append(key)
+	for key: String in GDSS.TransitionFunc:
+		if not _enum_values.has(key):
+			_enum_values.append(key)
+	for key: String in GDSS.CursorType:
+		if not _enum_values.has(key):
+			_enum_values.append(key)
+	
 	for obj: GdssNode in GDSS.get_gdss_nodes().values():
 		var style_name: String = obj.style_name
 		if not _nodes.has(style_name):
@@ -61,11 +74,14 @@ func _setup_highlighter() -> void:
 	_highlighter.property_meta = _property_meta
 	_highlighter.builtin_colors = _builtin_colors
 	_highlighter.value_functions = _value_functions
+	_highlighter.user_variables = _user_variables
+	_highlighter.enum_values = _enum_values
 	_highlighter._node_states = {}
 	for obj: GdssNode in GDSS.get_gdss_nodes().values():
 		_highlighter._node_states[obj.style_name] = obj.states
 	_highlighter.refresh_colors()
 	editor.syntax_highlighter = _highlighter
+	_highlighter.clear_highlighting_cache()
 
 
 class GdssCodeHighlighter extends SyntaxHighlighter:
@@ -78,7 +94,10 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var _brace_depth_cache: Array[int] = []
 	var _cache_dirty: bool = true
 	var value_functions: Array[String] = []
+	var col_variable: Color
 	var col_function: Color
+	var user_variables: Array[String] = []
+	var enum_values: Array[String] = []	
 
 	var col_keyword: Color
 	var col_type: Color
@@ -91,7 +110,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var col_string: Color
 	var col_member: Color
 	var col_brace_mismatch: Color
-	var col_enum: Color
+	var col_const: Color
 	var col_default: Color
 
 
@@ -108,9 +127,10 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		col_string = s.get_setting("text_editor/theme/highlighting/string_color")
 		col_member = s.get_setting("text_editor/theme/highlighting/member_variable_color")
 		col_brace_mismatch = s.get_setting("text_editor/theme/highlighting/brace_mismatch_color")
-		col_enum = s.get_setting("text_editor/theme/highlighting/gdscript/node_path_color")
+		col_const = s.get_setting("text_editor/theme/highlighting/gdscript/string_name_color")
 		col_default = s.get_setting("text_editor/theme/highlighting/text_color")
 		col_function = s.get_setting("text_editor/theme/highlighting/gdscript/global_function_color")
+		col_variable = s.get_setting("text_editor/theme/highlighting/function_color")
 
 
 	func invalidate_cache() -> void:
@@ -165,6 +185,16 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					j += 1
 				result[j] = {"color": col_string}
 				i = j + 1
+				continue
+				
+			if c == "$":
+				var start: int = i
+				i += 1
+				while i < len and _is_word_char(text[i]):
+					i += 1
+				var var_name: String = text.substr(start + 1, i - start - 1)
+				var known: bool = user_variables.has(var_name)
+				result[start] = {"color": col_variable if known else col_default}
 				continue
 
 			if c == "@":
@@ -252,20 +282,23 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				elif in_value:
 					if value_functions.has(word):
 						result[start] = {"color": col_function}
+					elif builtin_colors.has(word):
+						result[start] = {"color": col_const}
+					elif enum_values.has(word):
+						result[start] = {"color": col_const}
 					else:
-						var is_enum: bool = builtin_colors.has(word)
-						if not is_enum:
-							var colon_prop: int = trimmed_before.rfind(":")
-							if colon_prop != -1:
-								var prop: String = trimmed_before.substr(0, colon_prop).strip_edges()
-								for style_name: String in property_meta:
-									var meta: Dictionary = property_meta[style_name]
-									if meta.has(prop):
-										var pd: GdssProp = meta[prop]
-										if pd.type == GDSS.Type.CURSOR:
-											is_enum = true
-											break
-						result[start] = {"color": col_enum if is_enum else col_default}
+						var is_cursor: bool = false
+						var colon_prop: int = trimmed_before.rfind(":")
+						if colon_prop != -1:
+							var prop: String = trimmed_before.substr(0, colon_prop).strip_edges()
+							for style_name: String in property_meta:
+								var meta: Dictionary = property_meta[style_name]
+								if meta.has(prop):
+									var pd: GdssProp = meta[prop]
+									if pd.type == GDSS.Type.CURSOR:
+										is_cursor = true
+										break
+						result[start] = {"color": col_default}
 				elif word == "var":
 					result[start] = {"color": col_keyword}
 				elif word == "true" or word == "false":
@@ -310,5 +343,25 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 
 
 func _on_text_changed() -> void:
+	_parse_user_variables()
+	_highlighter.user_variables = _user_variables
+	_highlighter.clear_highlighting_cache()
 	_highlighter.invalidate_cache()
 	_highlighter.update_cache()
+
+
+func _parse_user_variables() -> void:
+	_user_variables.clear()
+	var global_regex: RegEx = RegEx.new()
+	global_regex.compile(r"@global\s+(\w+)\s*:")
+	var local_regex: RegEx = RegEx.new()
+	local_regex.compile(r"^var\s+(\w+)\s*:")
+	for line: String in editor.text.split("\n"):
+		var stripped: String = line.strip_edges()
+		var gm: RegExMatch = global_regex.search(stripped)
+		if gm:
+			_user_variables.append(gm.get_string(1))
+			continue
+		var lm: RegExMatch = local_regex.search(stripped)
+		if lm:
+			_user_variables.append(lm.get_string(1))

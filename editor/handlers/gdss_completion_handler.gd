@@ -35,7 +35,7 @@ func _build_from_objects() -> void:
 	_property_meta.clear()
 	_methods.clear()
 
-	var prefixes: Array[String] = ["@", ":", "\t"]
+	var prefixes: Array[String] = ["@", ":", "\t", "$"]
 	
 	for obj: GdssNode in GDSS.get_gdss_nodes().values():
 		var style_name: String = obj.style_name
@@ -68,6 +68,10 @@ func _build_from_objects() -> void:
 func _on_text_changed() -> void:
 	_parse_user_variables()
 	var word: String = _get_current_word()
+	if word.begins_with("$"):
+		_update_completions(word)
+		editor.request_code_completion(true)
+		return
 	if word.is_empty():
 		var context: Dictionary = _get_context()
 		var type: String = context.get("type", "")
@@ -75,9 +79,6 @@ func _on_text_changed() -> void:
 		var line_is_only_whitespace: bool = current_line.strip_edges().is_empty()
 		if type == "property_value":
 			editor.request_code_completion(true)
-			return
-		if line_is_only_whitespace:
-			editor.cancel_code_completion()
 			return
 		editor.cancel_code_completion()
 		return
@@ -90,6 +91,11 @@ func _on_completion_requested() -> void:
 
 
 func _update_completions(word: String) -> void:
+	if word.begins_with("$"):
+		_complete_values(word, "", "")
+		editor.update_code_completion_options(true)
+		return
+	
 	var context: Dictionary = _get_context()
 	
 	match context.get("type", "top_level"):
@@ -169,6 +175,15 @@ func _complete_states(word: String, style_name: String) -> void:
 
 
 func _complete_values(word: String, style_name: String, prop: String) -> void:
+	if word.begins_with("$"):
+		var partial: String = word.substr(1)
+		for v: String in _user_variables:
+			if v.begins_with("$"):
+				var name: String = v.substr(1)
+				if partial.is_empty() or name.begins_with(partial):
+					editor.add_code_completion_option(CodeEdit.KIND_VARIABLE, v, name +" ", _completion_color, _get_icon(&"LocalVariable"))
+		return
+	
 	var meta: Dictionary = _property_meta.get(style_name, {})
 	if meta.is_empty():
 		for key: String in _property_meta:
@@ -219,9 +234,6 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			for c: String in BUILTIN_COLORS:
 				if word.is_empty() or c.begins_with(word):
 					editor.add_code_completion_option(CodeEdit.KIND_CONSTANT, c, c, _completion_color, _get_icon(&"Color"))
-			for v: String in _user_variables:
-				if word.is_empty() or v.begins_with(word):
-					editor.add_code_completion_option(CodeEdit.KIND_VARIABLE, v, v, _completion_color, _get_icon(&"LocalVariable"))
 		GDSS.Type.CURSOR:
 			for cursor_key: String in GDSS.CursorType:
 				if word.is_empty() or cursor_key.begins_with(word):
@@ -248,8 +260,8 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 
 
 func _complete_at_directives(word: String) -> void:
-	if word.is_empty() or "@export var".begins_with(word):
-		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@export var", "export var ")
+	if word.is_empty() or "@global".begins_with(word):
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@global", "global ")
 
 
 func _get_context() -> Dictionary:
@@ -329,6 +341,14 @@ func _get_context() -> Dictionary:
 	
 	var colon_pos: int = stripped.find(":")
 	if colon_pos != -1:
+		var value_part: String = stripped.substr(colon_pos + 1).strip_edges()
+		if not value_part.is_empty():
+			return {
+				"type": "property_value_filled",
+				"style": current_style,
+				"variant": current_variant,
+				"property": stripped.substr(0, colon_pos).strip_edges()
+			}
 		return {
 			"type": "property_value",
 			"style": current_style,
@@ -345,25 +365,35 @@ func _get_context() -> Dictionary:
 
 func _parse_user_variables() -> void:
 	_user_variables.clear()
-	var var_regex: RegEx = RegEx.new()
-	var_regex.compile(r"@export\s+var\s+(\w+)")
-	
+	var local_regex: RegEx = RegEx.new()
+	local_regex.compile(r"^var\s+(\w+)\s*:")
+	var global_regex: RegEx = RegEx.new()
+	global_regex.compile(r"@global\s+(\w+)\s*:")
+
 	for line: String in editor.text.split("\n"):
-		var m: RegExMatch = var_regex.search(line)
-		if m:
-			_user_variables.append(m.get_string(1))
+		var stripped: String = line.strip_edges()
+		var lm: RegExMatch = local_regex.search(stripped)
+		if lm:
+			_user_variables.append("$" + lm.get_string(1))
+			continue
+		var gm: RegExMatch = global_regex.search(stripped)
+		if gm:
+			_user_variables.append("$" + gm.get_string(1))
 
 
 func _get_current_word() -> String:
 	var line: String = editor.get_line(editor.get_caret_line())
 	var col: int = editor.get_caret_column()
 	var word: String = ""
-	
+
 	for i: int in range(col - 1, -1, -1):
 		var c: String = line[i]
 		if c == " " or c == "\t" or c in ["{", "}", "\n", ","]:
 			break
 		if c == "=":
+			break
+		if c == "$":
+			word = c + word
 			break
 		if c == ":" and word.length() > 0 and not word.begins_with(":"):
 			var before_colon: String = line.substr(0, i).strip_edges()
@@ -374,7 +404,7 @@ func _get_current_word() -> String:
 				continue
 			break
 		word = c + word
-	
+
 	return word
 
 

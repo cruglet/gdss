@@ -21,23 +21,32 @@ static func get_instance() -> GdssInterpreter:
 
 
 func _ready() -> void:
-	if is_instance_valid(_inst) and _inst != self:
-		return
 	_inst = self
 	_build_defaults()
 	_load_from_file()
 	if Engine.is_editor_hint():
-		editor.code_edit.text_changed.connect(_on_text_changed)
+		if not editor.code_edit.text_changed.is_connected(_on_text_changed):
+			editor.code_edit.text_changed.connect(_on_text_changed)
 
 
 func _load_from_file() -> void:
+	if _idle_timer != null:
+		if _idle_timer.timeout.is_connected(_on_idle):
+			_idle_timer.timeout.disconnect(_on_idle)
+		_idle_timer = null
 	var data: Dictionary = GdssStorage.load_data()
 	if data.is_empty():
 		return
 	if data.has("source") and Engine.is_editor_hint() and is_instance_valid(editor):
+		if editor.code_edit.text_changed.is_connected(_on_text_changed):
+			editor.code_edit.text_changed.disconnect(_on_text_changed)
 		editor.code_edit.text = data["source"]
+		editor.code_edit.text_changed.connect(_on_text_changed)
 	if data.has("parsed") and data["parsed"] is Dictionary:
-		parsed = data["parsed"]
+		for key: String in (data["parsed"] as Dictionary):
+			var val: Variant = (data["parsed"] as Dictionary)[key]
+			if val is Dictionary:
+				parsed[key] = val
 		parsed_changed.emit()
 
 
@@ -80,6 +89,7 @@ func _on_idle() -> void:
 
 
 func interpret(source: String) -> Dictionary[String, Dictionary]:
+	var globals: Dictionary = _extract_globals(source)
 	var known_states: PackedStringArray = _collect_states()
 	var result: Dictionary[String, Dictionary] = {}
 	for selector: String in _defaults:
@@ -89,9 +99,44 @@ func interpret(source: String) -> Dictionary[String, Dictionary]:
 				result[selector][state] = _defaults[selector][state].duplicate()
 			else:
 				result[selector][state] = _defaults[selector][state]
-		result[selector]["_classes"] = {}
 	var tokens: Array[String] = _tokenize(source)
+	tokens = _substitute_globals(tokens, globals)
 	_parse_block(tokens, 0, result, "", known_states)
+	return result
+
+
+func _extract_globals(source: String) -> Dictionary:
+	var globals: Dictionary = {}
+	var global_regex: RegEx = RegEx.new()
+	global_regex.compile(r"@global\s+(\w+)\s*:\s*(.+)")
+	var local_regex: RegEx = RegEx.new()
+	local_regex.compile(r"^var\s+(\w+)\s*:\s*(.+)")
+
+	for line: String in source.split("\n"):
+		var stripped: String = line.strip_edges()
+		var comment_idx: int = stripped.find("//")
+		if comment_idx != -1:
+			stripped = stripped.substr(0, comment_idx).strip_edges()
+		var gm: RegExMatch = global_regex.search(stripped)
+		if gm:
+			globals[gm.get_string(1)] = gm.get_string(2).strip_edges()
+			continue
+		var lm: RegExMatch = local_regex.search(stripped)
+		if lm:
+			globals[lm.get_string(1)] = lm.get_string(2).strip_edges()
+	return globals
+
+
+func _substitute_globals(tokens: Array[String], globals: Dictionary) -> Array[String]:
+	var result: Array[String] = []
+	for token: String in tokens:
+		if token.begins_with("$"):
+			var key: String = token.substr(1)
+			if globals.has(key):
+				for part: String in globals[key].split(" ", false):
+					result.append(part)
+				continue
+		result.append(token)
 	return result
 
 
@@ -127,6 +172,10 @@ func _tokenize(source: String) -> Array[String]:
 	var tokens: Array[String] = []
 	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
+		if stripped.begins_with("@global var"):
+			continue
+		elif stripped.begins_with("var"):
+			continue
 		var comment_idx: int = stripped.find("//")
 		if comment_idx != -1:
 			stripped = stripped.substr(0, comment_idx).strip_edges()
