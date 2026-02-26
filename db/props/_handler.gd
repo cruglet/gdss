@@ -208,10 +208,43 @@ func _start_transition(from_state: String, to_state: String) -> void:
 		ref.queue_redraw()
 	)
 
-
 # builds a merged entry dict by starting from parsed[ref.get_class()] and then
 # layering each gdss_class in order (lowest to highest priority).
 # each name is looked up in the current entry's "_classes" for nesting.
+func _find_class_in_tree(classes: Dictionary, name: String) -> Dictionary:
+	if classes.has(name):
+		return classes[name]
+	for key: String in classes:
+		var nested: Dictionary = classes[key].get("_classes", {})
+		if nested.is_empty():
+			continue
+		var found: Dictionary = _find_class_in_tree(nested, name)
+		if not found.is_empty():
+			return found
+	return {}
+
+
+func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
+	var merged: Dictionary = {}
+	for state: String in base:
+		if state == "_classes":
+			continue
+		merged[state] = base[state].duplicate() if base[state] is Dictionary else base[state]
+	for state: String in override:
+		if state == "_classes":
+			continue
+		if not merged.has(state):
+			merged[state] = override[state].duplicate() if override[state] is Dictionary else override[state]
+			continue
+		if override[state] is Dictionary:
+			for key: String in override[state]:
+				merged[state][key] = override[state][key]
+		else:
+			merged[state] = override[state]
+	merged["_classes"] = override.get("_classes", {})
+	return merged
+
+
 func _resolve_entry() -> Dictionary:
 	if ref == null:
 		return {}
@@ -227,28 +260,10 @@ func _resolve_entry() -> Dictionary:
 	
 	var gdss_classes: PackedStringArray = ref.get_meta("gdss_classes") as PackedStringArray
 	for gdss_class_name: String in gdss_classes:
-		var classes: Dictionary = entry.get("_classes", {})
-		if not classes.has(gdss_class_name):
+		var override: Dictionary = _find_class_in_tree(parsed[selector].get("_classes", {}), gdss_class_name)
+		if override.is_empty():
 			continue
-		var override: Dictionary = classes[gdss_class_name]
-		var merged: Dictionary = {}
-		for state: String in entry:
-			if state == "_classes":
-				continue
-			merged[state] = entry[state].duplicate() if entry[state] is Dictionary else entry[state]
-		for state: String in override:
-			if state == "_classes":
-				continue
-			if not merged.has(state):
-				merged[state] = override[state].duplicate() if override[state] is Dictionary else override[state]
-				continue
-			if override[state] is Dictionary:
-				for key: String in override[state]:
-					merged[state][key] = override[state][key]
-			else:
-				merged[state] = override[state]
-		merged["_classes"] = override.get("_classes", {})
-		entry = merged
+		entry = _merge_entries(entry, override)
 	
 	return entry
 
@@ -358,16 +373,16 @@ func _draw_rect(to_canvas_item: RID, rect: Rect2, color: Color, corner_radii: Ve
 		var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, corner_radii, detail), rect, skew_x, skew_y)
 		RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [color])
 		return
-
+	
 	var fitted: Vector4 = _fit_corners(corner_radii, rect)
-
+	
 	if aa > 0.0:
 		var inner_rect: Rect2 = rect.grow(-aa)
 		var inner_fitted: Vector4 = _fit_corners(corner_radii, inner_rect)
 		_draw_ring_raw(to_canvas_item, inner_rect, rect, inner_fitted, fitted, color, true, detail, skew_x, skew_y)
 		rect = inner_rect
 		fitted = inner_fitted
-
+	
 	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, fitted, detail), rect, skew_x, skew_y)
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [color])
 
@@ -383,7 +398,7 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 	var outer_points: PackedVector2Array = _apply_skew(_get_rounded_rect(outer_rect, outer_radii, detail), outer_rect, skew_x, skew_y)
 	var all_points: PackedVector2Array = inner_points + outer_points
 	var indices: PackedInt32Array = _triangulate_ring(inner_points.size(), outer_points.size())
-
+	
 	var colors: PackedColorArray
 	if fade:
 		colors.resize(all_points.size())
@@ -393,7 +408,7 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 			colors[inner_points.size() + i] = Color(color.r, color.g, color.b, 0.0)
 	else:
 		colors = [color]
-
+	
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, all_points, colors)
 
 

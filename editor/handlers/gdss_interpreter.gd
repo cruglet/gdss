@@ -21,6 +21,8 @@ static func get_instance() -> GdssInterpreter:
 
 
 func _ready() -> void:
+	if is_instance_valid(_inst) and _inst != self:
+		return
 	_inst = self
 	_build_defaults()
 	_load_from_file()
@@ -164,12 +166,12 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 		var token: String = tokens[pos]
 		if token == "}":
 			return pos + 1
-
+		
 		var next: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
 		var next2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
-
+		
 		var is_comma_group: bool = _has_comma_before_brace(tokens, pos)
-
+		
 		if is_comma_group:
 			var collected: Array = _collect_selector_group(tokens, pos, known_states)
 			var selectors: Array[String] = collected[0]
@@ -190,13 +192,13 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 					_parse_block(block_tokens, 0, child_container, raw_selector, known_states)
 			pos = block_end
 			continue
-
+		
 		if next == ":" and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens[pos + 3] == "{":
 			var child_container: Dictionary = _get_child_container(result, parent_selector)
 			_ensure_selector(child_container, token, known_states)
 			pos = _parse_props_into(tokens, pos + 4, child_container, token, next2.to_lower(), known_states)
 			continue
-
+		
 		if token == ":" and next2 == "{":
 			if not parent_selector.is_empty():
 				_ensure_selector(result, parent_selector, known_states)
@@ -204,7 +206,7 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 			else:
 				pos += 3
 			continue
-
+		
 		if next == "{":
 			var child_container: Dictionary = _get_child_container(result, parent_selector)
 			_ensure_selector(child_container, token, known_states)
@@ -212,7 +214,7 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 				_inherit(child_container, token, result[parent_selector])
 			pos = _parse_block(tokens, pos + 2, child_container, token, known_states)
 			continue
-
+		
 		if next == ":":
 			if not parent_selector.is_empty() and next2 != "" and next2 != "{":
 				_ensure_selector(result, parent_selector, known_states)
@@ -222,11 +224,10 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 			else:
 				pos += 2
 			continue
-
+		
 		pos += 1
-
+	
 	return pos
-
 
 # child selectors go into result[parent]["_classes"] when inside a block,
 # or directly into result at the top level.
@@ -245,6 +246,12 @@ func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
 			return false
 		if tokens[i] == "}":
 			return false
+		if tokens[i] == ":":
+			var after: String = tokens[i + 1] if i + 1 < tokens.size() else ""
+			if after != "{" and after != "":
+				var after2: String = tokens[i + 2] if i + 2 < tokens.size() else ""
+				if after2 != "{" and after2 != ",":
+					return false
 		if tokens[i] == ",":
 			return true
 		i += 1
@@ -269,10 +276,10 @@ func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, sele
 		var token: String = tokens[pos]
 		if token == "}":
 			return pos + 1
-
+		
 		var next: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
 		var next2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
-
+		
 		if next == ":":
 			if next2 != "" and next2 != "{":
 				var consumed: Array = _consume_value(tokens, pos + 2, known_states)
@@ -281,9 +288,9 @@ func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, sele
 			else:
 				pos += 2
 			continue
-
+		
 		pos += 1
-
+	
 	return pos
 
 
