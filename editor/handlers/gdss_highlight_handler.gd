@@ -41,7 +41,7 @@ func _build_from_objects() -> void:
 		if not _enum_values.has(key):
 			_enum_values.append(key)
 	
-	for obj: GdssNode in GDSS.get_gdss_nodes().values():
+	for obj: GdssNode in GDSS._get_gdss_nodes().values():
 		var style_name: String = obj.style_name
 		if not _nodes.has(style_name):
 			_nodes.append(style_name)
@@ -61,7 +61,7 @@ func _build_from_objects() -> void:
 			if not _states.has(v):
 				_states.append(v)
 
-	for method: GdssMethod in GDSS.get_gdss_methods().values():
+	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if not _value_functions.has(method.method_name):
 			_value_functions.append(method.method_name)
 
@@ -77,7 +77,7 @@ func _setup_highlighter() -> void:
 	_highlighter.user_variables = _user_variables
 	_highlighter.enum_values = _enum_values
 	_highlighter._node_states = {}
-	for obj: GdssNode in GDSS.get_gdss_nodes().values():
+	for obj: GdssNode in GDSS._get_gdss_nodes().values():
 		_highlighter._node_states[obj.style_name] = obj.states
 	_highlighter.refresh_colors()
 	editor.syntax_highlighter = _highlighter

@@ -70,12 +70,18 @@ func _on_parsed_changed() -> void:
 		return
 	_apply_overrides()
 	emit_changed()
+	ref.queue_redraw()
+	if Engine.is_editor_hint():
+		ref.notify_property_list_changed()
+		var parent: Node = ref.get_parent()
+		if is_instance_valid(parent) and parent is CanvasItem:
+			(parent as CanvasItem).queue_redraw()
 
 
 func _apply_overrides() -> void:
 	if ref == null:
 		return
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return
 	var control: Control = ref as Control
@@ -106,7 +112,7 @@ func _get_animatable_props() -> Dictionary:
 	var result: Dictionary = {}
 	if ref == null:
 		return result
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return result
 	for prop: GdssProp in gdss_node.get_enabled_props():
@@ -122,7 +128,7 @@ func _start_transition(from_state: String, to_state: String) -> void:
 		_tweened_values.clear()
 		return
 
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	var default_state: String = gdss_node.states[0] if gdss_node and not gdss_node.states.is_empty() else "all"
 	var resolved_from: String = from_state if not from_state.is_empty() else default_state
 
@@ -324,7 +330,7 @@ func _get_state() -> String:
 		return "all"
 	if not current_state.is_empty():
 		return current_state
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node and not gdss_node.states.is_empty():
 		return gdss_node.states[0]
 	return "all"
@@ -349,7 +355,7 @@ func _get_val(key: String, fallback: Variant) -> Variant:
 func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	if ref == null:
 		return
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return
 

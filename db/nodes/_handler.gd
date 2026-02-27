@@ -4,7 +4,7 @@ extends Object
 
 
 static func bind(canvas_item: CanvasItem) -> void:
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(canvas_item.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if gdss_node == null:
 		printerr("Could not bind %s of type \"%s\"", canvas_item, canvas_item.get_class())
 		return
@@ -17,7 +17,7 @@ static func bind(canvas_item: CanvasItem) -> void:
 
 
 static func unbind(canvas_item: CanvasItem) -> void:
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(canvas_item.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if gdss_node == null:
 		printerr("Could not unbind %s of type \"%s\"", canvas_item, canvas_item.get_class())
 		return

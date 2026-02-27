@@ -37,7 +37,7 @@ func _build_from_objects() -> void:
 
 	var prefixes: Array[String] = ["@", ":", "\t", "$"]
 	
-	for obj: GdssNode in GDSS.get_gdss_nodes().values():
+	for obj: GdssNode in GDSS._get_gdss_nodes().values():
 		var style_name: String = obj.style_name
 		_nodes.append(style_name)
 
@@ -57,7 +57,7 @@ func _build_from_objects() -> void:
 				if not prefixes.has(pre):
 					prefixes.append(pre)
 
-	for method: GdssMethod in GDSS.get_gdss_methods().values():
+	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		_methods.append(method)
 		if method.method_name.length() > 0 and not prefixes.has(method.method_name[0]):
 			prefixes.append(method.method_name[0])

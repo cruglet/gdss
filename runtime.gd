@@ -1,35 +1,33 @@
 extends Node
 
-const POLL_INTERVAL: float = 1.0
-
 var _last_modified: int = 0
-var _poll_timer: SceneTreeTimer = null
 
 
 func _ready() -> void:
 	_ensure_parsed()
-	_last_modified = _get_file_modified_time()
+	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	get_tree().node_added.connect(_on_node_added)
-	_bind_tree.call_deferred(get_tree().root)
-	if OS.is_debug_build():
-		_schedule_poll()
+	_bind_tree.bind(get_tree().root).call_deferred()
+
+	if Engine.is_editor_hint() and OS.is_debug_build():
+		EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_editor_saved)
 
 
-func _get_file_modified_time() -> int:
-	return FileAccess.get_modified_time(GdssStorage.get_save_path())
-
-
-func _schedule_poll() -> void:
-	_poll_timer = get_tree().create_timer(POLL_INTERVAL)
-	_poll_timer.timeout.connect(_on_poll)
-
-
-func _on_poll() -> void:
-	var modified: int = _get_file_modified_time()
-	if modified != _last_modified:
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN and not Engine.is_editor_hint() and OS.is_debug_build():
+		var modified: int = FileAccess.get_modified_time(GdssStorage.get_save_path())
+		if modified == _last_modified:
+			return
 		_last_modified = modified
 		_reload_parsed()
-	_schedule_poll()
+
+
+func _on_editor_saved() -> void:
+	var modified: int = FileAccess.get_modified_time(GdssStorage.get_save_path())
+	if modified == _last_modified:
+		return
+	_last_modified = modified
+	_reload_parsed()
 
 
 func _reload_parsed() -> void:
@@ -76,7 +74,6 @@ func _ensure_parsed() -> void:
 
 
 func _bind_tree(node: Node) -> void:
-	#print("[GDSS] _bind_tree visiting: %s | is CanvasItem: %s" % [node.get_class(), str(node is CanvasItem)])
 	if node is CanvasItem:
 		_try_bind(node as CanvasItem)
 	for child: Node in node.get_children():
@@ -89,7 +86,7 @@ func _on_node_added(node: Node) -> void:
 
 
 func _try_bind(canvas_item: CanvasItem) -> void:
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(canvas_item.get_class())
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if not canvas_item.get_meta("gdss_enabled", false):
 		return
 	if canvas_item.has_meta("gdss_handler"):
@@ -107,5 +104,5 @@ func _try_bind(canvas_item: CanvasItem) -> void:
 
 
 func _rt_bind_ci(canvas_item: CanvasItem) -> void:
-	if GDSS.get_gdss_nodes().has(canvas_item.get_class()):
+	if GDSS._get_gdss_nodes().has(canvas_item.get_class()):
 		GdssNodeHandler.bind(canvas_item)

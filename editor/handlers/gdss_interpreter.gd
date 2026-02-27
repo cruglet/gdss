@@ -1,18 +1,16 @@
 @tool
-
 class_name GdssInterpreter
 extends Node
 
 signal parsed_changed
 
-const IDLE_TIME: float = 1.0
-
 static var parsed: Dictionary[String, Dictionary] = {}
+var _last_modified: int = 0
+var _saving: bool = false
 static var _inst: GdssInterpreter
 
 @export var editor: GdssEditor
 
-var _idle_timer: SceneTreeTimer = null
 var _defaults: Dictionary[String, Dictionary] = {}
 
 
@@ -27,21 +25,61 @@ func _ready() -> void:
 	if Engine.is_editor_hint():
 		if not editor.code_edit.text_changed.is_connected(_on_text_changed):
 			editor.code_edit.text_changed.connect(_on_text_changed)
+		if OS.is_debug_build():
+			EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_editor_file_saved)
+
+
+func _on_editor_file_saved() -> void:
+	if _saving:
+		return
+	var modified: int = FileAccess.get_modified_time(GdssStorage.get_save_path())
+	if modified == _last_modified:
+		return
+	_last_modified = modified
+	_load_from_file()
+	if Engine.is_editor_hint():
+		_force_viewport_redraw()
+
+
+func _on_text_changed() -> void:
+	editor._prompt_save()
+
+
+func save_current() -> void:
+	if editor == null:
+		return
+	parsed = interpret(editor.code_edit.text)
+	_saving = true
+	GdssStorage.save(editor.code_edit.text, parsed)
+	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
+	_saving = false
+	editor._user_saved()
+	parsed_changed.emit()
+	if Engine.is_editor_hint():
+		_force_viewport_redraw()
+
+
+func _force_viewport_redraw() -> void:
+	var viewport_container: Control = EditorInterface.get_editor_viewport_2d().get_parent() as Control
+	if viewport_container == null:
+		return
+	var original_size: Vector2 = viewport_container.size
+	viewport_container.size = original_size + Vector2(1, 0)
+	viewport_container.size = original_size
 
 
 func _load_from_file() -> void:
-	if _idle_timer != null:
-		if _idle_timer.timeout.is_connected(_on_idle):
-			_idle_timer.timeout.disconnect(_on_idle)
-		_idle_timer = null
+	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	var data: Dictionary = GdssStorage.load_data()
 	if data.is_empty():
 		return
 	if data.has("source") and Engine.is_editor_hint() and is_instance_valid(editor):
-		if editor.code_edit.text_changed.is_connected(_on_text_changed):
-			editor.code_edit.text_changed.disconnect(_on_text_changed)
-		editor.code_edit.text = data["source"]
-		editor.code_edit.text_changed.connect(_on_text_changed)
+		var source: String = data["source"]
+		if editor.code_edit.text != source:
+			if editor.code_edit.text_changed.is_connected(_on_text_changed):
+				editor.code_edit.text_changed.disconnect(_on_text_changed)
+			editor.code_edit.text = source
+			editor.code_edit.text_changed.connect(_on_text_changed)
 	if data.has("parsed") and data["parsed"] is Dictionary:
 		for key: String in (data["parsed"] as Dictionary):
 			var val: Variant = (data["parsed"] as Dictionary)[key]
@@ -52,8 +90,8 @@ func _load_from_file() -> void:
 
 func _build_defaults() -> void:
 	var known_states: PackedStringArray = _collect_states()
-	for selector: String in GDSS.get_gdss_nodes():
-		var node: GdssNode = GDSS.get_gdss_nodes().get(selector)
+	for selector: String in GDSS._get_gdss_nodes():
+		var node: GdssNode = GDSS._get_gdss_nodes().get(selector)
 		_ensure_selector(_defaults, selector, known_states)
 		if node.base_type != StringName("") and node.base_type != StringName(selector):
 			_defaults[selector]["base"] = String(node.base_type)
@@ -63,7 +101,7 @@ func _build_defaults() -> void:
 
 func _build_composite_map(selector: String) -> Dictionary:
 	var map: Dictionary = {}
-	var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(selector)
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(selector)
 	if gdss_node == null:
 		return map
 	for prop: GdssProp in gdss_node.get_enabled_props():
@@ -72,20 +110,6 @@ func _build_composite_map(selector: String) -> Dictionary:
 		for i: int in prop.composite_of.size():
 			map[prop.composite_of[i]] = {"prop": prop.name, "index": i}
 	return map
-
-
-func _on_text_changed() -> void:
-	if _idle_timer != null:
-		_idle_timer.timeout.disconnect(_on_idle)
-	_idle_timer = get_tree().create_timer(IDLE_TIME)
-	_idle_timer.timeout.connect(_on_idle)
-
-
-func _on_idle() -> void:
-	_idle_timer = null
-	parsed = interpret(editor.code_edit.text)
-	GdssStorage.save(editor.code_edit.text, parsed)
-	parsed_changed.emit()
 
 
 func interpret(source: String) -> Dictionary[String, Dictionary]:
@@ -142,7 +166,7 @@ func _substitute_globals(tokens: Array[String], globals: Dictionary) -> Array[St
 
 func _collect_states() -> PackedStringArray:
 	var states: PackedStringArray = []
-	for node: GdssNode in GDSS.get_gdss_nodes().values():
+	for node: GdssNode in GDSS._get_gdss_nodes().values():
 		for variant: String in node.states:
 			if not states.has(variant):
 				states.append(variant)
@@ -208,23 +232,21 @@ func _ensure_selector(result: Dictionary, selector: String, known_states: Packed
 	result[selector] = entry
 
 
-# result is the direct container (top-level or a "_classes" dict).
-# parent_selector is the enclosing selector name within that container, or "" at top level.
 func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray) -> int:
 	while pos < tokens.size():
 		var token: String = tokens[pos]
 		if token == "}":
 			return pos + 1
-		
+
 		var next: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
 		var next2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
-		
+
 		var is_comma_group: bool = _has_comma_before_brace(tokens, pos)
-		
+
 		if is_comma_group:
 			var collected: Array = _collect_selector_group(tokens, pos, known_states)
 			var selectors: Array[String] = collected[0]
-			var block_start: int = collected[1] + 1  # skip the {
+			var block_start: int = collected[1] + 1
 			var block_end: int = _find_block_end(tokens, block_start)
 			var block_tokens: Array[String] = tokens.slice(block_start, block_end - 1)
 			for raw_selector: String in selectors:
@@ -241,13 +263,13 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 					_parse_block(block_tokens, 0, child_container, raw_selector, known_states)
 			pos = block_end
 			continue
-		
+
 		if next == ":" and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens[pos + 3] == "{":
 			var child_container: Dictionary = _get_child_container(result, parent_selector)
 			_ensure_selector(child_container, token, known_states)
 			pos = _parse_props_into(tokens, pos + 4, child_container, token, next2.to_lower(), known_states)
 			continue
-		
+
 		if token == ":" and next2 == "{":
 			if not parent_selector.is_empty():
 				_ensure_selector(result, parent_selector, known_states)
@@ -255,7 +277,7 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 			else:
 				pos += 3
 			continue
-		
+
 		if next == "{":
 			var child_container: Dictionary = _get_child_container(result, parent_selector)
 			_ensure_selector(child_container, token, known_states)
@@ -263,7 +285,7 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 				_inherit(child_container, token, result[parent_selector])
 			pos = _parse_block(tokens, pos + 2, child_container, token, known_states)
 			continue
-		
+
 		if next == ":":
 			if not parent_selector.is_empty() and next2 != "" and next2 != "{":
 				_ensure_selector(result, parent_selector, known_states)
@@ -273,13 +295,12 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 			else:
 				pos += 2
 			continue
-		
+
 		pos += 1
-	
+
 	return pos
 
-# child selectors go into result[parent]["_classes"] when inside a block,
-# or directly into result at the top level.
+
 func _get_child_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
@@ -325,10 +346,10 @@ func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, sele
 		var token: String = tokens[pos]
 		if token == "}":
 			return pos + 1
-		
+
 		var next: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
 		var next2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
-		
+
 		if next == ":":
 			if next2 != "" and next2 != "{":
 				var consumed: Array = _consume_value(tokens, pos + 2, known_states)
@@ -337,9 +358,9 @@ func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, sele
 			else:
 				pos += 2
 			continue
-		
+
 		pos += 1
-	
+
 	return pos
 
 
@@ -404,7 +425,7 @@ func _set_prop(result: Dictionary, selector: String, state: String, prop: String
 		var parent_prop: String = info["prop"]
 		var index: int = info["index"]
 		if not result[selector][state].has(parent_prop):
-			var gdss_node: GdssNode = GDSS.get_gdss_nodes().get(selector)
+			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(selector)
 			for p: GdssProp in gdss_node.get_enabled_props():
 				if p.name == parent_prop:
 					result[selector][state][parent_prop] = p.get_default_value()
