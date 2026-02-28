@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="GdssNode_Panel" format=3 uid="uid://ba3p6on4rccbq"]
+
+[ext_resource type="Script" uid="uid://cyl4d1srrt0i5" path="res://addons/gdss/db/nodes/Panel.gd" id="1_xfoht"]
+
+[resource]
+script = ExtResource("1_xfoht")
+states = PackedStringArray("panel")
+theme_properties = Dictionary[String, bool]({
+"anti_aliasing": true,
+"bg_color": true,
+"border": true,
+"border_color": true,
+"corner_detail": true,
+"corner_radius": true,
+"cursor": true,
+"expand": true,
+"font_color": false,
+"font_size": false,
+"padding": true,
+"shadow": true,
+"shadow_color": true,
+"skew_x": true,
+"skew_y": true,
+"transition_func": false,
+"transition_time": false,
+"transition_type": false
+})
+base_type = &"Panel"
+style_name = &"Panel"
+metadata/_custom_type_script = "uid://cyl4d1srrt0i5"

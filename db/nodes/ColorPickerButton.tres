@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="GdssNode_Button" format=3 uid="uid://cgfetyh5xiwre"]
+
+[ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_rb5jp"]
+
+[resource]
+script = ExtResource("1_rb5jp")
+states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
+theme_properties = Dictionary[String, bool]({
+"anti_aliasing": true,
+"bg_color": true,
+"border": true,
+"border_color": true,
+"corner_detail": true,
+"corner_radius": true,
+"cursor": true,
+"expand": true,
+"font_color": true,
+"font_size": true,
+"padding": true,
+"shadow": true,
+"shadow_color": true,
+"skew_x": true,
+"skew_y": true,
+"transition_func": true,
+"transition_time": true,
+"transition_type": true
+})
+base_type = &"ColorPickerButton"
+style_name = &"ColorPickerButton"
+metadata/_custom_type_script = "uid://bysui7kt6peex"

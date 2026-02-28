@@ -36,7 +36,7 @@ var _populate_list: Callable:
 				for prop: String in PROPERTY_LIST.list:
 					var node: GdssNode = res as GdssNode
 					if not node.theme_properties.has(prop):
-						node.theme_properties.set(prop, false)
+						node.theme_properties.set(prop, true)
 				new_list[file_name.get_basename()] = res
 			
 			list = new_list

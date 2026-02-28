@@ -3,11 +3,25 @@
 [ext_resource type="Script" uid="uid://bn6wk7my78ce7" path="res://addons/gdss/db/nodes/_base.gd" id="1_r0mun"]
 [ext_resource type="Script" uid="uid://b8vr00vptx80a" path="res://addons/gdss/db/nodes/_list.gd" id="2_ilkrm"]
 [ext_resource type="Resource" uid="uid://dswljjkyn3bfd" path="res://addons/gdss/db/nodes/Button.tres" id="2_wk1uw"]
+[ext_resource type="Resource" uid="uid://d20mrkg1mjdgd" path="res://addons/gdss/db/nodes/CheckBox.tres" id="3_tekqs"]
+[ext_resource type="Resource" uid="uid://blewkqxtfx42v" path="res://addons/gdss/db/nodes/CheckButton.tres" id="4_ymymn"]
+[ext_resource type="Resource" uid="uid://cgfetyh5xiwre" path="res://addons/gdss/db/nodes/ColorPickerButton.tres" id="5_c0guw"]
+[ext_resource type="Resource" uid="uid://4b0bbl36miuk" path="res://addons/gdss/db/nodes/MenuButton.tres" id="6_an1s8"]
+[ext_resource type="Resource" uid="uid://pm2x5syejo74" path="res://addons/gdss/db/nodes/OptionButton.tres" id="7_e7exb"]
+[ext_resource type="Resource" uid="uid://ba3p6on4rccbq" path="res://addons/gdss/db/nodes/Panel.tres" id="8_lng6b"]
+[ext_resource type="Resource" uid="uid://cmvtwk5nv2ou4" path="res://addons/gdss/db/nodes/PanelContainer.tres" id="9_62nvv"]
 
 [resource]
 script = ExtResource("2_ilkrm")
 list = Dictionary[String, ExtResource("1_r0mun")]({
-"Button": ExtResource("2_wk1uw")
+"Button": ExtResource("2_wk1uw"),
+"CheckBox": ExtResource("3_tekqs"),
+"CheckButton": ExtResource("4_ymymn"),
+"ColorPickerButton": ExtResource("5_c0guw"),
+"MenuButton": ExtResource("6_an1s8"),
+"OptionButton": ExtResource("7_e7exb"),
+"Panel": ExtResource("8_lng6b"),
+"PanelContainer": ExtResource("9_62nvv")
 })
 dir_path = "res://addons/gdss/db/nodes"
 metadata/_custom_type_script = "uid://b8vr00vptx80a"

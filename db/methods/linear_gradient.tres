@@ -5,24 +5,24 @@
 
 [sub_resource type="Resource" id="Resource_q4n2y"]
 script = ExtResource("1_yjpyy")
-name = "color_start"
-type = 3
-default_value = Color(1, 1, 1, 1)
+name = ""
+type = 0
+default_value = null
 category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"
 
 [sub_resource type="Resource" id="Resource_q3wh2"]
 script = ExtResource("1_yjpyy")
-name = "color_end"
-type = 3
+name = ""
+type = 0
 default_value = null
 category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"
 
 [sub_resource type="Resource" id="Resource_h0y3x"]
 script = ExtResource("1_yjpyy")
-name = "angle_degrees"
-type = 1
+name = ""
+type = 0
 default_value = null
 category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

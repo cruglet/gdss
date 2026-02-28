@@ -1,6 +1,6 @@
 @tool
 class_name GdssEditor
-extends Control
+extends Node
 
 static var _code_editor_ref: CodeEdit
 
@@ -18,8 +18,6 @@ var file_name: String:
 
 
 func _ready() -> void:
-	size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_code_editor_ref = code_edit
 
 	error_label.add_theme_font_override(&"font", EditorInterface.get_editor_theme().get_font(&"expression", &"EditorFonts"))

@@ -5,24 +5,24 @@
 
 [sub_resource type="Resource" id="Resource_g5vwi"]
 script = ExtResource("1_g5vwi")
-name = "value"
-type = 1
+name = ""
+type = 0
 default_value = null
 category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"
 
 [sub_resource type="Resource" id="Resource_j8ut4"]
 script = ExtResource("1_g5vwi")
-name = "min"
-type = 1
+name = ""
+type = 0
 default_value = null
 category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"
 
 [sub_resource type="Resource" id="Resource_70jce"]
 script = ExtResource("1_g5vwi")
-name = "max"
-type = 1
+name = ""
+type = 0
 default_value = null
 category = 0
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

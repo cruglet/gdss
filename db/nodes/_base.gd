@@ -19,13 +19,22 @@ extends Resource
 @abstract func get_active_state(canvas_item: CanvasItem) -> String
 
 
+func get_default_events() -> PackedStringArray:
+	return ["item_rect_changed", "visibility_changed"]
+
+
 func bind_canvas_item(canvas_item: CanvasItem) -> void:
-	for event: String in get_events():
-		canvas_item.connect(event, _update_state, CONNECT_APPEND_SOURCE_OBJECT)
+	var events: PackedStringArray = get_events()
+	events.append_array(get_default_events())
+	for event: String in events:
+		if not canvas_item.is_connected(event, _update_state):
+			canvas_item.connect(event, _update_state, CONNECT_APPEND_SOURCE_OBJECT)
 
 
 func unbind_canvas_item(canvas_item: CanvasItem) -> void:
-	for event: String in get_events():
+	var events: PackedStringArray = get_events()
+	events.append_array(get_default_events())
+	for event: String in events:
 		if canvas_item.is_connected(event, _update_state):
 			canvas_item.disconnect(event, _update_state)
 

@@ -3,7 +3,6 @@ class_name GdssNode_Button
 extends GdssNode
 
 
-
 func get_active_state(canvas_item: CanvasItem) -> String:
 	var button: Button = canvas_item as Button
 	if button.disabled: return "disabled"
@@ -16,8 +15,4 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 
 func get_events() -> PackedStringArray:
 	return ["mouse_entered", "mouse_exited", "button_down", "button_up",
-	"toggled", "focus_entered", "focus_exited", "item_rect_changed"]
-
-
-func _on_state_changed(canvas_item: CanvasItem) -> void:
-	pass
+	"toggled", "focus_entered", "focus_exited"]
