@@ -85,7 +85,7 @@ func _enter_tree() -> void:
 		"name": "gdss/editor/location",
 		"type": TYPE_INT,
 		"hint": PROPERTY_HINT_ENUM,
-		"hint_string": "Main Screen,Dock"
+		"hint_string": "Dock,Main Screen"
 	})
 	editor_settings.settings_changed.connect(_on_editor_settings_changed)
 	
@@ -135,7 +135,7 @@ func _exit_tree() -> void:
 
 
 func _on_editor_settings_changed() -> void:
-	if EditorInterface.get_editor_settings().get_setting("gdss/editor/location") != (0 if _has_main_screen() else 1):
+	if EditorInterface.get_editor_settings().get_setting("gdss/editor/location") != (1 if _has_main_screen() else 0):
 		return
 	EditorInterface.get_editor_toaster().push_toast(
 		"GDSS: Reload the project to apply dock mode changes.",
@@ -144,7 +144,7 @@ func _on_editor_settings_changed() -> void:
 
 
 func _has_main_screen() -> bool:
-	return EditorInterface.get_editor_settings().get_setting("gdss/editor/location") == 0
+	return EditorInterface.get_editor_settings().get_setting("gdss/editor/location") == 1
 
 
 func _make_visible(visible: bool) -> void:
