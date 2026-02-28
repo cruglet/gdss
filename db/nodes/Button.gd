@@ -10,7 +10,7 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 	if button.is_hovered() and button.button_pressed and button.toggle_mode: return "hover_pressed"
 	if button.button_pressed: return "pressed"
 	if button.is_hovered(): return "hover"
-	if button.has_focus(): return "focus"
+	if button.has_focus(true): return "focus"
 	return "normal"
 
 
