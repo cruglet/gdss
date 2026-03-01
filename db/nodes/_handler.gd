@@ -26,3 +26,4 @@ static func unbind(canvas_item: CanvasItem) -> void:
 	if canvas_item.has_meta("gdss_handler"):
 		canvas_item.remove_meta("gdss_handler")
 	gdss_node.unbind_canvas_item(canvas_item)
+	GDSS.clear_instance_vars(canvas_item)

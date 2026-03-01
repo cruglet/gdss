@@ -9,7 +9,9 @@ var _nodes: Array[String] = []
 var _properties: Array[String] = []
 var _states: Array[String] = []
 var _property_meta: Dictionary = {}
-var _user_variables: Array[String] = []
+var _global_variables: Array[String] = []
+var _local_variables: Array[String] = []
+var _instance_variables: Array[String] = []
 var _builtin_colors: Array[String] = [
 	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
@@ -74,7 +76,9 @@ func _setup_highlighter() -> void:
 	_highlighter.property_meta = _property_meta
 	_highlighter.builtin_colors = _builtin_colors
 	_highlighter.value_functions = _value_functions
-	_highlighter.user_variables = _user_variables
+	_highlighter.global_variables = _global_variables
+	_highlighter.local_variables = _local_variables
+	_highlighter.instance_variables = _instance_variables
 	_highlighter.enum_values = _enum_values
 	_highlighter._node_states = {}
 	for obj: GdssNode in GDSS._get_gdss_nodes().values():
@@ -96,8 +100,10 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var value_functions: Array[String] = []
 	var col_variable: Color
 	var col_function: Color
-	var user_variables: Array[String] = []
-	var enum_values: Array[String] = []	
+	var global_variables: Array[String] = []
+	var local_variables: Array[String] = []
+	var instance_variables: Array[String] = []
+	var enum_values: Array[String] = []
 
 	var col_keyword: Color
 	var col_type: Color
@@ -112,6 +118,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var col_brace_mismatch: Color
 	var col_const: Color
 	var col_default: Color
+	var col_global: Color
+	var col_instance: Color
 
 
 	func refresh_colors() -> void:
@@ -131,6 +139,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		col_default = s.get_setting("text_editor/theme/highlighting/text_color")
 		col_function = s.get_setting("text_editor/theme/highlighting/gdscript/global_function_color")
 		col_variable = s.get_setting("text_editor/theme/highlighting/function_color")
+		col_global = s.get_setting("text_editor/theme/highlighting/string_placeholder_color")
+		col_instance = s.get_setting("text_editor/theme/highlighting/string_placeholder_color")
 
 
 	func invalidate_cache() -> void:
@@ -186,17 +196,23 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				result[j] = {"color": col_string}
 				i = j + 1
 				continue
-				
+			
 			if c == "$":
 				var start: int = i
 				i += 1
 				while i < len and _is_word_char(text[i]):
 					i += 1
 				var var_name: String = text.substr(start + 1, i - start - 1)
-				var known: bool = user_variables.has(var_name)
-				result[start] = {"color": col_variable if known else col_default}
+				if global_variables.has(var_name):
+					result[start] = {"color": col_global}
+				elif instance_variables.has(var_name):
+					result[start] = {"color": col_instance}
+				elif local_variables.has(var_name):
+					result[start] = {"color": col_variable}
+				else:
+					result[start] = {"color": col_default}
 				continue
-
+			
 			if c == "@":
 						var start: int = i
 						i += 1
@@ -344,24 +360,34 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 
 func _on_text_changed() -> void:
 	_parse_user_variables()
-	_highlighter.user_variables = _user_variables
+	_highlighter.global_variables = _global_variables
+	_highlighter.local_variables = _local_variables
+	_highlighter.instance_variables = _instance_variables
 	_highlighter.clear_highlighting_cache()
 	_highlighter.invalidate_cache()
 	_highlighter.update_cache()
 
 
 func _parse_user_variables() -> void:
-	_user_variables.clear()
+	_global_variables.clear()
+	_local_variables.clear()
+	_instance_variables.clear()
 	var global_regex: RegEx = RegEx.new()
-	global_regex.compile(r"@global\s+(\w+)\s*:")
+	global_regex.compile(r"@global\s+var\s+(\w+)\s*:")
+	var instance_regex: RegEx = RegEx.new()
+	instance_regex.compile(r"@instance\s+var\s+(\w+)\s*:")
 	var local_regex: RegEx = RegEx.new()
 	local_regex.compile(r"^var\s+(\w+)\s*:")
 	for line: String in editor.text.split("\n"):
 		var stripped: String = line.strip_edges()
 		var gm: RegExMatch = global_regex.search(stripped)
 		if gm:
-			_user_variables.append(gm.get_string(1))
+			_global_variables.append(gm.get_string(1))
+			continue
+		var im: RegExMatch = instance_regex.search(stripped)
+		if im:
+			_instance_variables.append(im.get_string(1))
 			continue
 		var lm: RegExMatch = local_regex.search(stripped)
 		if lm:
-			_user_variables.append(lm.get_string(1))
+			_local_variables.append(lm.get_string(1))

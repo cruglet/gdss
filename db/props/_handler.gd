@@ -318,11 +318,14 @@ func _get_parsed_val(key: String, state: String, fallback: Variant) -> Variant:
 	var entry: Dictionary = _resolve_entry()
 	if entry.is_empty():
 		return fallback
+	var raw: Variant = null
 	if entry.has(state) and entry[state].has(key):
-		return entry[state][key]
-	if entry.has("all") and entry["all"].has(key):
-		return entry["all"][key]
-	return fallback
+		raw = entry[state][key]
+	elif entry.has("all") and entry["all"].has(key):
+		raw = entry["all"][key]
+	else:
+		return fallback
+	return _resolve_sentinel(raw, fallback)
 
 
 func _get_state() -> String:
@@ -336,6 +339,29 @@ func _get_state() -> String:
 	return "all"
 
 
+func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
+	if not raw is String:
+		return raw
+	var s: String = raw as String
+	if s.begins_with("__gdss_global__"):
+		var name: String = s.substr("__gdss_global__".length())
+		if GdssInterpreter.globals.has(name):
+			return GdssInterpreter.globals[name]
+		if GdssInterpreter._global_defaults.has(name):
+			return GdssInterpreter._global_defaults[name]
+		return fallback
+	if s.begins_with("__gdss_instance__"):
+		var name: String = s.substr("__gdss_instance__".length())
+		if ref != null:
+			var id: int = ref.get_instance_id()
+			if GdssInterpreter._instance_vars.has(id) and GdssInterpreter._instance_vars[id].has(name):
+				return GdssInterpreter._instance_vars[id][name]
+		if GdssInterpreter._instance_defaults.has(name):
+			return GdssInterpreter._instance_defaults[name]
+		return fallback
+	return raw
+
+
 func _get_val(key: String, fallback: Variant) -> Variant:
 	if ref == null:
 		return fallback
@@ -345,11 +371,14 @@ func _get_val(key: String, fallback: Variant) -> Variant:
 	if entry.is_empty():
 		return fallback
 	var state: String = _get_state()
+	var raw: Variant = null
 	if entry.has(state) and entry[state].has(key):
-		return entry[state][key]
-	if entry.has("all") and entry["all"].has(key):
-		return entry["all"][key]
-	return fallback
+		raw = entry[state][key]
+	elif entry.has("all") and entry["all"].has(key):
+		raw = entry["all"][key]
+	else:
+		return fallback
+	return _resolve_sentinel(raw, fallback)
 
 
 func _draw(to_canvas_item: RID, rect: Rect2) -> void:

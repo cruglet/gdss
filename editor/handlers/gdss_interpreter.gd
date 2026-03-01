@@ -5,6 +5,10 @@ extends Node
 signal parsed_changed
 
 static var parsed: Dictionary[String, Dictionary] = {}
+static var globals: Dictionary = {}
+static var _global_defaults: Dictionary = {}
+static var _instance_vars: Dictionary = {}
+static var _instance_defaults: Dictionary = {}
 var _last_modified: int = 0
 var _saving: bool = false
 static var _inst: GdssInterpreter
@@ -50,7 +54,7 @@ func save_current() -> void:
 		return
 	parsed = interpret(editor.code_edit.text)
 	_saving = true
-	GdssStorage.save(editor.code_edit.text, parsed)
+	GdssStorage.save(editor.code_edit.text, parsed, GdssInterpreter._global_defaults, GdssInterpreter._instance_defaults)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	_saving = false
 	editor._user_saved()
@@ -130,9 +134,15 @@ func interpret(source: String) -> Dictionary[String, Dictionary]:
 
 
 func _extract_globals(source: String) -> Dictionary:
-	var globals: Dictionary = {}
+	var local_vars: Dictionary = {}
+	globals.clear()
+	_global_defaults.clear()
+	_instance_defaults.clear()
+
 	var global_regex: RegEx = RegEx.new()
-	global_regex.compile(r"@global\s+(\w+)\s*:\s*(.+)")
+	global_regex.compile(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
+	var instance_regex: RegEx = RegEx.new()
+	instance_regex.compile(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
 	var local_regex: RegEx = RegEx.new()
 	local_regex.compile(r"^var\s+(\w+)\s*:\s*(.+)")
 
@@ -143,22 +153,38 @@ func _extract_globals(source: String) -> Dictionary:
 			stripped = stripped.substr(0, comment_idx).strip_edges()
 		var gm: RegExMatch = global_regex.search(stripped)
 		if gm:
-			globals[gm.get_string(1)] = gm.get_string(2).strip_edges()
+			var name: String = gm.get_string(1)
+			var val: Variant = _parse_value([gm.get_string(2).strip_edges()])
+			globals[name] = val
+			_global_defaults[name] = val
+			continue
+		var im: RegExMatch = instance_regex.search(stripped)
+		if im:
+			var name: String = im.get_string(1)
+			var val: Variant = _parse_value([im.get_string(2).strip_edges()])
+			_instance_defaults[name] = val
 			continue
 		var lm: RegExMatch = local_regex.search(stripped)
 		if lm:
-			globals[lm.get_string(1)] = lm.get_string(2).strip_edges()
-	return globals
+			local_vars[lm.get_string(1)] = lm.get_string(2).strip_edges()
+	return local_vars
 
 
-func _substitute_globals(tokens: Array[String], globals: Dictionary) -> Array[String]:
+
+func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array[String]:
 	var result: Array[String] = []
 	for token: String in tokens:
 		if token.begins_with("$"):
 			var key: String = token.substr(1)
-			if globals.has(key):
-				for part: String in globals[key].split(" ", false):
+			if local_vars.has(key):
+				for part: String in local_vars[key].split(" ", false):
 					result.append(part)
+				continue
+			if globals.has(key):
+				result.append("__gdss_global__" + key)
+				continue
+			if _instance_defaults.has(key):
+				result.append("__gdss_instance__" + key)
 				continue
 		result.append(token)
 	return result
@@ -196,9 +222,7 @@ func _tokenize(source: String) -> Array[String]:
 	var tokens: Array[String] = []
 	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
-		if stripped.begins_with("@global var"):
-			continue
-		elif stripped.begins_with("var"):
+		if stripped.begins_with("@global") or stripped.begins_with("@instance") or stripped.begins_with("var "):
 			continue
 		var comment_idx: int = stripped.find("//")
 		if comment_idx != -1:

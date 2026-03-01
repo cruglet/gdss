@@ -71,6 +71,15 @@ func _ensure_parsed() -> void:
 		var val: Variant = (raw as Dictionary)[key]
 		if val is Dictionary:
 			GdssInterpreter.parsed[key] = val
+	if data.has("global_defaults") and data["global_defaults"] is Dictionary:
+		for key: String in (data["global_defaults"] as Dictionary):
+			var val: Variant = (data["global_defaults"] as Dictionary)[key]
+			GdssInterpreter._global_defaults[key] = val
+			if not GdssInterpreter.globals.has(key):
+				GdssInterpreter.globals[key] = val
+	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
+		for key: String in (data["instance_defaults"] as Dictionary):
+			GdssInterpreter._instance_defaults[key] = (data["instance_defaults"] as Dictionary)[key]
 
 
 func _bind_tree(node: Node) -> void:

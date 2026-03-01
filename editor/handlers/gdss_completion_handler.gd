@@ -261,7 +261,9 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 
 func _complete_at_directives(word: String) -> void:
 	if word.is_empty() or "@global".begins_with(word):
-		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@global", "global ")
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@global var", "global var ", _completion_color, _get_icon(&"MemberAnnotation"))
+	if word.is_empty() or "@instance".begins_with(word):
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@instance var", "instance var ", _completion_color, _get_icon(&"MemberAnnotation"))
 
 
 func _get_context() -> Dictionary:
@@ -365,20 +367,26 @@ func _get_context() -> Dictionary:
 
 func _parse_user_variables() -> void:
 	_user_variables.clear()
+	var global_regex: RegEx = RegEx.new()
+	global_regex.compile(r"@global\s+var\s+(\w+)\s*:")
+	var instance_regex: RegEx = RegEx.new()
+	instance_regex.compile(r"@instance\s+var\s+(\w+)\s*:")
 	var local_regex: RegEx = RegEx.new()
 	local_regex.compile(r"^var\s+(\w+)\s*:")
-	var global_regex: RegEx = RegEx.new()
-	global_regex.compile(r"@global\s+(\w+)\s*:")
-
+	
 	for line: String in editor.text.split("\n"):
 		var stripped: String = line.strip_edges()
-		var lm: RegExMatch = local_regex.search(stripped)
-		if lm:
-			_user_variables.append("$" + lm.get_string(1))
-			continue
 		var gm: RegExMatch = global_regex.search(stripped)
 		if gm:
 			_user_variables.append("$" + gm.get_string(1))
+			continue
+		var im: RegExMatch = instance_regex.search(stripped)
+		if im:
+			_user_variables.append("$" + im.get_string(1))
+			continue
+		var lm: RegExMatch = local_regex.search(stripped)
+		if lm:
+			_user_variables.append("$" + lm.get_string(1))
 
 
 func _get_current_word() -> String:

@@ -49,7 +49,7 @@ enum TransitionFunc {
 	SPRING
 }
 
-static var inst: EditorPlugin
+static var _inst: EditorPlugin
 
 var debug_container: Container
 var debug_label: Label
@@ -64,6 +64,98 @@ var theme_hook: Control
 var was_in_distraction_free_mode: bool = false
 
 
+## Gets the value of a [b]global variable[/b] defined in GDSS.
+## [br][br]
+## Global variables are shared across the entire environment. If the variable
+## does not exist, it returns the [param fallback] value.
+## [codeblock]
+## var my_color: Color = GDSS.get_global_var("theme_accent", Color.WHITE)
+## [/codeblock]
+static func get_global_var(name: String, fallback: Variant = null) -> Variant:
+	return GdssInterpreter.globals.get(name, fallback)
+
+## Sets the value of a [b]global variable[/b] and triggers a refresh.
+## [br][br]
+## This updates the global state and automatically notifies any objects or 
+## UI elements that are currently "listening" to or affected by this variable.
+## [codeblock]
+## GDSS.set_global_var("player_score", 100)
+## [/codeblock]
+static func set_global_var(name: String, value: Variant) -> void:
+	GdssInterpreter.globals[name] = value
+	_refresh_affected(name)
+
+## Assigns an [b]instance-specific override[/b] for a GDSS variable on a Node.
+## [br][br]
+## If the [param node] has a [code]gdss_handler[/code] meta-tag, this function will 
+## automatically apply the new value, emit change signals, and queue a redraw 
+## if the node is a [CanvasItem].
+## [codeblock]
+## GDSS.set_instance_var(enemy_sprite, "modulate_color", Color.RED)
+## [/codeblock]
+static func set_instance_var(node: Node, name: String, value: Variant) -> void:
+	var id: int = node.get_instance_id()
+	if not GdssInterpreter._instance_vars.has(id):
+		GdssInterpreter._instance_vars[id] = {}
+	GdssInterpreter._instance_vars[id][name] = value
+	if node.has_meta("gdss_handler"):
+		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
+		box._apply_overrides()
+		box.emit_changed()
+		if node is CanvasItem:
+			(node as CanvasItem).queue_redraw()
+
+## Retrieves the value of a variable for a [b]specific Node instance[/b].
+## [br][br]
+## This function checks for local overrides first. If no instance-specific 
+## value is found, it falls back to the default value defined in 
+## [code]_instance_defaults[/code].
+## [codeblock]
+## var speed = GDSS.get_instance_var(self, "move_speed", 200.0)
+## [/codeblock]
+static func get_instance_var(node: Node, name: String, fallback: Variant = null) -> Variant:
+	var id: int = node.get_instance_id()
+	if GdssInterpreter._instance_vars.has(id):
+		return GdssInterpreter._instance_vars[id].get(name, fallback)
+	return GdssInterpreter._instance_defaults.get(name, fallback)
+
+## Clears all GDSS instance variables from a specific node.
+static func clear_instance_vars(node: Node) -> void:
+	GdssInterpreter._instance_vars.erase(node.get_instance_id())
+
+
+static func _refresh_affected(global_name: String) -> void:
+	var sentinel: String = "__gdss_global__" + global_name
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	_refresh_affected_tree(tree.root, sentinel)
+
+
+static func _refresh_affected_tree(node: Node, sentinel: String) -> void:
+	if node.has_meta("gdss_handler"):
+		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
+		if _handler_uses_sentinel(box, sentinel):
+			box._apply_overrides()
+			box.emit_changed()
+			if node is CanvasItem:
+				(node as CanvasItem).queue_redraw()
+	for child: Node in node.get_children():
+		_refresh_affected_tree(child, sentinel)
+
+
+static func _handler_uses_sentinel(box: GdssPropHandler, sentinel: String) -> bool:
+	var entry: Dictionary = box._resolve_entry()
+	for state: String in entry:
+		if not entry[state] is Dictionary:
+			continue
+		for key: String in entry[state]:
+			var val: Variant = entry[state][key]
+			if val is String and (val as String) == sentinel:
+				return true
+	return false
+
+
 static func _get_gdss_nodes() -> Dictionary[String, GdssNode]:
 	var nl: GdssNodeList = preload("uid://jw1xlcsh6exq")
 	return nl.list
@@ -75,7 +167,7 @@ static func _get_gdss_methods() -> Dictionary[String, GdssMethod]:
 
 
 func _enter_tree() -> void:
-	inst = self
+	_inst = self
 
 	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
 	if not editor_settings.has_setting("gdss/editor/location"):
