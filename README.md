@@ -48,10 +48,10 @@ Panel, PanelContainer {
 - [x] Variable support
 - [x] Some way to preview the node as you're writing in gdss.
 - [x] Export variable support (in order to access from GDScript)
+- [x] Method support 
 
 ### TODO
 (not necessarily in order)
-- [ ] Custom method support `min()/max()/clamp(), linear_gradient(), etc.`
 - [ ] Syntax error highlighting 
 - [ ] UI polish
 
