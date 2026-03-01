@@ -5,22 +5,26 @@ extends StyleBox
 static var _texture_cache: Dictionary = {}
 
 @export_storage var _ref_path: NodePath = NodePath()
-
 var _ref_node: CanvasItem = null
+var _ref_node_rt: CanvasItem = null
 
 var ref: CanvasItem:
 	get:
 		if Engine.is_editor_hint():
 			return _ref_node
+		if is_instance_valid(_ref_node_rt):
+			return _ref_node_rt
 		if _ref_path.is_empty():
 			return null
 		var tree: SceneTree = Engine.get_main_loop() as SceneTree
 		if tree == null:
 			return null
-		return tree.root.get_node_or_null(_ref_path) as CanvasItem
+		_ref_node_rt = tree.root.get_node_or_null(_ref_path) as CanvasItem
+		return _ref_node_rt
 	set(v):
 		if v == null:
 			_ref_node = null
+			_ref_node_rt = null
 			_ref_path = NodePath()
 			return
 		if Engine.is_editor_hint():
@@ -31,13 +35,16 @@ var ref: CanvasItem:
 				v.connect("renamed", _on_ref_renamed)
 			if not v.is_connected("tree_entered", _on_ref_tree_entered):
 				v.connect("tree_entered", _on_ref_tree_entered)
+			if not v.is_connected("tree_exiting", _on_ref_tree_exiting):
+				v.connect("tree_exiting", _on_ref_tree_exiting)
 		else:
+			_ref_node_rt = v
 			if v.is_inside_tree():
 				_ref_path = v.get_path()
-			else:
-				v.tree_entered.connect(func() -> void:
-					_ref_path = v.get_path()
-				, CONNECT_ONE_SHOT)
+			if not v.is_connected("tree_entered", _on_ref_tree_entered_rt):
+				v.connect("tree_entered", _on_ref_tree_entered_rt)
+			if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
+				v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 		if Engine.is_editor_hint():
 			var interp: GdssInterpreter = GdssInterpreter.get_instance()
 			if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
@@ -77,6 +84,22 @@ func _on_ref_renamed() -> void:
 func _on_ref_tree_entered() -> void:
 	if is_instance_valid(_ref_node):
 		_ref_path = _ref_node.get_path()
+
+
+func _on_ref_tree_exiting() -> void:
+	if is_instance_valid(_ref_node) and _ref_node.is_inside_tree():
+		_ref_path = _ref_node.get_path()
+
+
+func _on_ref_tree_entered_rt() -> void:
+	if is_instance_valid(_ref_node_rt):
+		_ref_path = _ref_node_rt.get_path()
+
+
+func _on_ref_tree_exiting_rt() -> void:
+	if is_instance_valid(_ref_node_rt) and _ref_node_rt.is_inside_tree():
+		_ref_path = _ref_node_rt.get_path()
+	_ref_node_rt = null
 
 
 func _on_parsed_changed() -> void:
