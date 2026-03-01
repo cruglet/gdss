@@ -570,6 +570,8 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	var bg: Variant = vals.get("bg_color", Color.TRANSPARENT)
 	if bg is GradientTexture2D:
 		_draw_linear_gradient_rect(to_canvas_item, bg as GradientTexture2D, rect, corner_radius, detail, skew_x, skew_y)
+	elif bg is Texture2D:
+		_draw_texture_in_rect(to_canvas_item, bg as Texture2D, rect, corner_radius, detail, skew_x, skew_y)
 	elif bg is Color and (bg as Color).a > 0.0:
 		_draw_rect(to_canvas_item, rect, bg as Color, corner_radius, aa_size, detail, skew_x, skew_y)
 
@@ -588,10 +590,16 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 func _draw_texture_in_rect(to_canvas_item: RID, tex: Texture2D, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
 	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, _fit_corners(corner_radii, rect), detail), rect, skew_x, skew_y)
 	var n: int = points.size()
+	var tex_size: Vector2 = tex.get_size()
+	var scale: float = maxf(rect.size.x / tex_size.x, rect.size.y / tex_size.y)
+	var scaled: Vector2 = tex_size * scale
+	var uv_scale: Vector2 = rect.size / scaled
+	var uv_offset: Vector2 = (Vector2.ONE - uv_scale) * 0.5
 	var uvs: PackedVector2Array
 	uvs.resize(n)
 	for i: int in n:
-		uvs[i] = (points[i] - rect.position) / rect.size
+		var local: Vector2 = (points[i] - rect.position) / rect.size
+		uvs[i] = uv_offset + local * uv_scale
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [Color.WHITE], uvs, tex.get_rid())
 
 

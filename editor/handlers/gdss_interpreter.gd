@@ -148,7 +148,16 @@ func _extract_globals(source: String) -> Dictionary:
 
 	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
-		var comment_idx: int = stripped.find("//")
+		var comment_idx: int = -1
+		var search_from: int = 0
+		while true:
+			var idx: int = stripped.find("//", search_from)
+			if idx == -1:
+				break
+			if idx == 0 or stripped[idx - 1] == " " or stripped[idx - 1] == "\t":
+				comment_idx = idx
+				break
+			search_from = idx + 2
 		if comment_idx != -1:
 			stripped = stripped.substr(0, comment_idx).strip_edges()
 		var gm: RegExMatch = global_regex.search(stripped)
@@ -183,8 +192,18 @@ func _extract_globals(source: String) -> Dictionary:
 func _tokenize_value(raw: String) -> Array[String]:
 	var tokens: Array[String] = []
 	var current: String = ""
+	var in_quote: bool = false
+	var quote_char: String = ""
 	for ch: String in raw:
-		if ch in ["{", "}", ":", ",", "(", ")"]:
+		if in_quote:
+			if ch == quote_char:
+				in_quote = false
+			current += ch
+		elif ch == "\"" or ch == "'":
+			in_quote = true
+			quote_char = ch
+			current += ch
+		elif ch in ["{", "}", ":", ",", "(", ")"]:
 			if not current.strip_edges().is_empty():
 				tokens.append(current.strip_edges())
 				current = ""
@@ -257,14 +276,33 @@ func _tokenize(source: String) -> Array[String]:
 		var stripped: String = line.strip_edges()
 		if stripped.begins_with("@global") or stripped.begins_with("@instance") or stripped.begins_with("var "):
 			continue
-		var comment_idx: int = stripped.find("//")
+		var comment_idx: int = -1
+		var search_from: int = 0
+		while true:
+			var idx: int = stripped.find("//", search_from)
+			if idx == -1:
+				break
+			if idx == 0 or stripped[idx - 1] != ":":
+				comment_idx = idx
+				break
+			search_from = idx + 2
 		if comment_idx != -1:
 			stripped = stripped.substr(0, comment_idx).strip_edges()
 		if stripped.is_empty():
 			continue
 		var current: String = ""
+		var in_quote: bool = false
+		var quote_char: String = ""
 		for ch: String in stripped:
-			if ch in ["{", "}", ":", ",", "(", ")"]:
+			if in_quote:
+				if ch == quote_char:
+					in_quote = false
+				current += ch
+			elif ch == "\"" or ch == "'":
+				in_quote = true
+				quote_char = ch
+				current += ch
+			elif ch in ["{", "}", ":", ",", "(", ")"]:
 				if not current.strip_edges().is_empty():
 					tokens.append(current.strip_edges())
 					current = ""
@@ -435,9 +473,19 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 			var raw_args: Array[String] = []
 			var current_arg: String = ""
 			var depth: int = 1
+			var in_quote: bool = false
+			var quote_char: String = ""
 			while pos < tokens.size() and depth > 0:
 				var tok: String = tokens[pos]
-				if tok == "(":
+				if in_quote:
+					if tok == quote_char:
+						in_quote = false
+					current_arg += tok
+				elif tok == "\"" or tok == "'":
+					in_quote = true
+					quote_char = tok
+					current_arg += tok
+				elif tok == "(":
 					depth += 1
 					current_arg += tok
 				elif tok == ")":
