@@ -19,7 +19,7 @@ var file_name: String:
 
 func _ready() -> void:
 	_code_editor_ref = code_edit
-
+	
 	error_label.add_theme_font_override(&"font", EditorInterface.get_editor_theme().get_font(&"expression", &"EditorFonts"))
 	error_label.add_theme_color_override(&"font_color", EditorInterface.get_editor_theme().get_color(&"error_color", &"Editor"))
 	

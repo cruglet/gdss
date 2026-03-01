@@ -9,6 +9,7 @@ static var globals: Dictionary = {}
 static var _global_defaults: Dictionary = {}
 static var _instance_vars: Dictionary = {}
 static var _instance_defaults: Dictionary = {}
+static var _local_vars: Dictionary = {}
 var _last_modified: int = 0
 var _saving: bool = false
 static var _inst: GdssInterpreter
@@ -54,13 +55,13 @@ func save_current() -> void:
 		return
 	parsed = interpret(editor.code_edit.text)
 	_saving = true
-	GdssStorage.save(editor.code_edit.text, parsed, GdssInterpreter._global_defaults, GdssInterpreter._instance_defaults)
+	GdssStorage.save(editor.code_edit.text, parsed, GdssInterpreter._global_defaults, GdssInterpreter._instance_defaults, GdssInterpreter._local_vars)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
-	_saving = false
 	editor._user_saved()
 	parsed_changed.emit()
 	if Engine.is_editor_hint():
 		_force_viewport_redraw()
+	_saving = false
 
 
 func _force_viewport_redraw() -> void:
@@ -77,18 +78,15 @@ func _load_from_file() -> void:
 	var data: Dictionary = GdssStorage.load_data()
 	if data.is_empty():
 		return
-	if data.has("source") and Engine.is_editor_hint() and is_instance_valid(editor):
+	if data.has("source"):
 		var source: String = data["source"]
-		if editor.code_edit.text != source:
-			if editor.code_edit.text_changed.is_connected(_on_text_changed):
-				editor.code_edit.text_changed.disconnect(_on_text_changed)
-			editor.code_edit.text = source
-			editor.code_edit.text_changed.connect(_on_text_changed)
-	if data.has("parsed") and data["parsed"] is Dictionary:
-		for key: String in (data["parsed"] as Dictionary):
-			var val: Variant = (data["parsed"] as Dictionary)[key]
-			if val is Dictionary:
-				parsed[key] = val
+		if Engine.is_editor_hint() and is_instance_valid(editor):
+			if editor.code_edit.text != source:
+				if editor.code_edit.text_changed.is_connected(_on_text_changed):
+					editor.code_edit.text_changed.disconnect(_on_text_changed)
+				editor.code_edit.text = source
+				editor.code_edit.text_changed.connect(_on_text_changed)
+		parsed = interpret(source)
 		parsed_changed.emit()
 
 
@@ -146,6 +144,8 @@ func _extract_globals(source: String) -> Dictionary:
 	var local_regex: RegEx = RegEx.new()
 	local_regex.compile(r"^var\s+(\w+)\s*:\s*(.+)")
 
+	var known_states: PackedStringArray = _collect_states()
+
 	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
 		var comment_idx: int = stripped.find("//")
@@ -154,21 +154,50 @@ func _extract_globals(source: String) -> Dictionary:
 		var gm: RegExMatch = global_regex.search(stripped)
 		if gm:
 			var name: String = gm.get_string(1)
-			var val: Variant = _parse_value([gm.get_string(2).strip_edges()])
+			var raw: String = gm.get_string(2).strip_edges()
+			var tokens: Array[String] = _tokenize_value(raw)
+			var consumed: Array = _consume_value(tokens, 0, known_states)
+			var val: Variant = consumed[0]
 			globals[name] = val
 			_global_defaults[name] = val
 			continue
 		var im: RegExMatch = instance_regex.search(stripped)
 		if im:
 			var name: String = im.get_string(1)
-			var val: Variant = _parse_value([im.get_string(2).strip_edges()])
-			_instance_defaults[name] = val
+			var raw: String = im.get_string(2).strip_edges()
+			var tokens: Array[String] = _tokenize_value(raw)
+			var consumed: Array = _consume_value(tokens, 0, known_states)
+			_instance_defaults[name] = consumed[0]
 			continue
 		var lm: RegExMatch = local_regex.search(stripped)
 		if lm:
-			local_vars[lm.get_string(1)] = lm.get_string(2).strip_edges()
+			var raw: String = lm.get_string(2).strip_edges()
+			var tokens: Array[String] = _tokenize_value(raw)
+			var consumed: Array = _consume_value(tokens, 0, known_states)
+			local_vars[lm.get_string(1)] = consumed[0]
+			if consumed[0] is Dictionary:
+				_local_vars[lm.get_string(1)] = consumed[0]
 	return local_vars
 
+
+func _tokenize_value(raw: String) -> Array[String]:
+	var tokens: Array[String] = []
+	var current: String = ""
+	for ch: String in raw:
+		if ch in ["{", "}", ":", ",", "(", ")"]:
+			if not current.strip_edges().is_empty():
+				tokens.append(current.strip_edges())
+				current = ""
+			tokens.append(ch)
+		elif ch == " " or ch == "\t":
+			if not current.strip_edges().is_empty():
+				tokens.append(current.strip_edges())
+				current = ""
+		else:
+			current += ch
+	if not current.strip_edges().is_empty():
+		tokens.append(current.strip_edges())
+	return tokens
 
 
 func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array[String]:
@@ -177,8 +206,12 @@ func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array
 		if token.begins_with("$"):
 			var key: String = token.substr(1)
 			if local_vars.has(key):
-				for part: String in local_vars[key].split(" ", false):
-					result.append(part)
+				var val: Variant = local_vars[key]
+				if val is Dictionary:
+					result.append("__gdss_local_method__" + key)
+				else:
+					for part: String in str(val).split(" ", false):
+						result.append(part)
 				continue
 			if globals.has(key):
 				result.append("__gdss_global__" + key)
@@ -231,7 +264,7 @@ func _tokenize(source: String) -> Array[String]:
 			continue
 		var current: String = ""
 		for ch: String in stripped:
-			if ch in ["{", "}", ":", ","]:
+			if ch in ["{", "}", ":", ",", "(", ")"]:
 				if not current.strip_edges().is_empty():
 					tokens.append(current.strip_edges())
 					current = ""
@@ -396,6 +429,34 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 			break
 		var lookahead: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
 		var lookahead2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
+		if lookahead == "(":
+			var method_name: String = t
+			pos += 2
+			var raw_args: Array[String] = []
+			var current_arg: String = ""
+			var depth: int = 1
+			while pos < tokens.size() and depth > 0:
+				var tok: String = tokens[pos]
+				if tok == "(":
+					depth += 1
+					current_arg += tok
+				elif tok == ")":
+					depth -= 1
+					if depth == 0:
+						if not current_arg.strip_edges().is_empty():
+							raw_args.append(current_arg.strip_edges())
+					else:
+						current_arg += tok
+				elif tok == ",":
+					if not current_arg.strip_edges().is_empty():
+						raw_args.append(current_arg.strip_edges())
+					current_arg = ""
+				else:
+					if not current_arg.is_empty():
+						current_arg += " "
+					current_arg += tok
+				pos += 1
+			return [{"__gdss_method__": method_name, "args": raw_args}, pos]
 		if lookahead == "{":
 			break
 		if lookahead == ":" and (lookahead2 == "{" or known_states.has(lookahead2.to_lower())):

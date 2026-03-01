@@ -2,38 +2,42 @@
 class_name GdssPropHandler
 extends StyleBox
 
+static var _texture_cache: Dictionary = {}
+
 @export_storage var _ref_path: NodePath = NodePath()
+
+var _ref_node: CanvasItem = null
 
 var ref: CanvasItem:
 	get:
+		if Engine.is_editor_hint():
+			return _ref_node
 		if _ref_path.is_empty():
 			return null
 		var tree: SceneTree = Engine.get_main_loop() as SceneTree
 		if tree == null:
 			return null
-		var result: CanvasItem = tree.root.get_node_or_null(_ref_path) as CanvasItem
-		if result != null:
-			return result
-		var path_str: String = str(_ref_path)
-		var marker: String = "SubViewport/"
-		var marker_idx: int = path_str.rfind(marker)
-		if marker_idx != -1:
-			var relative: String = path_str.substr(marker_idx + marker.length())
-			for child: Node in tree.root.get_children():
-				result = child.get_node_or_null(relative) as CanvasItem
-				if result != null:
-					return result
-		return null
+		return tree.root.get_node_or_null(_ref_path) as CanvasItem
 	set(v):
 		if v == null:
+			_ref_node = null
 			_ref_path = NodePath()
 			return
-		if v.is_inside_tree():
-			_ref_path = v.get_path()
-		else:
-			v.tree_entered.connect(func() -> void:
+		if Engine.is_editor_hint():
+			_ref_node = v
+			if v.is_inside_tree():
 				_ref_path = v.get_path()
-			, CONNECT_ONE_SHOT)
+			if not v.is_connected("renamed", _on_ref_renamed):
+				v.connect("renamed", _on_ref_renamed)
+			if not v.is_connected("tree_entered", _on_ref_tree_entered):
+				v.connect("tree_entered", _on_ref_tree_entered)
+		else:
+			if v.is_inside_tree():
+				_ref_path = v.get_path()
+			else:
+				v.tree_entered.connect(func() -> void:
+					_ref_path = v.get_path()
+				, CONNECT_ONE_SHOT)
 		if Engine.is_editor_hint():
 			var interp: GdssInterpreter = GdssInterpreter.get_instance()
 			if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
@@ -65,9 +69,22 @@ func _notification(what: int) -> void:
 			interp.parsed_changed.disconnect(cb)
 
 
+func _on_ref_renamed() -> void:
+	if is_instance_valid(_ref_node) and _ref_node.is_inside_tree():
+		_ref_path = _ref_node.get_path()
+
+
+func _on_ref_tree_entered() -> void:
+	if is_instance_valid(_ref_node):
+		_ref_path = _ref_node.get_path()
+
+
 func _on_parsed_changed() -> void:
 	if ref == null:
 		return
+	for method: GdssMethod in GDSS._get_gdss_methods().values():
+		if method.returns_texture:
+			method.clear_live_textures()
 	_apply_overrides()
 	emit_changed()
 	ref.queue_redraw()
@@ -168,11 +185,40 @@ func _start_transition(from_state: String, to_state: String) -> void:
 	for prop_name: String in animatable:
 		var prop: GdssProp = animatable[prop_name]
 		var is_style: bool = prop.category == GdssProp.Category.STYLE
+
+		var from_raw: Variant = _get_raw_parsed_val(prop_name, resolved_from)
+		var to_raw: Variant = _get_raw_parsed_val(prop_name, to_state)
+
+		if from_raw is Dictionary and (from_raw as Dictionary).has("__gdss_method__") and \
+		   to_raw is Dictionary and (to_raw as Dictionary).has("__gdss_method__") and \
+		   (from_raw as Dictionary)["__gdss_method__"] == (to_raw as Dictionary)["__gdss_method__"]:
+			var mn: String = (from_raw as Dictionary)["__gdss_method__"]
+			var method: GdssMethod = GDSS._get_gdss_methods().get(mn)
+			if method != null and not method.get_tweenable_args().is_empty():
+				var from_args: Array[Variant] = _resolve_method_args(from_raw as Dictionary)
+				var to_args: Array[Variant] = _resolve_method_args(to_raw as Dictionary)
+				var captured_prop: String = prop_name
+				var captured_method: GdssMethod = method
+				var node_id: int = ref.get_instance_id() if ref != null else -1
+				pending_tween.tween_method(func(t: float) -> void:
+					var interp_args: Array[Variant] = captured_method.interpolate_args(from_args, to_args, t)
+					var result: Variant = captured_method.call_method(interp_args, node_id, "tween:" + captured_prop)
+					if result != null:
+						_tweened_values[captured_prop] = result
+					ref.queue_redraw()
+				, 0.0, 1.0, transition_time)
+				tweener_count += 1
+				continue
+		
 		match prop.type:
 			GDSS.Type.COLOR:
 				var fallback: Color = prop.get_default_value() if prop.get_default_value() is Color else Color.TRANSPARENT
-				var from: Color = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback)) as Color
-				var to: Color = _get_parsed_val(prop_name, to_state, fallback) as Color
+				var from_val: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
+				var to_val: Variant = _get_parsed_val(prop_name, to_state, fallback)
+				if not from_val is Color or not to_val is Color:
+					continue
+				var from: Color = from_val as Color
+				var to: Color = to_val as Color
 				if from == to:
 					continue
 				var captured: String = prop_name
@@ -185,11 +231,11 @@ func _start_transition(from_state: String, to_state: String) -> void:
 						_apply_overrides()
 				, from, to, transition_time)
 				tweener_count += 1
-
+			
 			GDSS.Type.COMPOSITE4:
 				var fallback: Vector4i = prop.get_default_value() if prop.get_default_value() is Vector4i else Vector4i.ZERO
-				var from_raw: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
-				var from: Vector4 = Vector4(from_raw) if from_raw is Vector4 else Vector4(from_raw as Vector4i)
+				var composite_from_raw: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
+				var from: Vector4 = Vector4(composite_from_raw) if composite_from_raw is Vector4 else Vector4(composite_from_raw as Vector4i)
 				var to: Vector4 = Vector4(_get_parsed_val(prop_name, to_state, fallback) as Vector4i)
 				if from == to:
 					continue
@@ -314,6 +360,79 @@ func _resolve_entry() -> Dictionary:
 	return entry
 
 
+func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> Variant:
+	raw = _resolve_sentinel(raw, fallback)
+	if raw is Dictionary:
+		var d: Dictionary = raw as Dictionary
+		if d.has("__resolved__"):
+			return d["__resolved__"]
+		if d.has("__gdss_method__"):
+			return _call_method(d, fallback, state_key)
+	if raw is String:
+		var s: String = raw as String
+		if s.begins_with("#") and Color.html_is_valid(s):
+			return Color.html(s)
+		if not s.begins_with("__gdss_"):
+			var named: Color = Color.from_string(s, Color(-1, -1, -1, -1))
+			if named.r != -1:
+				return named
+	return raw
+
+
+func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
+	var method_name: String = descriptor["__gdss_method__"]
+	var raw_args: Array = descriptor.get("args", [])
+	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
+	var resolved: Array[Variant] = []
+	for raw: String in raw_args:
+		var stripped: String = (raw as String).strip_edges()
+		if stripped.begins_with("$"):
+			var key: String = stripped.substr(1)
+			if GdssInterpreter.globals.has(key):
+				resolved.append(GdssInterpreter.globals[key])
+			elif ref != null and GdssInterpreter._instance_vars.has(ref.get_instance_id()):
+				resolved.append(GdssInterpreter._instance_vars[ref.get_instance_id()].get(key, null))
+			else:
+				resolved.append(GdssInterpreter._instance_defaults.get(key, null))
+		else:
+			resolved.append(method._resolve_arg(stripped) if method != null else stripped)
+	return resolved
+
+
+func _call_method(descriptor: Dictionary, fallback: Variant, state_key: String = "") -> Variant:
+	if descriptor.has("__resolved__"):
+		return descriptor["__resolved__"]
+
+	var name: String = descriptor["__gdss_method__"]
+	var raw_args: Array = descriptor.get("args", [])
+	var method: GdssMethod = GDSS._get_gdss_methods().get(name)
+	if method == null:
+		return fallback
+
+	var resolved_args: Array[Variant] = []
+	for raw: Variant in raw_args:
+		var stripped: String = (raw as String).strip_edges()
+		if stripped.begins_with("$"):
+			var key: String = stripped.substr(1)
+			if GdssInterpreter.globals.has(key):
+				resolved_args.append(GdssInterpreter.globals[key])
+			elif ref != null and GdssInterpreter._instance_vars.has(ref.get_instance_id()):
+				var iv: Dictionary = GdssInterpreter._instance_vars[ref.get_instance_id()]
+				resolved_args.append(iv.get(key, GdssInterpreter._instance_defaults.get(key, null)))
+			else:
+				resolved_args.append(GdssInterpreter._instance_defaults.get(key, null))
+		else:
+			resolved_args.append(method._resolve_arg(stripped))
+
+	var node_id: int = ref.get_instance_id() if ref != null else -1
+
+	if method.returns_texture:
+		var result: Variant = method.call_method(resolved_args, node_id, state_key)
+		return result if result != null else fallback
+
+	return method.call_method(resolved_args, node_id, state_key)
+
+
 func _get_parsed_val(key: String, state: String, fallback: Variant) -> Variant:
 	var entry: Dictionary = _resolve_entry()
 	if entry.is_empty():
@@ -325,7 +444,7 @@ func _get_parsed_val(key: String, state: String, fallback: Variant) -> Variant:
 		raw = entry["all"][key]
 	else:
 		return fallback
-	return _resolve_sentinel(raw, fallback)
+	return _resolve_value(raw, fallback, state)
 
 
 func _get_state() -> String:
@@ -359,6 +478,11 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 		if GdssInterpreter._instance_defaults.has(name):
 			return GdssInterpreter._instance_defaults[name]
 		return fallback
+	if s.begins_with("__gdss_local_method__"):
+		var name: String = s.substr("__gdss_local_method__".length())
+		if GdssInterpreter._local_vars.has(name):
+			return GdssInterpreter._local_vars[name]
+		return fallback
 	return raw
 
 
@@ -378,7 +502,33 @@ func _get_val(key: String, fallback: Variant) -> Variant:
 		raw = entry["all"][key]
 	else:
 		return fallback
-	return _resolve_sentinel(raw, fallback)
+	if raw is Dictionary and (raw as Dictionary).has("__gdss_method__"):
+		var mn: String = (raw as Dictionary)["__gdss_method__"]
+		var method: GdssMethod = GDSS._get_gdss_methods().get(mn)
+		if method != null and method.returns_texture:
+			var node_id: int = ref.get_instance_id()
+			var tween_tex: Texture2D = method.get_live_texture(node_id, "tween:" + key)
+			if tween_tex != null:
+				return tween_tex
+	return _resolve_value(raw, fallback, state)
+
+
+func _get_raw_parsed_val(key: String, state: String) -> Variant:
+	var entry: Dictionary = _resolve_entry()
+	if entry.is_empty():
+		return null
+	var raw: Variant = null
+	if entry.has(state) and entry[state].has(key):
+		raw = entry[state][key]
+	elif entry.has("all") and entry["all"].has(key):
+		raw = entry["all"][key]
+	else:
+		return null
+	raw = _resolve_sentinel(raw, null)
+	if raw is String and (raw as String).begins_with("__gdss_local_method__"):
+		var local_key: String = (raw as String).substr("__gdss_local_method__".length())
+		return GdssInterpreter._local_vars.get(local_key, null)
+	return raw
 
 
 func _draw(to_canvas_item: RID, rect: Rect2) -> void:
@@ -395,38 +545,131 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 
 	var expand: Vector4 = Vector4(vals.get("expand", Vector4i.ZERO))
 	rect = rect.grow_individual(expand.x, expand.z, expand.y, expand.w)
-
 	if not rect.has_area():
 		return
-
+	
 	var corner_radius: Vector4 = Vector4(vals.get("corner_radius", Vector4i.ZERO))
-	var corner_radii: Vector4 = corner_radius
-
 	var anti_aliasing: bool = vals.get("anti_aliasing", true)
 	var aa_size: float = 1.0 if anti_aliasing else 0.0
 	var detail: int = max(1, int(vals.get("corner_detail", 8)))
 	var skew_x: float = vals.get("skew_x", 0.0)
 	var skew_y: float = vals.get("skew_y", 0.0)
-
-	# Shadow
+	
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
-	var shadow_color: Color = vals.get("shadow_color", Color(0, 0, 0, 0.4))
+	var shadow_src: Variant = vals.get("shadow_color", Color(0, 0, 0, 0.4))
 	var shadow_size: float = float(shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
-	if shadow_size > 0.0:
+	if shadow_size > 1.0:
 		var shadow_outer: Rect2 = rect.grow(shadow_size)
-		_draw_ring_raw(to_canvas_item, rect, shadow_outer, _fit_corners(corner_radii, rect), _fit_corners(corner_radii, shadow_outer), shadow_color, true, detail, skew_x, skew_y)
+		if shadow_src is GradientTexture2D:
+			_draw_linear_gradient_ring(to_canvas_item, shadow_src as GradientTexture2D, rect, shadow_outer, _fit_corners(corner_radius, rect), detail, skew_x, skew_y, true)
+		elif shadow_src is Texture2D:
+			_draw_textured_ring(to_canvas_item, rect, shadow_outer, _fit_corners(corner_radius, rect), shadow_src as Texture2D, detail, skew_x, skew_y, true)
+		elif shadow_src is Color:
+			_draw_ring_raw(to_canvas_item, rect, shadow_outer, _fit_corners(corner_radius, rect), _fit_corners(corner_radius, shadow_outer), shadow_src as Color, true, detail, skew_x, skew_y)
 
-	var bg_color: Color = vals.get("bg_color", Color.TRANSPARENT)
-	if bg_color.a > 0.0:
-		_draw_rect(to_canvas_item, rect, bg_color, corner_radii, aa_size, detail, skew_x, skew_y)
+	var bg: Variant = vals.get("bg_color", Color.TRANSPARENT)
+	if bg is GradientTexture2D:
+		_draw_linear_gradient_rect(to_canvas_item, bg as GradientTexture2D, rect, corner_radius, detail, skew_x, skew_y)
+	elif bg is Color and (bg as Color).a > 0.0:
+		_draw_rect(to_canvas_item, rect, bg as Color, corner_radius, aa_size, detail, skew_x, skew_y)
 
 	var border: Vector4 = Vector4(vals.get("border", Vector4i.ZERO))
-	var border_color: Color = vals.get("border_color", Color.TRANSPARENT)
+	var border_src: Variant = vals.get("border_color", Color.TRANSPARENT)
 	var has_border: bool = border.x > 0 or border.y > 0 or border.z > 0 or border.w > 0
-	if has_border and border_color.a > 0.0:
+	if has_border:
 		var inner_rect: Rect2 = rect.grow_individual(-border.x, -border.z, -border.y, -border.w)
 		if inner_rect.has_area():
-			_draw_ring(to_canvas_item, inner_rect, rect, corner_radii, border_color, aa_size, detail, skew_x, skew_y)
+			if border_src is GradientTexture2D:
+				_draw_linear_gradient_ring(to_canvas_item, border_src as GradientTexture2D, inner_rect, rect, corner_radius, detail, skew_x, skew_y)
+			elif border_src is Color and (border_src as Color).a > 0.0:
+				_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_src as Color, aa_size, detail, skew_x, skew_y)
+
+
+func _draw_texture_in_rect(to_canvas_item: RID, tex: Texture2D, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
+	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, _fit_corners(corner_radii, rect), detail), rect, skew_x, skew_y)
+	var n: int = points.size()
+	var uvs: PackedVector2Array
+	uvs.resize(n)
+	for i: int in n:
+		uvs[i] = (points[i] - rect.position) / rect.size
+	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [Color.WHITE], uvs, tex.get_rid())
+
+
+func _draw_textured_ring(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, corner_radii: Vector4, tex: Texture2D, detail: int, skew_x: float, skew_y: float, fade: bool = false) -> void:
+	var outer_fitted: Vector4 = _fit_corners(corner_radii, outer_rect)
+	var inner_fitted: Vector4 = _fit_corners(corner_radii, inner_rect)
+	var inner_points: PackedVector2Array = _apply_skew(_get_rounded_rect(inner_rect, inner_fitted, detail), inner_rect, skew_x, skew_y)
+	var outer_points: PackedVector2Array = _apply_skew(_get_rounded_rect(outer_rect, outer_fitted, detail), outer_rect, skew_x, skew_y)
+	var n: int = max(inner_points.size(), outer_points.size())
+	for i: int in n:
+		var i0: int = i % inner_points.size()
+		var i1: int = (i + 1) % inner_points.size()
+		var o0: int = i % outer_points.size()
+		var o1: int = (i + 1) % outer_points.size()
+		var p0: Vector2 = inner_points[i0]
+		var p1: Vector2 = outer_points[o0]
+		var p2: Vector2 = outer_points[o1]
+		var p3: Vector2 = inner_points[i1]
+		if p0.is_equal_approx(p1) or p0.is_equal_approx(p3) or p1.is_equal_approx(p2) or p2.is_equal_approx(p3) or p0.is_equal_approx(p2) or p1.is_equal_approx(p3):
+			continue
+		var quad: PackedVector2Array = PackedVector2Array([p0, p1, p2, p3])
+		var uvs: PackedVector2Array
+		uvs.resize(4)
+		var colors: PackedColorArray
+		colors.resize(4)
+		for j: int in 4:
+			uvs[j] = (quad[j] - outer_rect.position) / outer_rect.size
+			var is_outer: bool = j == 1 or j == 2
+			colors[j] = Color(1, 1, 1, 0.0 if (fade and is_outer) else 1.0)
+		RenderingServer.canvas_item_add_polygon(to_canvas_item, quad, colors, uvs, tex.get_rid())
+
+
+func _draw_linear_gradient_rect(to_canvas_item: RID, tex: GradientTexture2D, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
+	var grad: Gradient = tex.gradient
+	var c1: Color = grad.get_color(0)
+	var c2: Color = grad.get_color(1)
+	var angle: float = tex.fill_from.angle_to_point(tex.fill_to)
+	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, _fit_corners(corner_radii, rect), detail), rect, skew_x, skew_y)
+	var colors: PackedColorArray
+	colors.resize(points.size())
+	for i: int in points.size():
+		var p: Vector2 = points[i]
+		var t: float = ((p - rect.position) / rect.size).dot(Vector2(cos(angle), sin(angle))) * 0.5 + 0.5
+		colors[i] = c1.lerp(c2, clampf(t, 0.0, 1.0))
+	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, colors)
+
+
+func _draw_linear_gradient_ring(to_canvas_item: RID, tex: GradientTexture2D, inner_rect: Rect2, outer_rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float, fade: bool = false) -> void:
+	var grad: Gradient = tex.gradient
+	var c1: Color = grad.get_color(0)
+	var c2: Color = grad.get_color(1)
+	var angle: float = tex.fill_from.angle_to_point(tex.fill_to)
+	var outer_fitted: Vector4 = _fit_corners(corner_radii, outer_rect)
+	var inner_fitted: Vector4 = _fit_corners(corner_radii, inner_rect)
+	var inner_points: PackedVector2Array = _apply_skew(_get_rounded_rect(inner_rect, inner_fitted, detail), inner_rect, skew_x, skew_y)
+	var outer_points: PackedVector2Array = _apply_skew(_get_rounded_rect(outer_rect, outer_fitted, detail), outer_rect, skew_x, skew_y)
+	var n: int = max(inner_points.size(), outer_points.size())
+	for i: int in n:
+		var i0: int = i % inner_points.size()
+		var i1: int = (i + 1) % inner_points.size()
+		var o0: int = i % outer_points.size()
+		var o1: int = (i + 1) % outer_points.size()
+		var p0: Vector2 = inner_points[i0]
+		var p1: Vector2 = outer_points[o0]
+		var p2: Vector2 = outer_points[o1]
+		var p3: Vector2 = inner_points[i1]
+		var quad: PackedVector2Array = PackedVector2Array([p0, p1, p2, p3])
+		var quad_colors: PackedColorArray
+		quad_colors.resize(4)
+		for j: int in 4:
+			var p: Vector2 = quad[j]
+			var t: float = ((p - outer_rect.position) / outer_rect.size).dot(Vector2(cos(angle), sin(angle))) * 0.5 + 0.5
+			var col: Color = c1.lerp(c2, clampf(t, 0.0, 1.0))
+			var is_outer: bool = j == 1 or j == 2
+			if fade and is_outer:
+				col.a = 0.0
+			quad_colors[j] = col
+		RenderingServer.canvas_item_add_polygon(to_canvas_item, quad, quad_colors)
 
 
 func _draw_rect(to_canvas_item: RID, rect: Rect2, color: Color, corner_radii: Vector4, aa: float, detail: int, skew_x: float, skew_y: float) -> void:

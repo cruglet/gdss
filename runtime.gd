@@ -41,6 +41,12 @@ func _reload_parsed() -> void:
 		var val: Variant = (raw as Dictionary)[key]
 		if val is Dictionary:
 			GdssInterpreter.parsed[key] = val
+	if data.has("local_vars") and data["local_vars"] is Dictionary:
+		for key: String in (data["local_vars"] as Dictionary):
+			GdssInterpreter._local_vars[key] = (data["local_vars"] as Dictionary)[key]
+	for method: GdssMethod in GDSS._get_gdss_methods().values():
+		if method.returns_texture:
+			method.clear_live_textures()
 	_refresh_all_handlers()
 
 
@@ -51,6 +57,7 @@ func _refresh_all_handlers() -> void:
 func _refresh_tree(node: Node) -> void:
 	if node.has_meta("gdss_handler"):
 		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
+		box._tweened_values.clear()
 		box.emit_changed()
 		if node is CanvasItem:
 			(node as CanvasItem).queue_redraw()
@@ -80,6 +87,9 @@ func _ensure_parsed() -> void:
 	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
 		for key: String in (data["instance_defaults"] as Dictionary):
 			GdssInterpreter._instance_defaults[key] = (data["instance_defaults"] as Dictionary)[key]
+	if data.has("local_vars") and data["local_vars"] is Dictionary:
+		for key: String in (data["local_vars"] as Dictionary):
+			GdssInterpreter._local_vars[key] = (data["local_vars"] as Dictionary)[key]
 
 
 func _bind_tree(node: Node) -> void:

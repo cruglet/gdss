@@ -7,12 +7,13 @@ static func get_save_path() -> String:
 	return ProjectSettings.get_setting("gdss/storage/save_path", "res://theme.gdss")
 
 
-static func save(source: String, parsed: Dictionary, global_defaults: Dictionary = {}, instance_defaults: Dictionary = {}, path: String = "") -> void:
+static func save(source: String, parsed: Dictionary, global_defaults: Dictionary = {}, instance_defaults: Dictionary = {}, local_vars: Dictionary = {}, path: String = "") -> void:
 	var data: Dictionary = {
 		"source": source,
 		"parsed": parsed,
 		"global_defaults": global_defaults,
-		"instance_defaults": instance_defaults
+		"instance_defaults": instance_defaults,
+		"local_vars": local_vars,
 	}
 	var target: String = path if not path.is_empty() else get_save_path()
 	var bytes: PackedByteArray = var_to_bytes_with_objects(data)

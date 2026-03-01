@@ -68,6 +68,7 @@ func _build_from_objects() -> void:
 func _on_text_changed() -> void:
 	_parse_user_variables()
 	var word: String = _get_current_word()
+	_update_code_hint(word)
 	if word.begins_with("$"):
 		_update_completions(word)
 		editor.request_code_completion(true)
@@ -75,19 +76,47 @@ func _on_text_changed() -> void:
 	if word.is_empty():
 		var context: Dictionary = _get_context()
 		var type: String = context.get("type", "")
-		var current_line: String = editor.get_line(editor.get_caret_line())
-		var line_is_only_whitespace: bool = current_line.strip_edges().is_empty()
 		if type == "property_value":
 			editor.request_code_completion(true)
 			return
 		editor.cancel_code_completion()
 		return
 	_update_completions(word)
+	editor.request_code_completion(true)
 
 
 func _on_completion_requested() -> void:
 	_parse_user_variables()
-	_update_completions(_get_current_word())
+	var word: String = _get_current_word()
+	_update_completions(word)
+	_update_code_hint(word)
+
+
+func _update_code_hint(word: String) -> void:
+	var line: String = editor.get_line(editor.get_caret_line())
+	var col: int = editor.get_caret_column()
+	var paren_pos: int = line.rfind("(", col)
+	if paren_pos == -1:
+		editor.set_code_hint("")
+		return
+	var before_paren: String = line.substr(0, paren_pos).strip_edges()
+	var method_name: String = before_paren.split(" ")[-1].split(":")[-1].strip_edges()
+	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
+	if method == null:
+		editor.set_code_hint("")
+		return
+	var inside: String = line.substr(paren_pos + 1, col - paren_pos - 1)
+	var depth: int = 0
+	var active_param: int = 0
+	for i: int in inside.length():
+		var c: String = inside[i]
+		if c == "(":
+			depth += 1
+		elif c == ")":
+			depth -= 1
+		elif c == "," and depth == 0:
+			active_param += 1
+	editor.set_code_hint(method.get_code_hint(active_param))
 
 
 func _update_completions(word: String) -> void:
@@ -113,7 +142,7 @@ func _update_completions(word: String) -> void:
 				_complete_properties(word, context.get("style", ""))
 		"variant_decl":
 			_complete_states(word.trim_prefix(":"), context.get("style", ""))
-		"property_value":
+		"property_value", "property_value_filled":
 			_complete_values(word, context.get("style", ""), context.get("property", ""))
 		"variant_block":
 			_complete_properties(word, context.get("style", ""))
@@ -220,11 +249,18 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 		effective_type = prop_def.type
 
 	for method: GdssMethod in _methods:
-		if not method.supported_types.has(effective_type):
+		if not method.supported_prop_types.has(effective_type):
 			continue
 		if word.is_empty() or method.method_name.begins_with(word):
-			var label: String = method.method_name + ("(…)" if method.parameters.size() > 0 else "()")
-			editor.add_code_completion_option(CodeEdit.KIND_FUNCTION, label, method.method_name + "(", _completion_color, _get_icon(&"MemberMethod"))
+			var has_params: bool = method.parameters.size() > 0
+			var display: String = method.method_name + ("(…)" if has_params else "()")
+			editor.add_code_completion_option(
+				CodeEdit.KIND_FUNCTION,
+				display,
+				method.method_name + "(",
+				_completion_color,
+				_get_icon(&"MemberMethod")
+			)
 
 	if prop_def == null:
 		return
