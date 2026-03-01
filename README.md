@@ -6,10 +6,7 @@ decided to open source it in case anyone would like to use it or help support th
 Do not expect this plugin to be 100% stable- it is a work in progress.
 
 ## Some showcase videos
-
-https://youtu.be/0vPR0N9wa-M
-
-https://youtu.be/HSPjfHhVoIQ
+[[dev#1]](https://youtu.be/0vPR0N9wa-M) [[dev#2]](https://youtu.be/HSPjfHhVoIQ) [[dev#3]](https://youtu.be/9HrSvX_Mqbo) [[dev#4]](https://youtu.be/JoT_QkDIMgE)
 
 ## Example Syntax
 
@@ -41,7 +38,6 @@ Panel, PanelContainer {
 
 ### Features
 - [x] Selectors, state blocks, composite shorthand, comma groups
-- [x] Live editor preview
 - [x] State transitions
 - [x] Easing config (`transition_func`, `transition_type`)
 - [x] Skew (`skew_x`, `skew_y`), corner detail, shadow
@@ -49,13 +45,13 @@ Panel, PanelContainer {
 - [x] Classes
 - [x] Runtime support + hot-reload
 - [x] Hex color parsing
+- [x] Variable support
+- [x] Some way to preview the node as you're writing in gdss.
+- [x] Export variable support (in order to access from GDScript)
 
 ### TODO
 (not necessarily in order)
 - [ ] Custom method support `min()/max()/clamp(), linear_gradient(), etc.`
-- [ ] Variable support
-- [ ] Export variable support (in order to access from GDScript)
 - [ ] Syntax error highlighting 
 - [ ] UI polish
-- [ ] Some way to preview tS2heetshe node as you're writing in gdss.
-- [ ] Masking support (for animated/custom color properties like a gradient bg_color or border_color)
+
