@@ -140,12 +140,29 @@ func _apply_overrides() -> void:
 			GdssProp.Category.COLOR:
 				if val is Color:
 					control.add_theme_color_override(prop.name, val)
+					for subprop: String in prop.category_subproperties:
+						control.add_theme_color_override(subprop, val)
 			GdssProp.Category.CONST:
 				if val is int or val is float:
 					control.add_theme_constant_override(prop.name, int(val))
 			GdssProp.Category.FONT_SIZE:
 				if val is int or val is float:
 					control.add_theme_font_size_override(prop.name, int(val))
+			GdssProp.Category.NODE_PROPERTY:
+				if prop.type == GDSS.Type.CURSOR:
+					if control is Control:
+						control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
+				else:
+					control.set(prop.name, val)
+
+
+func _get_cursor_shape(type: String) -> Control.CursorShape:
+	match type:
+		"ARROW": return Control.CursorShape.CURSOR_ARROW
+		"IBEAM": return Control.CursorShape.CURSOR_IBEAM
+		"POINTING": return Control.CursorShape.CURSOR_POINTING_HAND
+		"DISABLED": return Control.CursorShape.CURSOR_FORBIDDEN
+	return Control.CursorShape.CURSOR_ARROW
 
 
 func _get_animatable_props() -> Dictionary:
@@ -657,8 +674,6 @@ func _draw_textured_ring(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rec
 
 func _draw_linear_gradient_rect(to_canvas_item: RID, tex: GradientTexture2D, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
 	var grad: Gradient = tex.gradient
-	var c1: Color = grad.get_color(0)
-	var c2: Color = grad.get_color(1)
 	var angle: float = tex.fill_from.angle_to_point(tex.fill_to)
 	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, _fit_corners(corner_radii, rect), detail), rect, skew_x, skew_y)
 	var colors: PackedColorArray
@@ -666,7 +681,7 @@ func _draw_linear_gradient_rect(to_canvas_item: RID, tex: GradientTexture2D, rec
 	for i: int in points.size():
 		var p: Vector2 = points[i]
 		var t: float = ((p - rect.position) / rect.size).dot(Vector2(cos(angle), sin(angle))) * 0.5 + 0.5
-		colors[i] = c1.lerp(c2, clampf(t, 0.0, 1.0))
+		colors[i] = grad.sample(clampf(t, 0.0, 1.0))
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, colors)
 
 

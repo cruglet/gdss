@@ -7,6 +7,7 @@ enum Category {
 	COLOR,
 	CONST,
 	FONT_SIZE,
+	NODE_PROPERTY
 }
 
 var name: String = "":
@@ -29,6 +30,7 @@ var composite_of: PackedStringArray = []:
 			return composite_of
 		else:
 			return []
+var category_subproperties: PackedStringArray
 
 
 func _get_property_list() -> Array[Dictionary]:
@@ -64,6 +66,12 @@ func _get_property_list() -> Array[Dictionary]:
 		"type": TYPE_INT,
 		"hint": PROPERTY_HINT_ENUM,
 		"hint_string": ",".join(Category.keys())
+	})
+	
+	props.append({
+		"name": "category_subproperties",
+		"type": TYPE_PACKED_STRING_ARRAY,
+		"hint": PROPERTY_HINT_ARRAY_TYPE,
 	})
 	
 	return props
