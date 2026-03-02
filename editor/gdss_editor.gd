@@ -8,6 +8,9 @@ static var _code_editor_ref: CodeEdit
 @export var code_edit: CodeEdit
 @export var error_label: Label
 @export var title_label: Label
+@export var copy_button: Button
+
+var err_line_num: int
 
 var _has_unsaved_changes: bool = false
 var _current_file_path: String = ""
@@ -22,9 +25,34 @@ func _ready() -> void:
 	
 	error_label.add_theme_font_override(&"font", EditorInterface.get_editor_theme().get_font(&"expression", &"EditorFonts"))
 	error_label.add_theme_color_override(&"font_color", EditorInterface.get_editor_theme().get_color(&"error_color", &"Editor"))
+	error_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	error_label.gui_input.connect(func(e: InputEvent) -> void:
+		if e is InputEventMouseButton:
+			if e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+				code_edit.set_caret_line(err_line_num)
+	)
+	
+	copy_button.icon = EditorInterface.get_editor_theme().get_icon(&"ActionCopy", &"EditorIcons")
 	
 	title_label.text = file_name
 	code_edit.gui_input.connect(_on_code_edit_input)
+
+
+func get_code_edit() -> CodeEdit:
+	return code_edit
+
+
+func show_error(message: String, line_num: int) -> void:
+	if line_num == -1:
+		error_label.text = ""
+		error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		copy_button.disabled = true
+		return
+	
+	error_label.text = "[%s]: %s" % [line_num, message]
+	err_line_num = line_num
+	error_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	copy_button.disabled = false
 
 
 func _on_code_edit_input(event: InputEvent) -> void:
@@ -69,3 +97,7 @@ func get_current_file_path() -> String:
 
 func has_unsaved_changes() -> bool:
 	return _has_unsaved_changes
+
+
+func _on_copy_button_pressed() -> void:
+	DisplayServer.clipboard_set(error_label.text)
