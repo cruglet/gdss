@@ -157,13 +157,16 @@ static func _handler_uses_sentinel(box: GdssPropHandler, sentinel: String) -> bo
 
 
 static func _get_gdss_nodes() -> Dictionary[String, GdssNode]:
-	var nl: GdssNodeList = preload("uid://jw1xlcsh6exq")
-	return nl.list
+	return get_db().node_list
 
 
 static func _get_gdss_methods() -> Dictionary[String, GdssMethod]:
-	var ml: GdssMethodList = preload("uid://b5cvdpn7uy7xt")
-	return ml.list
+	return get_db().method_list
+
+
+static func get_db() -> GdssDB:
+	var db: GdssDB = preload("uid://wmo287ce38ty")
+	return db
 
 
 func _enter_tree() -> void:
@@ -287,8 +290,7 @@ func _debug_hook() -> void:
 	debug_repopulate_button = Button.new()
 	debug_repopulate_button.text = "Repopulate (Nodes + Methods)"
 	debug_repopulate_button.pressed.connect(func() -> void:
-		preload("uid://b5cvdpn7uy7xt")._populate_list.call()
-		preload("uid://jw1xlcsh6exq")._populate_list.call()
+		get_db().repopulate()
 		EditorInterface.get_editor_toaster().push_toast("Repopulated nodes + methods!", EditorToaster.SEVERITY_INFO)
 	)
 	debug_container.add_child(debug_repopulate_button)

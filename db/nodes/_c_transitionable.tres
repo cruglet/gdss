@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="GdssNodeComponent" format=3 uid="uid://bqvj78i7bw5mc"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_hja70"]
+[ext_resource type="Resource" uid="uid://dxljxuc70lfm1" path="res://addons/gdss/db/props/transition_time.tres" id="2_fn0wh"]
+[ext_resource type="Script" uid="uid://dwbg4n2iss5cu" path="res://addons/gdss/db/nodes/_component.gd" id="2_tub2j"]
+[ext_resource type="Resource" uid="uid://bd1gpuhft3450" path="res://addons/gdss/db/props/transition_func.tres" id="3_j7hec"]
+[ext_resource type="Resource" uid="uid://5sistwednw3k" path="res://addons/gdss/db/props/transition_type.tres" id="4_gkgbx"]
+
+[resource]
+script = ExtResource("2_tub2j")
+component_name = "Transitionable"
+properties = Array[ExtResource("1_hja70")]([ExtResource("2_fn0wh"), ExtResource("3_j7hec"), ExtResource("4_gkgbx")])
+default_state = true
+metadata/_custom_type_script = "uid://dwbg4n2iss5cu"

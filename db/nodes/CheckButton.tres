@@ -5,26 +5,6 @@
 [resource]
 script = ExtResource("1_sj36t")
 states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
-theme_properties = Dictionary[String, bool]({
-"anti_aliasing": true,
-"bg_color": true,
-"border": true,
-"border_color": true,
-"corner_detail": true,
-"corner_radius": true,
-"cursor": true,
-"expand": true,
-"font_color": true,
-"font_size": true,
-"padding": true,
-"shadow": true,
-"shadow_color": true,
-"skew_x": true,
-"skew_y": true,
-"transition_func": true,
-"transition_time": true,
-"transition_type": true
-})
 base_type = &"CheckButton"
 style_name = &"CheckButton"
 metadata/_custom_type_script = "uid://bysui7kt6peex"

@@ -1,0 +1,106 @@
+[gd_resource type="Resource" script_class="GdssDB" format=3 uid="uid://wmo287ce38ty"]
+
+[ext_resource type="Script" uid="uid://bdit0f5lvxmbp" path="res://addons/gdss/db/db.gd" id="1_dm4kf"]
+[ext_resource type="Script" uid="uid://dwbg4n2iss5cu" path="res://addons/gdss/db/nodes/_component.gd" id="1_miyk3"]
+[ext_resource type="Script" uid="uid://bn6wk7my78ce7" path="res://addons/gdss/db/nodes/_base.gd" id="1_yumic"]
+[ext_resource type="Script" uid="uid://dwjolxl3ubtln" path="res://addons/gdss/db/methods/_base.gd" id="1_yv5ta"]
+[ext_resource type="Resource" uid="uid://bvvowubwvk21u" path="res://addons/gdss/db/methods/clamp.tres" id="2_jdab2"]
+[ext_resource type="Resource" uid="uid://kh3rhpun3b8o" path="res://addons/gdss/db/nodes/_c_base.tres" id="2_nih4e"]
+[ext_resource type="Resource" uid="uid://bxhe0trxoy761" path="res://addons/gdss/db/methods/hsv.tres" id="3_miyk3"]
+[ext_resource type="Resource" uid="uid://bgid61knna504" path="res://addons/gdss/db/nodes/_c_editable_text.tres" id="3_swgl8"]
+[ext_resource type="Resource" uid="uid://xr7xsw62oswb" path="res://addons/gdss/db/nodes/_c_standard_fonts.tres" id="4_m66bn"]
+[ext_resource type="Resource" uid="uid://bbxnlk0lhi1ir" path="res://addons/gdss/db/methods/linear_gradient.tres" id="4_qdgra"]
+[ext_resource type="Resource" uid="uid://5dkveqhu4tfo" path="res://addons/gdss/db/methods/mix.tres" id="5_dl33f"]
+[ext_resource type="Resource" uid="uid://d1s07mmffemj0" path="res://addons/gdss/db/nodes/_c_stylebox.tres" id="5_lnx7k"]
+[ext_resource type="Resource" uid="uid://bktwm0iff3ncf" path="res://addons/gdss/db/methods/rgba.tres" id="6_cfjqs"]
+[ext_resource type="Resource" uid="uid://bqvj78i7bw5mc" path="res://addons/gdss/db/nodes/_c_transitionable.tres" id="6_vkhqo"]
+[ext_resource type="Resource" uid="uid://dfq872kabx1lx" path="res://addons/gdss/db/methods/texture.tres" id="7_vgjvw"]
+[ext_resource type="Resource" uid="uid://v3fvukce5m8m" path="res://addons/gdss/db/nodes/Button.tres" id="9_nih4e"]
+[ext_resource type="Resource" uid="uid://d20mrkg1mjdgd" path="res://addons/gdss/db/nodes/CheckBox.tres" id="10_swgl8"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="11_ig14j"]
+[ext_resource type="Resource" uid="uid://blewkqxtfx42v" path="res://addons/gdss/db/nodes/CheckButton.tres" id="11_m66bn"]
+[ext_resource type="Resource" uid="uid://cgfetyh5xiwre" path="res://addons/gdss/db/nodes/ColorPickerButton.tres" id="12_lnx7k"]
+[ext_resource type="Resource" uid="uid://ubsnex8kqdd1" path="res://addons/gdss/db/nodes/LinkButton.tres" id="13_vkhqo"]
+[ext_resource type="Resource" uid="uid://4b0bbl36miuk" path="res://addons/gdss/db/nodes/MenuButton.tres" id="14_24g4u"]
+[ext_resource type="Resource" uid="uid://pm2x5syejo74" path="res://addons/gdss/db/nodes/OptionButton.tres" id="15_vke44"]
+[ext_resource type="Resource" uid="uid://ba3p6on4rccbq" path="res://addons/gdss/db/nodes/Panel.tres" id="16_7n7pt"]
+[ext_resource type="Resource" uid="uid://cmvtwk5nv2ou4" path="res://addons/gdss/db/nodes/PanelContainer.tres" id="17_nm68i"]
+[ext_resource type="Resource" uid="uid://dohoynmmu05o" path="res://addons/gdss/db/props/anti_aliasing.tres" id="19_0ebdc"]
+[ext_resource type="Resource" uid="uid://c0mcitl1dqjit" path="res://addons/gdss/db/nodes/LineEdit.tres" id="19_swgl8"]
+[ext_resource type="Resource" uid="uid://bw81w2ub4jtck" path="res://addons/gdss/db/props/bg_color.tres" id="20_vv3f1"]
+[ext_resource type="Resource" uid="uid://baf7ce3gs2jv3" path="res://addons/gdss/db/props/border.tres" id="21_mvt35"]
+[ext_resource type="Resource" uid="uid://q868h2lvtq21" path="res://addons/gdss/db/props/border_color.tres" id="22_s2toh"]
+[ext_resource type="Resource" uid="uid://oggay82e2rqi" path="res://addons/gdss/db/props/caret_color.tres" id="23_6rbdx"]
+[ext_resource type="Resource" uid="uid://flt841skxt6l" path="res://addons/gdss/db/props/corner_detail.tres" id="24_sxra3"]
+[ext_resource type="Resource" uid="uid://cyk5xlgeaiuwi" path="res://addons/gdss/db/props/corner_radius.tres" id="25_vm72y"]
+[ext_resource type="Resource" uid="uid://c2w3chwnlgn3c" path="res://addons/gdss/db/props/cursor.tres" id="26_v8gur"]
+[ext_resource type="Resource" uid="uid://dmbeiejithhrk" path="res://addons/gdss/db/props/expand.tres" id="27_r8g22"]
+[ext_resource type="Resource" uid="uid://dumxdopjyi2u6" path="res://addons/gdss/db/props/font_color.tres" id="28_etjxy"]
+[ext_resource type="Resource" uid="uid://dv6huefcagugx" path="res://addons/gdss/db/props/font_placeholder_color.tres" id="29_ucild"]
+[ext_resource type="Resource" uid="uid://yxypl7ibep8a" path="res://addons/gdss/db/props/font_size.tres" id="30_am8mq"]
+[ext_resource type="Resource" uid="uid://7rdt8cs04c00" path="res://addons/gdss/db/props/padding.tres" id="31_lxf86"]
+[ext_resource type="Resource" uid="uid://cc2cy2bwp50se" path="res://addons/gdss/db/props/selection_color.tres" id="32_fgtpw"]
+[ext_resource type="Resource" uid="uid://2fe4ykeh5di" path="res://addons/gdss/db/props/shadow.tres" id="33_m1mbn"]
+[ext_resource type="Resource" uid="uid://dtfjy127omnii" path="res://addons/gdss/db/props/shadow_color.tres" id="34_6rrgx"]
+[ext_resource type="Resource" uid="uid://bm34cnrewsno3" path="res://addons/gdss/db/props/skew_x.tres" id="35_xa356"]
+[ext_resource type="Resource" uid="uid://c0x5kfmolr1qc" path="res://addons/gdss/db/props/skew_y.tres" id="36_h65uo"]
+[ext_resource type="Resource" uid="uid://bd1gpuhft3450" path="res://addons/gdss/db/props/transition_func.tres" id="37_c7yx5"]
+[ext_resource type="Resource" uid="uid://dxljxuc70lfm1" path="res://addons/gdss/db/props/transition_time.tres" id="38_6r8de"]
+[ext_resource type="Resource" uid="uid://5sistwednw3k" path="res://addons/gdss/db/props/transition_type.tres" id="39_7gfsa"]
+
+[resource]
+script = ExtResource("1_dm4kf")
+node_list = Dictionary[String, ExtResource("1_yumic")]({
+"Button": ExtResource("9_nih4e"),
+"CheckBox": ExtResource("10_swgl8"),
+"CheckButton": ExtResource("11_m66bn"),
+"ColorPickerButton": ExtResource("12_lnx7k"),
+"LineEdit": ExtResource("19_swgl8"),
+"LinkButton": ExtResource("13_vkhqo"),
+"MenuButton": ExtResource("14_24g4u"),
+"OptionButton": ExtResource("15_vke44"),
+"Panel": ExtResource("16_7n7pt"),
+"PanelContainer": ExtResource("17_nm68i")
+})
+property_list = Dictionary[String, ExtResource("11_ig14j")]({
+"anti_aliasing": ExtResource("19_0ebdc"),
+"bg_color": ExtResource("20_vv3f1"),
+"border": ExtResource("21_mvt35"),
+"border_color": ExtResource("22_s2toh"),
+"caret_color": ExtResource("23_6rbdx"),
+"corner_detail": ExtResource("24_sxra3"),
+"corner_radius": ExtResource("25_vm72y"),
+"cursor": ExtResource("26_v8gur"),
+"expand": ExtResource("27_r8g22"),
+"font_color": ExtResource("28_etjxy"),
+"font_placeholder_color": ExtResource("29_ucild"),
+"font_size": ExtResource("30_am8mq"),
+"padding": ExtResource("31_lxf86"),
+"selection_color": ExtResource("32_fgtpw"),
+"shadow": ExtResource("33_m1mbn"),
+"shadow_color": ExtResource("34_6rrgx"),
+"skew_x": ExtResource("35_xa356"),
+"skew_y": ExtResource("36_h65uo"),
+"transition_func": ExtResource("37_c7yx5"),
+"transition_time": ExtResource("38_6r8de"),
+"transition_type": ExtResource("39_7gfsa")
+})
+method_list = Dictionary[String, ExtResource("1_yv5ta")]({
+"clamp": ExtResource("2_jdab2"),
+"hsv": ExtResource("3_miyk3"),
+"linear_gradient": ExtResource("4_qdgra"),
+"mix": ExtResource("5_dl33f"),
+"rgba": ExtResource("6_cfjqs"),
+"texture": ExtResource("7_vgjvw")
+})
+component_list = Dictionary[String, ExtResource("1_miyk3")]({
+"Base": ExtResource("2_nih4e"),
+"Editable Text": ExtResource("3_swgl8"),
+"Standard Fonts": ExtResource("4_m66bn"),
+"Stylebox": ExtResource("5_lnx7k"),
+"Transitionable": ExtResource("6_vkhqo")
+})
+methods_dir = "res://addons/gdss/db/methods"
+nodes_dir = "res://addons/gdss/db/nodes"
+props_dir = "res://addons/gdss/db/props"
+metadata/_custom_type_script = "uid://bdit0f5lvxmbp"

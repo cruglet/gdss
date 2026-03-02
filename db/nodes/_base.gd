@@ -3,16 +3,9 @@
 extends Resource
 
 @export var states: PackedStringArray
-@export var theme_properties: Dictionary[String, bool]
+@export var enabled_components: Dictionary[String, bool]
 @export var base_type: StringName
 @export var style_name: StringName
-
-@export_group("Debug")
-#@export_tool_button("Print Property Info") var _print_properties: Callable:
-	#get:
-		#return func() -> void:
-			#for prop: GdssProp in theme_properties:
-				#print(prop.get_info(), "\n\n")
 
 
 @abstract func get_events() -> PackedStringArray
@@ -42,10 +35,11 @@ func unbind_canvas_item(canvas_item: CanvasItem) -> void:
 func get_enabled_props() -> Array[GdssProp]:
 	var props: Array[GdssProp]
 	
-	for prop: String in theme_properties:
-		var enabled: bool = theme_properties.get(prop)
-		if enabled:
-			props.append(GdssNodeList.PROPERTY_LIST.list.get(prop))
+	for component_name: String in enabled_components:
+		var list: Dictionary[String, GdssNodeComponent] = GDSS.get_db().component_list
+		if list.has(component_name):
+			var component: GdssNodeComponent = list.get(component_name)
+			props.append_array(component.properties)
 	
 	return props
 

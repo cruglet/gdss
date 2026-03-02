@@ -5,25 +5,12 @@
 [resource]
 script = ExtResource("1_xfoht")
 states = PackedStringArray("panel")
-theme_properties = Dictionary[String, bool]({
-"anti_aliasing": true,
-"bg_color": true,
-"border": true,
-"border_color": true,
-"corner_detail": true,
-"corner_radius": true,
-"cursor": true,
-"expand": true,
-"font_color": false,
-"font_size": false,
-"padding": true,
-"shadow": true,
-"shadow_color": true,
-"skew_x": true,
-"skew_y": true,
-"transition_func": false,
-"transition_time": false,
-"transition_type": false
+enabled_components = Dictionary[String, bool]({
+"Base": true,
+"Editable Text": false,
+"Standard Fonts": false,
+"Stylebox": true,
+"Transitionable": false
 })
 base_type = &"Panel"
 style_name = &"Panel"

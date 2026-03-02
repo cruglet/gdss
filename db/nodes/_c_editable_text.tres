@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GdssNodeComponent" format=3 uid="uid://bgid61knna504"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_22b7j"]
+[ext_resource type="Script" uid="uid://dwbg4n2iss5cu" path="res://addons/gdss/db/nodes/_component.gd" id="2_06ulg"]
+[ext_resource type="Resource" uid="uid://dv6huefcagugx" path="res://addons/gdss/db/props/font_placeholder_color.tres" id="2_sdw4s"]
+[ext_resource type="Resource" uid="uid://oggay82e2rqi" path="res://addons/gdss/db/props/caret_color.tres" id="3_wpcvl"]
+[ext_resource type="Resource" uid="uid://cc2cy2bwp50se" path="res://addons/gdss/db/props/selection_color.tres" id="4_cxy6h"]
+
+[resource]
+script = ExtResource("2_06ulg")
+component_name = "Editable Text"
+properties = Array[ExtResource("1_22b7j")]([ExtResource("2_sdw4s"), ExtResource("3_wpcvl"), ExtResource("4_cxy6h")])
+metadata/_custom_type_script = "uid://dwbg4n2iss5cu"

@@ -106,6 +106,9 @@ func _on_node_added(node: Node) -> void:
 
 func _try_bind(canvas_item: CanvasItem) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
+	if not gdss_node:
+		#push_warning("Could not bind type \"%s\" to gdss_node:\nList Entry: %s" % [canvas_item.get_class(), GDSS._get_gdss_nodes()])
+		return
 	if not canvas_item.get_meta("gdss_enabled", false):
 		return
 	if canvas_item.has_meta("gdss_handler"):

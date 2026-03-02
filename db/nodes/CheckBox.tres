@@ -5,25 +5,12 @@
 [resource]
 script = ExtResource("1_yek1f")
 states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
-theme_properties = Dictionary[String, bool]({
-"anti_aliasing": true,
-"bg_color": true,
-"border": true,
-"border_color": true,
-"corner_detail": true,
-"corner_radius": true,
-"cursor": true,
-"expand": true,
-"font_color": true,
-"font_size": true,
-"padding": true,
-"shadow": true,
-"shadow_color": true,
-"skew_x": true,
-"skew_y": true,
-"transition_func": true,
-"transition_time": true,
-"transition_type": true
+enabled_components = Dictionary[String, bool]({
+"Base": true,
+"Editable Text": false,
+"Standard Fonts": true,
+"Stylebox": true,
+"Transitionable": true
 })
 base_type = &"CheckBox"
 style_name = &"CheckBox"
