@@ -10,17 +10,27 @@ var _ref_node_rt: CanvasItem = null
 
 var ref: CanvasItem:
 	get:
-		if Engine.is_editor_hint():
+		if is_instance_valid(_ref_node):
 			return _ref_node
 		if is_instance_valid(_ref_node_rt):
 			return _ref_node_rt
 		if _ref_path.is_empty():
 			return null
+			
 		var tree: SceneTree = Engine.get_main_loop() as SceneTree
 		if tree == null:
 			return null
-		_ref_node_rt = tree.root.get_node_or_null(_ref_path) as CanvasItem
-		return _ref_node_rt
+		
+		var resolved_node = tree.root.get_node_or_null(_ref_path) as CanvasItem
+		
+		if Engine.is_editor_hint():
+			_ref_node = resolved_node
+			if is_instance_valid(_ref_node):
+				_connect_ref_signals(_ref_node)
+		else:
+			_ref_node_rt = resolved_node
+			
+		return resolved_node
 	set(v):
 		if v == null:
 			_ref_node = null
@@ -74,6 +84,25 @@ func _notification(what: int) -> void:
 		var cb: Callable = Callable(self, &"_on_parsed_changed")
 		if interp.parsed_changed.is_connected(cb):
 			interp.parsed_changed.disconnect(cb)
+
+
+func _connect_ref_signals(v: CanvasItem) -> void:
+	if Engine.is_editor_hint():
+		if not v.is_connected("renamed", _on_ref_renamed):
+			v.connect("renamed", _on_ref_renamed)
+		if not v.is_connected("tree_entered", _on_ref_tree_entered):
+			v.connect("tree_entered", _on_ref_tree_entered)
+		if not v.is_connected("tree_exiting", _on_ref_tree_exiting):
+			v.connect("tree_exiting", _on_ref_tree_exiting)
+		
+		var interp = GdssInterpreter.get_instance()
+		if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
+			interp.parsed_changed.connect(_on_parsed_changed)
+	else:
+		if not v.is_connected("tree_entered", _on_ref_tree_entered_rt):
+			v.connect("tree_entered", _on_ref_tree_entered_rt)
+		if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
+			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 
 
 func _on_ref_renamed() -> void:
