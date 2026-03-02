@@ -2,7 +2,7 @@
 class_name GDSS
 extends EditorPlugin
 
-const DEBUG_MODE: bool = true
+const DEBUG_MODE: bool = false
 const DEBUG_WAS_VISIBLE: StringName = &"gdss_was_visible"
 
 const GdssInspector = preload("uid://bhvd3stvftya8")

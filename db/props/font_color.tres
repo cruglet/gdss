@@ -8,5 +8,5 @@ name = "font_color"
 type = 3
 default_value = Color(1, 1, 1, 1)
 category = 1
-category_subproperties = PackedStringArray("font_hover_color", "font_pressed_color", "font_focus_color", "font_disabled_color", "font_uneditable_color", "font_selected_color")
+category_subproperties = PackedStringArray("font_hover_color", "font_pressed_color", "font_focus_color", "font_disabled_color", "font_uneditable_color", "font_selected_color", "font_readonly_color")
 metadata/_custom_type_script = "uid://b7gagsyfvnai7"

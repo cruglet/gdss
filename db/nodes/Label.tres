@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GdssNode_Label" format=3 uid="uid://b12scqv5cg43q"]
+
+[ext_resource type="Script" uid="uid://wknty2e4q7ew" path="res://addons/gdss/db/nodes/Label.gd" id="1_fpf5r"]
+
+[resource]
+script = ExtResource("1_fpf5r")
+states = PackedStringArray("normal", "focus")
+enabled_components = Dictionary[String, bool]({
+"Base": true,
+"Editable Text": false,
+"Standard Fonts": true,
+"Stylebox": true,
+"Transitionable": true
+})
+base_type = &"Label"
+style_name = &"Label"
+metadata/_custom_type_script = "uid://wknty2e4q7ew"

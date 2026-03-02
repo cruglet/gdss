@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GdssNode_TextEdit" format=3 uid="uid://6krdjud55uk8"]
+
+[ext_resource type="Script" uid="uid://5yyds2fc3w4i" path="res://addons/gdss/db/nodes/TextEdit.gd" id="1_t0voj"]
+
+[resource]
+script = ExtResource("1_t0voj")
+states = PackedStringArray("normal", "focus", "read_only")
+enabled_components = Dictionary[String, bool]({
+"Base": true,
+"Editable Text": true,
+"Standard Fonts": true,
+"Stylebox": true,
+"Transitionable": true
+})
+base_type = &"TextEdit"
+style_name = &"TextEdit"
+metadata/_custom_type_script = "uid://5yyds2fc3w4i"
