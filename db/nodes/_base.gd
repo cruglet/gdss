@@ -35,6 +35,8 @@ func unbind_canvas_item(canvas_item: CanvasItem) -> void:
 func get_enabled_props() -> Array[GdssProp]:
 	var props: Array[GdssProp]
 	for component_name: String in enabled_components:
+		if enabled_components.get(component_name) == false:
+			continue
 		var list: Dictionary[String, GdssNodeComponent] = GDSS.get_db().component_list
 		if list.has(component_name):
 			props.append_array(list.get(component_name).properties)
