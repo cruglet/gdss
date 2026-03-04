@@ -44,6 +44,16 @@ func _ready() -> void:
 	check_errors(editor.get_code_edit().text)
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_IN and Engine.is_editor_hint():
+		var modified: int = FileAccess.get_modified_time(GdssStorage.get_save_path())
+		if modified == _last_modified:
+			return
+		_last_modified = modified
+		_load_from_file()
+		_force_viewport_redraw()
+
+
 func _on_editor_file_saved() -> void:
 	if _saving:
 		return
