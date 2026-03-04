@@ -168,21 +168,35 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 
 
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
+	if value_str.contains("("):
+		var method_name: String = value_str.substr(0, value_str.find("(")).strip_edges()
+		_check_method_call(value_str, method_name, prop, known_methods, errors, line)
+		return
+	
+	var actual_type: GDSS.Type = prop.type
+	if prop.composite_of.has(prop_name):
+		actual_type = GDSS.Type.INT
+	
+	if actual_type == GDSS.Type.COMPOSITE4:
+		var parts: PackedStringArray = value_str.split(" ", false)
+		if parts.size() != 4:
+			errors.append(["Property '%s' expects 4 integer values, got %d" % [prop_name, parts.size()], line])
+			return
+		for part: String in parts:
+			if part.begins_with("$"):
+				var var_name: String = part.substr(1)
+				if not declared_vars.has(var_name) and not GdssInterpreter._global_defaults.has(var_name) and not GdssInterpreter._instance_defaults.has(var_name):
+					errors.append(["Undefined variable '$%s'" % var_name, line])
+			elif not part.is_valid_int():
+				errors.append(["Property '%s' expects all integer components, got '%s'" % [prop_name, part], line])
+		return
+	
 	if value_str.begins_with("$"):
 		var var_name: String = value_str.substr(1)
 		if not declared_vars.has(var_name) and not GdssInterpreter._global_defaults.has(var_name) and not GdssInterpreter._instance_defaults.has(var_name):
 			errors.append(["Undefined variable '$%s'" % var_name, line])
 		return
-
-	if value_str.contains("("):
-		var method_name: String = value_str.substr(0, value_str.find("(")).strip_edges()
-		_check_method_call(value_str, method_name, prop, known_methods, errors, line)
-		return
-
-	var actual_type: GDSS.Type = prop.type
-	if prop.composite_of.has(prop_name):
-		actual_type = GDSS.Type.INT
-
+	
 	match actual_type:
 		GDSS.Type.INT, GDSS.Type.CURSOR, GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
 			if not value_str.is_valid_int():
@@ -198,15 +212,6 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		GDSS.Type.COLOR:
 			if not _is_valid_color_value(value_str):
 				errors.append(["Property '%s' expects a color value (#hex, named color, or method), got '%s'" % [prop_name, value_str], line])
-		GDSS.Type.COMPOSITE4:
-			var parts: PackedStringArray = value_str.split(" ", false)
-			if parts.size() != 4:
-				errors.append(["Property '%s' expects 4 integer values, got %d" % [prop_name, parts.size()], line])
-			else:
-				for part: String in parts:
-					if not part.is_valid_int():
-						errors.append(["Property '%s' expects all integer components, got '%s'" % [prop_name, part], line])
-						break
 
 
 func check_errors(source: String) -> Array[Array]:
