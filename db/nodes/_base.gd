@@ -4,6 +4,7 @@ extends Resource
 
 @export var states: PackedStringArray
 @export var enabled_components: Dictionary[String, bool]
+@export var unique_properties: Array[GdssProp]
 @export var base_type: StringName
 @export var style_name: StringName
 @export var is_static: bool = false
@@ -40,6 +41,7 @@ func get_enabled_props() -> Array[GdssProp]:
 		var list: Dictionary[String, GdssNodeComponent] = GDSS.get_db().component_list
 		if list.has(component_name):
 			props.append_array(list.get(component_name).properties)
+	props.append_array(unique_properties)
 	return props
 
 

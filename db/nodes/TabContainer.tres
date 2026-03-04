@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="GdssNode_TabBar" format=3 uid="uid://chjiinriweygb"]
+
+[ext_resource type="Script" uid="uid://cnjiw44efikxu" path="res://addons/gdss/db/nodes/TabBar.gd" id="1_7ofum"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_vcfeg"]
+[ext_resource type="Resource" uid="uid://c5jdflyjdwbwg" path="res://addons/gdss/db/props/tab_separation.tres" id="3_gxr1t"]
+[ext_resource type="Resource" uid="uid://c4w51yj0kdr4w" path="res://addons/gdss/db/props/tab_drop_mark_color.tres" id="5_as6dq"]
+[ext_resource type="Resource" uid="uid://cx6qs2n4cfl7i" path="res://addons/gdss/db/props/tab_side_margin.tres" id="5_gxr1t"]
+
+[resource]
+script = ExtResource("1_7ofum")
+states = PackedStringArray("panel", "tabbar_background", "tab_unselected", "tab_selected", "tab_hovered", "tab_disabled", "tab_focus")
+enabled_components = Dictionary[String, bool]({
+"Base": true,
+"Editable Text": false,
+"Font Outlines": true,
+"Standard Fonts": true,
+"Standard Icon": true,
+"Stylebox": true,
+"Transitionable": false
+})
+unique_properties = Array[ExtResource("2_vcfeg")]([ExtResource("5_as6dq"), ExtResource("3_gxr1t"), ExtResource("5_gxr1t")])
+base_type = &"TabContainer"
+style_name = &"TabContainer"
+is_static = true
+metadata/_custom_type_script = "uid://cnjiw44efikxu"

@@ -52,20 +52,27 @@ func _set_nodes(new: bool = false) -> void:
 		if not file_name.get_extension() == "tres":
 			continue
 		var resource: Resource = load(nodes_dir.path_join(file_name))
-		
+	
 		if resource is GdssNode:
 			nodes.set(resource.base_type, resource)
 		elif resource is GdssNodeComponent:
 			component_list.set(resource.component_name, resource)
 			components.append(resource)
 	
+	var valid_component_names: PackedStringArray = []
+	for component: GdssNodeComponent in components:
+		valid_component_names.append(component.component_name)
+	
 	for node: GdssNode in nodes.values():
 		if new:
 			node.enabled_components.clear()
+		for component_name: String in node.enabled_components.keys():
+			if not valid_component_names.has(component_name):
+				node.enabled_components.erase(component_name)
 		for component: GdssNodeComponent in components:
 			if not node.enabled_components.has(component.component_name):
 				node.enabled_components.set(component.component_name, component.default_state)
-	
+
 	node_list = nodes
 
 

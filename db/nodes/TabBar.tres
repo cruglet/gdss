@@ -1,6 +1,10 @@
 [gd_resource type="Resource" script_class="GdssNode_TabBar" format=3 uid="uid://8d7cd8om78ko"]
 
 [ext_resource type="Script" uid="uid://cnjiw44efikxu" path="res://addons/gdss/db/nodes/TabBar.gd" id="1_rcl82"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_klkbd"]
+[ext_resource type="Resource" uid="uid://c5jdflyjdwbwg" path="res://addons/gdss/db/props/tab_separation.tres" id="3_d5mhq"]
+[ext_resource type="Resource" uid="uid://c4w51yj0kdr4w" path="res://addons/gdss/db/props/tab_drop_mark_color.tres" id="4_yrjgm"]
+[ext_resource type="Resource" uid="uid://v2jem5bcopxk" path="res://addons/gdss/db/props/hover_switch_wait_msec.tres" id="5_yrjgm"]
 
 [resource]
 script = ExtResource("1_rcl82")
@@ -12,9 +16,9 @@ enabled_components = Dictionary[String, bool]({
 "Standard Fonts": true,
 "Standard Icon": true,
 "Stylebox": true,
-"Tabs": true,
 "Transitionable": false
 })
+unique_properties = Array[ExtResource("2_klkbd")]([ExtResource("3_d5mhq"), ExtResource("4_yrjgm"), ExtResource("5_yrjgm")])
 base_type = &"TabBar"
 style_name = &"TabBar"
 is_static = true
