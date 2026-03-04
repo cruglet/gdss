@@ -204,16 +204,25 @@ func _enter_tree() -> void:
 		"hint_string": "Dock,Main Screen"
 	})
 	editor_settings.settings_changed.connect(_on_editor_settings_changed)
-
-
+	
 	if not ProjectSettings.has_setting("gdss/storage/save_path"):
-		ProjectSettings.set_setting("gdss/storage/save_path", "res://theme.gdss")
-		ProjectSettings.set_initial_value("gdss/storage/save_path", "res://theme.gdss")
+		ProjectSettings.set_setting("gdss/storage/save_path", "res://theme.tgdss")
+		ProjectSettings.set_initial_value("gdss/storage/save_path", "res://theme.tgdss")
 		ProjectSettings.add_property_info({
 			"name": "gdss/storage/save_path",
 			"type": TYPE_STRING,
 			"hint": PROPERTY_HINT_FILE,
-			"hint_string": "*.gdss"
+			"hint_string": "*.tgdss,*.gdss"
+		})
+	
+	if not ProjectSettings.has_setting("gdss/storage/gdss_cache_path"):
+		ProjectSettings.set_setting("gdss/storage/gdss_cache_path", "user://gdss_cache.gdssc")
+		ProjectSettings.set_initial_value("gdss/storage/gdss_cache_path", "user://gdss_cache.gdssc")
+		ProjectSettings.add_property_info({
+			"name": "gdss/storage/gdss_cache_path",
+			"type": TYPE_STRING,
+			"hint": PROPERTY_HINT_FILE,
+			"hint_string": "*.gdssc"
 		})
 
 	inspector_plugin = GdssInspectorPlugin.new()
