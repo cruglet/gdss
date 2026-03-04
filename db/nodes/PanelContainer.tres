@@ -8,8 +8,11 @@ states = PackedStringArray("panel")
 enabled_components = Dictionary[String, bool]({
 "Base": true,
 "Editable Text": false,
+"Font Outlines": false,
 "Standard Fonts": false,
+"Standard Icon": false,
 "Stylebox": true,
+"Tabs": false,
 "Transitionable": false
 })
 base_type = &"PanelContainer"

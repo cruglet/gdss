@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GdssNodeComponent" format=3 uid="uid://wfy5ghcmddsc"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_6hdfi"]
+[ext_resource type="Resource" uid="uid://bl7yeiib8lqdf" path="res://addons/gdss/db/props/icon_color.tres" id="2_fm7ke"]
+[ext_resource type="Script" uid="uid://dwbg4n2iss5cu" path="res://addons/gdss/db/nodes/_component.gd" id="2_t4o5x"]
+[ext_resource type="Resource" uid="uid://dwt0slrpk1dmv" path="res://addons/gdss/db/props/icon_h_separation.tres" id="3_lgc3o"]
+[ext_resource type="Resource" uid="uid://2lwvguakh2ok" path="res://addons/gdss/db/props/icon_max_width.tres" id="4_fobgp"]
+
+[resource]
+script = ExtResource("2_t4o5x")
+component_name = "Standard Icon"
+properties = Array[ExtResource("1_6hdfi")]([ExtResource("2_fm7ke"), ExtResource("3_lgc3o"), ExtResource("4_fobgp")])
+metadata/_custom_type_script = "uid://dwbg4n2iss5cu"

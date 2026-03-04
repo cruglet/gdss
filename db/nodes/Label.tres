@@ -8,8 +8,11 @@ states = PackedStringArray("normal", "focus")
 enabled_components = Dictionary[String, bool]({
 "Base": true,
 "Editable Text": false,
+"Font Outlines": true,
 "Standard Fonts": true,
+"Standard Icon": false,
 "Stylebox": true,
+"Tabs": false,
 "Transitionable": true
 })
 base_type = &"Label"

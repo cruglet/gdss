@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="GdssNodeComponent" format=3 uid="uid://b8rl1vl4pvykf"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_qwdqx"]
+[ext_resource type="Resource" uid="uid://0p76spg1h2r6" path="res://addons/gdss/db/props/font_outline.tres" id="2_mnb0t"]
+[ext_resource type="Script" uid="uid://dwbg4n2iss5cu" path="res://addons/gdss/db/nodes/_component.gd" id="2_rvubo"]
+[ext_resource type="Resource" uid="uid://1nhnhbhs3dwn" path="res://addons/gdss/db/props/font_outline_color.tres" id="3_gdvd4"]
+
+[resource]
+script = ExtResource("2_rvubo")
+component_name = "Font Outlines"
+properties = Array[ExtResource("1_qwdqx")]([ExtResource("2_mnb0t"), ExtResource("3_gdvd4")])
+metadata/_custom_type_script = "uid://dwbg4n2iss5cu"

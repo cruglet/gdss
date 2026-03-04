@@ -14,7 +14,10 @@
 [ext_resource type="Resource" uid="uid://d1s07mmffemj0" path="res://addons/gdss/db/nodes/_c_stylebox.tres" id="5_lnx7k"]
 [ext_resource type="Resource" uid="uid://bktwm0iff3ncf" path="res://addons/gdss/db/methods/rgba.tres" id="6_cfjqs"]
 [ext_resource type="Resource" uid="uid://bqvj78i7bw5mc" path="res://addons/gdss/db/nodes/_c_transitionable.tres" id="6_vkhqo"]
+[ext_resource type="Resource" uid="uid://dclulhema3hey" path="res://addons/gdss/db/nodes/_c_tabs.tres" id="7_v8gur"]
 [ext_resource type="Resource" uid="uid://dfq872kabx1lx" path="res://addons/gdss/db/methods/texture.tres" id="7_vgjvw"]
+[ext_resource type="Resource" uid="uid://b8rl1vl4pvykf" path="res://addons/gdss/db/nodes/_c_font_outline.tres" id="8_r8g22"]
+[ext_resource type="Resource" uid="uid://wfy5ghcmddsc" path="res://addons/gdss/db/nodes/_c_standard_icon.tres" id="9_etjxy"]
 [ext_resource type="Resource" uid="uid://v3fvukce5m8m" path="res://addons/gdss/db/nodes/Button.tres" id="9_nih4e"]
 [ext_resource type="Resource" uid="uid://d20mrkg1mjdgd" path="res://addons/gdss/db/nodes/CheckBox.tres" id="10_swgl8"]
 [ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="11_ig14j"]
@@ -51,6 +54,14 @@
 [ext_resource type="Resource" uid="uid://bd1gpuhft3450" path="res://addons/gdss/db/props/transition_func.tres" id="37_c7yx5"]
 [ext_resource type="Resource" uid="uid://dxljxuc70lfm1" path="res://addons/gdss/db/props/transition_time.tres" id="38_6r8de"]
 [ext_resource type="Resource" uid="uid://5sistwednw3k" path="res://addons/gdss/db/props/transition_type.tres" id="39_7gfsa"]
+[ext_resource type="Resource" uid="uid://0p76spg1h2r6" path="res://addons/gdss/db/props/font_outline.tres" id="44_ucild"]
+[ext_resource type="Resource" uid="uid://1nhnhbhs3dwn" path="res://addons/gdss/db/props/font_outline_color.tres" id="45_am8mq"]
+[ext_resource type="Resource" uid="uid://v2jem5bcopxk" path="res://addons/gdss/db/props/hover_switch_wait_msec.tres" id="47_lxf86"]
+[ext_resource type="Resource" uid="uid://bl7yeiib8lqdf" path="res://addons/gdss/db/props/icon_color.tres" id="48_fgtpw"]
+[ext_resource type="Resource" uid="uid://dwt0slrpk1dmv" path="res://addons/gdss/db/props/icon_h_separation.tres" id="49_m1mbn"]
+[ext_resource type="Resource" uid="uid://2lwvguakh2ok" path="res://addons/gdss/db/props/icon_max_width.tres" id="50_6rrgx"]
+[ext_resource type="Resource" uid="uid://c4w51yj0kdr4w" path="res://addons/gdss/db/props/tab_drop_mark_color.tres" id="57_xa356"]
+[ext_resource type="Resource" uid="uid://c5jdflyjdwbwg" path="res://addons/gdss/db/props/tab_separation.tres" id="58_h65uo"]
 
 [resource]
 script = ExtResource("1_dm4kf")
@@ -79,16 +90,24 @@ property_list = Dictionary[String, ExtResource("11_ig14j")]({
 "corner_detail": ExtResource("24_sxra3"),
 "corner_radius": ExtResource("25_vm72y"),
 "cursor": ExtResource("26_v8gur"),
+"drop_mark_color": ExtResource("57_xa356"),
 "expand": ExtResource("27_r8g22"),
 "font_color": ExtResource("28_etjxy"),
+"font_outline_color": ExtResource("45_am8mq"),
 "font_placeholder_color": ExtResource("29_ucild"),
 "font_size": ExtResource("30_am8mq"),
+"h_separation": ExtResource("49_m1mbn"),
+"hover_switch_wait_msec": ExtResource("47_lxf86"),
+"icon_color": ExtResource("48_fgtpw"),
+"icon_max_width": ExtResource("50_6rrgx"),
+"outline_size": ExtResource("44_ucild"),
 "padding": ExtResource("31_lxf86"),
 "selection_color": ExtResource("32_fgtpw"),
 "shadow": ExtResource("33_m1mbn"),
 "shadow_color": ExtResource("34_6rrgx"),
 "skew_x": ExtResource("35_xa356"),
 "skew_y": ExtResource("36_h65uo"),
+"tab_separation": ExtResource("58_h65uo"),
 "transition_func": ExtResource("37_c7yx5"),
 "transition_time": ExtResource("38_6r8de"),
 "transition_type": ExtResource("39_7gfsa")
@@ -104,8 +123,11 @@ method_list = Dictionary[String, ExtResource("1_yv5ta")]({
 component_list = Dictionary[String, ExtResource("1_miyk3")]({
 "Base": ExtResource("2_nih4e"),
 "Editable Text": ExtResource("3_swgl8"),
+"Font Outlines": ExtResource("8_r8g22"),
 "Standard Fonts": ExtResource("4_m66bn"),
+"Standard Icon": ExtResource("9_etjxy"),
 "Stylebox": ExtResource("5_lnx7k"),
+"Tabs": ExtResource("7_v8gur"),
 "Transitionable": ExtResource("6_vkhqo")
 })
 methods_dir = "res://addons/gdss/db/methods"

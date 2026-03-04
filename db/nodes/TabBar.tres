@@ -8,7 +8,9 @@ states = PackedStringArray("tab_unselected", "tab_selected", "tab_hovered", "tab
 enabled_components = Dictionary[String, bool]({
 "Base": true,
 "Editable Text": false,
+"Font Outlines": true,
 "Standard Fonts": true,
+"Standard Icon": true,
 "Stylebox": true,
 "Tabs": true,
 "Transitionable": false

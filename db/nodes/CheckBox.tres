@@ -8,8 +8,11 @@ states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed
 enabled_components = Dictionary[String, bool]({
 "Base": true,
 "Editable Text": false,
+"Font Outlines": true,
 "Standard Fonts": true,
+"Standard Icon": true,
 "Stylebox": true,
+"Tabs": false,
 "Transitionable": true
 })
 base_type = &"CheckBox"
