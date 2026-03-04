@@ -14,4 +14,5 @@ enabled_components = Dictionary[String, bool]({
 })
 base_type = &"TextEdit"
 style_name = &"TextEdit"
+is_static = null
 metadata/_custom_type_script = "uid://5yyds2fc3w4i"

@@ -7,6 +7,7 @@ func _ready() -> void:
 	_ensure_parsed()
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	get_tree().node_added.connect(_on_node_added)
+	_bind_tree(get_tree().root)
 	_bind_tree.bind(get_tree().root).call_deferred()
 
 	if Engine.is_editor_hint() and OS.is_debug_build():
@@ -55,7 +56,17 @@ func _refresh_all_handlers() -> void:
 
 
 func _refresh_tree(node: Node) -> void:
-	if node.has_meta("gdss_handler"):
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
+	if gdss_node != null and gdss_node.is_static:
+		for state: String in gdss_node.states:
+			var meta_key: StringName = "gdss_handler_" + state
+			if node.has_meta(meta_key):
+				var box: GdssPropHandler = node.get_meta(meta_key) as GdssPropHandler
+				box._tweened_values.clear()
+				box.emit_changed()
+				if node is CanvasItem:
+					(node as CanvasItem).queue_redraw()
+	elif node.has_meta("gdss_handler"):
 		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
 		box._tweened_values.clear()
 		box.emit_changed()
@@ -107,22 +118,11 @@ func _on_node_added(node: Node) -> void:
 func _try_bind(canvas_item: CanvasItem) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if not gdss_node:
-		#push_warning("Could not bind type \"%s\" to gdss_node:\nList Entry: %s" % [canvas_item.get_class(), GDSS._get_gdss_nodes()])
 		return
 	if not canvas_item.get_meta("gdss_enabled", false):
 		return
-	if canvas_item.has_meta("gdss_handler"):
-		var box: GdssPropHandler = canvas_item.get_meta("gdss_handler") as GdssPropHandler
-		box.ref = canvas_item
-		if canvas_item.is_inside_tree():
-			_rt_bind_ci(canvas_item)
-			gdss_node.update_state(canvas_item)
-		else:
-			canvas_item.tree_entered.connect(func() -> void:
-				gdss_node.update_state.call_deferred(canvas_item)
-				_rt_bind_ci(canvas_item)
-			, CONNECT_ONE_SHOT)
-		return
+	_rt_bind_ci(canvas_item)
+	gdss_node.update_state(canvas_item)
 
 
 func _rt_bind_ci(canvas_item: CanvasItem) -> void:

@@ -3,6 +3,7 @@ class_name GdssPropHandler
 extends StyleBox
 
 static var _texture_cache: Dictionary = {}
+var _slot_state: String = ""
 
 @export_storage var _ref_path: NodePath = NodePath()
 var _ref_node: CanvasItem = null
@@ -10,27 +11,21 @@ var _ref_node_rt: CanvasItem = null
 
 var ref: CanvasItem:
 	get:
-		if is_instance_valid(_ref_node):
-			return _ref_node
-		if is_instance_valid(_ref_node_rt):
-			return _ref_node_rt
-		if _ref_path.is_empty():
-			return null
-			
-		var tree: SceneTree = Engine.get_main_loop() as SceneTree
-		if tree == null:
-			return null
-		
-		var resolved_node = tree.root.get_node_or_null(_ref_path) as CanvasItem
-		
 		if Engine.is_editor_hint():
-			_ref_node = resolved_node
 			if is_instance_valid(_ref_node):
+				return _ref_node
+			if _ref_path.is_empty():
+				return null
+			var tree: SceneTree = Engine.get_main_loop() as SceneTree
+			if tree == null:
+				return null
+			var resolved: CanvasItem = tree.root.get_node_or_null(_ref_path) as CanvasItem
+			if is_instance_valid(resolved):
+				_ref_node = resolved
 				_connect_ref_signals(_ref_node)
+			return resolved
 		else:
-			_ref_node_rt = resolved_node
-			
-		return resolved_node
+			return _ref_node_rt if is_instance_valid(_ref_node_rt) else null
 	set(v):
 		if v == null:
 			_ref_node = null
@@ -47,6 +42,9 @@ var ref: CanvasItem:
 				v.connect("tree_entered", _on_ref_tree_entered)
 			if not v.is_connected("tree_exiting", _on_ref_tree_exiting):
 				v.connect("tree_exiting", _on_ref_tree_exiting)
+			var interp: GdssInterpreter = GdssInterpreter.get_instance()
+			if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
+				interp.parsed_changed.connect(_on_parsed_changed)
 		else:
 			_ref_node_rt = v
 			if v.is_inside_tree():
@@ -55,10 +53,6 @@ var ref: CanvasItem:
 				v.connect("tree_entered", _on_ref_tree_entered_rt)
 			if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 				v.connect("tree_exiting", _on_ref_tree_exiting_rt)
-		if Engine.is_editor_hint():
-			var interp: GdssInterpreter = GdssInterpreter.get_instance()
-			if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
-				interp.parsed_changed.connect(_on_parsed_changed)
 
 
 var current_state: String = "":
@@ -517,6 +511,8 @@ func _get_parsed_val(key: String, state: String, fallback: Variant) -> Variant:
 
 
 func _get_state() -> String:
+	if not _slot_state.is_empty():
+		return _slot_state
 	if ref == null:
 		return "all"
 	if not current_state.is_empty():

@@ -37,6 +37,7 @@
 [ext_resource type="Resource" uid="uid://6krdjud55uk8" path="res://addons/gdss/db/nodes/TextEdit.tres" id="25_m66bn"]
 [ext_resource type="Resource" uid="uid://cyk5xlgeaiuwi" path="res://addons/gdss/db/props/corner_radius.tres" id="25_vm72y"]
 [ext_resource type="Resource" uid="uid://c2w3chwnlgn3c" path="res://addons/gdss/db/props/cursor.tres" id="26_v8gur"]
+[ext_resource type="Resource" uid="uid://8d7cd8om78ko" path="res://addons/gdss/db/nodes/TabBar.tres" id="27_24g4u"]
 [ext_resource type="Resource" uid="uid://dmbeiejithhrk" path="res://addons/gdss/db/props/expand.tres" id="27_r8g22"]
 [ext_resource type="Resource" uid="uid://dumxdopjyi2u6" path="res://addons/gdss/db/props/font_color.tres" id="28_etjxy"]
 [ext_resource type="Resource" uid="uid://dv6huefcagugx" path="res://addons/gdss/db/props/font_placeholder_color.tres" id="29_ucild"]
@@ -66,6 +67,7 @@ node_list = Dictionary[String, ExtResource("1_yumic")]({
 "OptionButton": ExtResource("15_vke44"),
 "Panel": ExtResource("16_7n7pt"),
 "PanelContainer": ExtResource("17_nm68i"),
+"TabBar": ExtResource("27_24g4u"),
 "TextEdit": ExtResource("25_m66bn")
 })
 property_list = Dictionary[String, ExtResource("11_ig14j")]({

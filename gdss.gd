@@ -2,7 +2,7 @@
 class_name GDSS
 extends EditorPlugin
 
-const DEBUG_MODE: bool = false
+const DEBUG_MODE: bool = true
 const DEBUG_WAS_VISIBLE: StringName = &"gdss_was_visible"
 
 const GdssInspector = preload("uid://bhvd3stvftya8")
@@ -98,7 +98,17 @@ static func set_instance_var(node: Node, name: String, value: Variant) -> void:
 	if not GdssInterpreter._instance_vars.has(id):
 		GdssInterpreter._instance_vars[id] = {}
 	GdssInterpreter._instance_vars[id][name] = value
-	if node.has_meta("gdss_handler"):
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class()) if node is CanvasItem else null
+	if gdss_node != null and gdss_node.is_static:
+		for state: String in gdss_node.states:
+			var meta_key: StringName = "gdss_handler_" + state
+			if node.has_meta(meta_key):
+				var box: GdssPropHandler = node.get_meta(meta_key) as GdssPropHandler
+				box._apply_overrides()
+				box.emit_changed()
+				if node is CanvasItem:
+					(node as CanvasItem).queue_redraw()
+	elif node.has_meta("gdss_handler"):
 		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
 		box._apply_overrides()
 		box.emit_changed()
@@ -133,7 +143,18 @@ static func _refresh_affected(global_name: String) -> void:
 
 
 static func _refresh_affected_tree(node: Node, sentinel: String) -> void:
-	if node.has_meta("gdss_handler"):
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
+	if gdss_node != null and gdss_node.is_static:
+		for state: String in gdss_node.states:
+			var meta_key: StringName = "gdss_handler_" + state
+			if node.has_meta(meta_key):
+				var box: GdssPropHandler = node.get_meta(meta_key) as GdssPropHandler
+				if _handler_uses_sentinel(box, sentinel):
+					box._apply_overrides()
+					box.emit_changed()
+					if node is CanvasItem:
+						(node as CanvasItem).queue_redraw()
+	elif node.has_meta("gdss_handler"):
 		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
 		if _handler_uses_sentinel(box, sentinel):
 			box._apply_overrides()
@@ -183,7 +204,7 @@ func _enter_tree() -> void:
 		"hint_string": "Dock,Main Screen"
 	})
 	editor_settings.settings_changed.connect(_on_editor_settings_changed)
-	
+
 
 	if not ProjectSettings.has_setting("gdss/storage/save_path"):
 		ProjectSettings.set_setting("gdss/storage/save_path", "res://theme.gdss")

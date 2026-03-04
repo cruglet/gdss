@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="GdssNodeComponent" format=3 uid="uid://dclulhema3hey"]
+
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="1_rwemy"]
+[ext_resource type="Resource" uid="uid://jfmnuw3dme34" path="res://addons/gdss/db/props/h_separation_tabs.tres" id="2_ascsk"]
+[ext_resource type="Script" uid="uid://dwbg4n2iss5cu" path="res://addons/gdss/db/nodes/_component.gd" id="2_dauce"]
+[ext_resource type="Resource" uid="uid://c5jdflyjdwbwg" path="res://addons/gdss/db/props/tab_separation.tres" id="3_go48g"]
+[ext_resource type="Resource" uid="uid://v2jem5bcopxk" path="res://addons/gdss/db/props/hover_switch_wait_msec.tres" id="4_a5qvw"]
+
+[resource]
+script = ExtResource("2_dauce")
+component_name = "Tabs"
+properties = Array[ExtResource("1_rwemy")]([ExtResource("2_ascsk"), ExtResource("3_go48g"), ExtResource("4_a5qvw")])
+metadata/_custom_type_script = "uid://dwbg4n2iss5cu"
