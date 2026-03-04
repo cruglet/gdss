@@ -14,7 +14,6 @@
 [ext_resource type="Resource" uid="uid://d1s07mmffemj0" path="res://addons/gdss/db/nodes/_c_stylebox.tres" id="5_lnx7k"]
 [ext_resource type="Resource" uid="uid://bktwm0iff3ncf" path="res://addons/gdss/db/methods/rgba.tres" id="6_cfjqs"]
 [ext_resource type="Resource" uid="uid://bqvj78i7bw5mc" path="res://addons/gdss/db/nodes/_c_transitionable.tres" id="6_vkhqo"]
-[ext_resource type="Resource" uid="uid://dclulhema3hey" path="res://addons/gdss/db/nodes/_c_tabs.tres" id="7_v8gur"]
 [ext_resource type="Resource" uid="uid://dfq872kabx1lx" path="res://addons/gdss/db/methods/texture.tres" id="7_vgjvw"]
 [ext_resource type="Resource" uid="uid://b8rl1vl4pvykf" path="res://addons/gdss/db/nodes/_c_font_outline.tres" id="8_r8g22"]
 [ext_resource type="Resource" uid="uid://wfy5ghcmddsc" path="res://addons/gdss/db/nodes/_c_standard_icon.tres" id="9_etjxy"]
@@ -45,6 +44,7 @@
 [ext_resource type="Resource" uid="uid://dumxdopjyi2u6" path="res://addons/gdss/db/props/font_color.tres" id="28_etjxy"]
 [ext_resource type="Resource" uid="uid://dv6huefcagugx" path="res://addons/gdss/db/props/font_placeholder_color.tres" id="29_ucild"]
 [ext_resource type="Resource" uid="uid://yxypl7ibep8a" path="res://addons/gdss/db/props/font_size.tres" id="30_am8mq"]
+[ext_resource type="Resource" uid="uid://chjiinriweygb" path="res://addons/gdss/db/nodes/TabContainer.tres" id="30_r8g22"]
 [ext_resource type="Resource" uid="uid://7rdt8cs04c00" path="res://addons/gdss/db/props/padding.tres" id="31_lxf86"]
 [ext_resource type="Resource" uid="uid://cc2cy2bwp50se" path="res://addons/gdss/db/props/selection_color.tres" id="32_fgtpw"]
 [ext_resource type="Resource" uid="uid://2fe4ykeh5di" path="res://addons/gdss/db/props/shadow.tres" id="33_m1mbn"]
@@ -62,6 +62,7 @@
 [ext_resource type="Resource" uid="uid://2lwvguakh2ok" path="res://addons/gdss/db/props/icon_max_width.tres" id="50_6rrgx"]
 [ext_resource type="Resource" uid="uid://c4w51yj0kdr4w" path="res://addons/gdss/db/props/tab_drop_mark_color.tres" id="57_xa356"]
 [ext_resource type="Resource" uid="uid://c5jdflyjdwbwg" path="res://addons/gdss/db/props/tab_separation.tres" id="58_h65uo"]
+[ext_resource type="Resource" uid="uid://cx6qs2n4cfl7i" path="res://addons/gdss/db/props/tab_side_margin.tres" id="59_etjxy"]
 
 [resource]
 script = ExtResource("1_dm4kf")
@@ -79,6 +80,7 @@ node_list = Dictionary[String, ExtResource("1_yumic")]({
 "Panel": ExtResource("16_7n7pt"),
 "PanelContainer": ExtResource("17_nm68i"),
 "TabBar": ExtResource("27_24g4u"),
+"TabContainer": ExtResource("30_r8g22"),
 "TextEdit": ExtResource("25_m66bn")
 })
 property_list = Dictionary[String, ExtResource("11_ig14j")]({
@@ -105,6 +107,7 @@ property_list = Dictionary[String, ExtResource("11_ig14j")]({
 "selection_color": ExtResource("32_fgtpw"),
 "shadow": ExtResource("33_m1mbn"),
 "shadow_color": ExtResource("34_6rrgx"),
+"side_margin": ExtResource("59_etjxy"),
 "skew_x": ExtResource("35_xa356"),
 "skew_y": ExtResource("36_h65uo"),
 "tab_separation": ExtResource("58_h65uo"),
@@ -127,7 +130,6 @@ component_list = Dictionary[String, ExtResource("1_miyk3")]({
 "Standard Fonts": ExtResource("4_m66bn"),
 "Standard Icon": ExtResource("9_etjxy"),
 "Stylebox": ExtResource("5_lnx7k"),
-"Tabs": ExtResource("7_v8gur"),
 "Transitionable": ExtResource("6_vkhqo")
 })
 methods_dir = "res://addons/gdss/db/methods"

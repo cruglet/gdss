@@ -15,6 +15,7 @@ enabled_components = Dictionary[String, bool]({
 "Stylebox": true,
 "Transitionable": true
 })
+unique_icons = null
 base_type = &"Button"
 style_name = &"Button"
 metadata/_custom_type_script = "uid://bysui7kt6peex"

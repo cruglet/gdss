@@ -168,6 +168,9 @@ func _apply_overrides() -> void:
 			GdssProp.Category.CONST:
 				if val is int or val is float:
 					control.add_theme_constant_override(prop.name, int(val))
+			GdssProp.Category.ICON:
+				if val is Texture2D:
+					control.add_theme_icon_override(prop.name, val)
 			GdssProp.Category.FONT_SIZE:
 				if val is int or val is float:
 					control.add_theme_font_size_override(prop.name, int(val))
@@ -346,6 +349,7 @@ func _start_transition(from_state: String, to_state: String) -> void:
 						_apply_overrides()
 				, float(from), float(to), transition_time)
 				tweener_count += 1
+
 
 	if tweener_count == 0:
 		pending_tween.kill()

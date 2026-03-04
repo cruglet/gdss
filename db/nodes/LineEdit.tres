@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_LineEdit" format=3 uid="uid://c0mcitl1dqjit"]
 
 [ext_resource type="Script" uid="uid://c1662rffs58ip" path="res://addons/gdss/db/nodes/LineEdit.gd" id="1_58h13"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_epcf5"]
 
 [resource]
 script = ExtResource("1_58h13")
@@ -8,7 +9,9 @@ states = PackedStringArray("normal", "focus", "read_only")
 enabled_components = Dictionary[String, bool]({
 "Base": true,
 "Editable Text": true,
+"Font Outlines": false,
 "Standard Fonts": true,
+"Standard Icon": false,
 "Stylebox": true,
 "Transitionable": true
 })

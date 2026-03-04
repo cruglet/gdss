@@ -7,7 +7,8 @@ enum Category {
 	COLOR,
 	CONST,
 	FONT_SIZE,
-	NODE_PROPERTY
+	NODE_PROPERTY,
+	ICON,
 }
 
 var name: String = "":
@@ -57,6 +58,7 @@ func _get_property_list() -> Array[Dictionary]:
 		GDSS.Type.CURSOR: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.CursorType.keys())})
 		GDSS.Type.TRANSITION_TYPE: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionType.keys())})
 		GDSS.Type.TRANSITION_FUNC: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionFunc.keys())})
+		GDSS.Type.ICON: props.append({"name": "default_value", "type": TYPE_OBJECT, "hint": PROPERTY_HINT_RESOURCE_TYPE, "hint_string": "Texture2D"})
 	
 	if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE:
 		props.append({"name": "composite_of", "type": TYPE_PACKED_STRING_ARRAY})
@@ -121,6 +123,7 @@ func get_info() -> Dictionary:
 		GDSS.Type.CURSOR: type_name = "CURSOR"
 		GDSS.Type.TRANSITION_TYPE: type_name = "TRANSITION_TYPE"
 		GDSS.Type.TRANSITION_FUNC: type_name = "TRANSITION_FUNC"
+		GDSS.Type.ICON: type_name = "ICON"
 		_:
 			type_name = "UNKNOWN"
 	

@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_TextEdit" format=3 uid="uid://rrskb0swqmvm"]
 
 [ext_resource type="Script" uid="uid://5yyds2fc3w4i" path="res://addons/gdss/db/nodes/TextEdit.gd" id="1_mwofw"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_hej8v"]
 
 [resource]
 script = ExtResource("1_mwofw")
@@ -12,7 +13,6 @@ enabled_components = Dictionary[String, bool]({
 "Standard Fonts": true,
 "Standard Icon": false,
 "Stylebox": true,
-"Tabs": false,
 "Transitionable": true
 })
 base_type = &"CodeEdit"

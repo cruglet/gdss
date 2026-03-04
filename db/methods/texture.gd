@@ -12,6 +12,7 @@ func _init() -> void:
 		Param.new("path", ParamType.STRING, true, ""),
 	]
 
+
 func call_method(args: Array[Variant], node_id: int = -1, state_key: String = "") -> Variant:
 	if args.is_empty() or str(args[0]).is_empty():
 		return null
