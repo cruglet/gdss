@@ -6,7 +6,7 @@ decided to open source it in case anyone would like to use it or help support th
 Do not expect this plugin to be 100% stable- it is a work in progress.
 
 ## Some showcase videos
-[[dev#1]](https://youtu.be/0vPR0N9wa-M) [[dev#2]](https://youtu.be/HSPjfHhVoIQ) [[dev#3]](https://youtu.be/9HrSvX_Mqbo) [[dev#4]](https://youtu.be/JoT_QkDIMgE)
+[[dev#1]](https://youtu.be/0vPR0N9wa-M) [[dev#2]](https://youtu.be/HSPjfHhVoIQ) [[dev#3]](https://youtu.be/9HrSvX_Mqbo) [[dev#4]](https://youtu.be/JoT_QkDIMgE) [[dev#5]](https://www.youtube.com/watch?v=BR3UW3jRbD8)
 
 ## Example Syntax
 
@@ -49,9 +49,9 @@ Panel, PanelContainer {
 - [x] Some way to preview the node as you're writing in gdss.
 - [x] Export variable support (in order to access from GDScript)
 - [x] Method support 
+- [x] Syntax error highlighting 
 
 ### TODO
 (not necessarily in order)
-- [ ] Syntax error highlighting 
 - [ ] UI polish
 
