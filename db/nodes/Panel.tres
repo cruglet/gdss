@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_Panel" format=3 uid="uid://ba3p6on4rccbq"]
 
 [ext_resource type="Script" uid="uid://cyl4d1srrt0i5" path="res://addons/gdss/db/nodes/Panel.gd" id="1_xfoht"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_fommi"]
 
 [resource]
 script = ExtResource("1_xfoht")
@@ -8,7 +9,9 @@ states = PackedStringArray("panel")
 enabled_components = Dictionary[String, bool]({
 "Base": true,
 "Editable Text": false,
+"Font Outlines": false,
 "Standard Fonts": false,
+"Standard Icon Colors": false,
 "Stylebox": true,
 "Transitionable": false
 })

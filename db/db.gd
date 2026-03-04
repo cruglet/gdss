@@ -72,7 +72,15 @@ func _set_nodes(new: bool = false) -> void:
 		for component: GdssNodeComponent in components:
 			if not node.enabled_components.has(component.component_name):
 				node.enabled_components.set(component.component_name, component.default_state)
-
+		
+		var icon_list: PackedStringArray = ThemeDB.get_default_theme().get_icon_list(node.base_type)
+		
+		node.unique_icons.clear()
+		
+		for icon_name: String in icon_list:
+			if not node.unique_icons.has(icon_name):
+				node.unique_icons.append(icon_name)
+	
 	node_list = nodes
 
 

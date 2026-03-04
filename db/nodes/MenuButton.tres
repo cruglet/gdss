@@ -1,10 +1,20 @@
 [gd_resource type="Resource" script_class="GdssNode_Button" format=3 uid="uid://4b0bbl36miuk"]
 
 [ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_6y11i"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_xhgkr"]
 
 [resource]
 script = ExtResource("1_6y11i")
 states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
+enabled_components = Dictionary[String, bool]({
+"Base": true,
+"Editable Text": false,
+"Font Outlines": false,
+"Standard Fonts": true,
+"Standard Icon Colors": true,
+"Stylebox": true,
+"Transitionable": true
+})
 base_type = &"MenuButton"
 style_name = &"MenuButton"
 metadata/_custom_type_script = "uid://bysui7kt6peex"

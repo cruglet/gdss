@@ -14,11 +14,12 @@ enabled_components = Dictionary[String, bool]({
 "Editable Text": false,
 "Font Outlines": true,
 "Standard Fonts": true,
-"Standard Icon": true,
+"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": false
 })
 unique_properties = Array[ExtResource("2_klkbd")]([ExtResource("3_d5mhq"), ExtResource("4_yrjgm"), ExtResource("5_yrjgm")])
+unique_icons = PackedStringArray("increment", "increment_highlight", "decrement", "decrement_highlight", "drop_mark", "close")
 base_type = &"TabBar"
 style_name = &"TabBar"
 is_static = true

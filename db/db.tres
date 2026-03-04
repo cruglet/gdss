@@ -57,6 +57,7 @@
 [ext_resource type="Resource" uid="uid://0p76spg1h2r6" path="res://addons/gdss/db/props/font_outline.tres" id="44_ucild"]
 [ext_resource type="Resource" uid="uid://1nhnhbhs3dwn" path="res://addons/gdss/db/props/font_outline_color.tres" id="45_am8mq"]
 [ext_resource type="Resource" uid="uid://v2jem5bcopxk" path="res://addons/gdss/db/props/hover_switch_wait_msec.tres" id="47_lxf86"]
+[ext_resource type="Resource" uid="uid://lpw5wrd54fxi" path="res://addons/gdss/db/props/icon.tres" id="48_etjxy"]
 [ext_resource type="Resource" uid="uid://bl7yeiib8lqdf" path="res://addons/gdss/db/props/icon_color.tres" id="48_fgtpw"]
 [ext_resource type="Resource" uid="uid://dwt0slrpk1dmv" path="res://addons/gdss/db/props/icon_h_separation.tres" id="49_m1mbn"]
 [ext_resource type="Resource" uid="uid://2lwvguakh2ok" path="res://addons/gdss/db/props/icon_max_width.tres" id="50_6rrgx"]
@@ -100,6 +101,7 @@ property_list = Dictionary[String, ExtResource("11_ig14j")]({
 "font_size": ExtResource("30_am8mq"),
 "h_separation": ExtResource("49_m1mbn"),
 "hover_switch_wait_msec": ExtResource("47_lxf86"),
+"icon": ExtResource("48_etjxy"),
 "icon_color": ExtResource("48_fgtpw"),
 "icon_max_width": ExtResource("50_6rrgx"),
 "outline_size": ExtResource("44_ucild"),
@@ -128,7 +130,7 @@ component_list = Dictionary[String, ExtResource("1_miyk3")]({
 "Editable Text": ExtResource("3_swgl8"),
 "Font Outlines": ExtResource("8_r8g22"),
 "Standard Fonts": ExtResource("4_m66bn"),
-"Standard Icon": ExtResource("9_etjxy"),
+"Standard Icon Colors": ExtResource("9_etjxy"),
 "Stylebox": ExtResource("5_lnx7k"),
 "Transitionable": ExtResource("6_vkhqo")
 })

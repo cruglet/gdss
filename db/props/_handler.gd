@@ -181,7 +181,6 @@ func _apply_overrides() -> void:
 				else:
 					control.set(prop.name, val)
 
-
 func _get_cursor_shape(type: String) -> Control.CursorShape:
 	match type:
 		"ARROW": return Control.CursorShape.CURSOR_ARROW

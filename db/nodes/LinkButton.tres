@@ -1,29 +1,19 @@
 [gd_resource type="Resource" script_class="GdssNode_Button" format=3 uid="uid://ubsnex8kqdd1"]
 
 [ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_t4oma"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_quslr"]
 
 [resource]
 script = ExtResource("1_t4oma")
 states = PackedStringArray("focus")
-theme_properties = Dictionary[String, bool]({
-"anti_aliasing": true,
-"bg_color": true,
-"border": true,
-"border_color": true,
-"corner_detail": true,
-"corner_radius": true,
-"cursor": true,
-"expand": true,
-"font_color": true,
-"font_size": true,
-"padding": true,
-"shadow": true,
-"shadow_color": true,
-"skew_x": true,
-"skew_y": true,
-"transition_func": true,
-"transition_time": true,
-"transition_type": true
+enabled_components = Dictionary[String, bool]({
+"Base": true,
+"Editable Text": false,
+"Font Outlines": false,
+"Standard Fonts": true,
+"Standard Icon Colors": false,
+"Stylebox": true,
+"Transitionable": true
 })
 base_type = &"LinkButton"
 style_name = &"LinkButton"

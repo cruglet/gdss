@@ -298,6 +298,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				elif in_value:
 					if value_functions.has(word):
 						result[start] = {"color": col_function}
+					elif word.to_lower() == "true" or word.to_lower() == "false":
+						result[start] = {"color": col_keyword}
 					elif builtin_colors.has(word):
 						result[start] = {"color": col_const}
 					elif enum_values.has(word):

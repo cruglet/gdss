@@ -165,7 +165,7 @@ func _complete_node_states(node: String, partial: String) -> void:
 
 func _complete_properties(word: String, style_name: String) -> void:
 	var props: Array[String] = []
-	
+
 	if style_name != "" and _properties.has(style_name):
 		props.assign(_properties[style_name])
 	else:
@@ -173,25 +173,26 @@ func _complete_properties(word: String, style_name: String) -> void:
 			for p: String in _properties[key]:
 				if not props.has(p):
 					props.append(p)
-	
+
 	for prop: String in props:
 		var meta: Dictionary = _property_meta.get(style_name, {})
 		var prop_def: GdssProp = meta.get(prop, null)
-		
+		var icon: Texture2D = _get_prop_icon(prop_def)
+
 		if word.is_empty() or prop.begins_with(word):
-			editor.add_code_completion_option(CodeEdit.KIND_MEMBER, prop, prop + ": ", _completion_color, _get_icon(&"MemberProperty"))
-		
+			editor.add_code_completion_option(CodeEdit.KIND_MEMBER, prop, prop + ": ", _completion_color, icon)
+
 		if prop_def == null or prop_def.type != GDSS.Type.COMPOSITE4:
 			continue
 		if prop_def.default_value == null or not prop_def.default_value is Vector4i:
 			continue
 		var v4: Vector4i = prop_def.default_value
 		var components: Array[Variant] = [v4.x, v4.y, v4.z, v4.w]
-		
+
 		for idx: int in range(prop_def.composite_of.size()):
 			var sub: String = prop_def.composite_of[idx]
 			if word.is_empty() or sub.begins_with(word):
-				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, _get_icon(&"MemberProperty"))
+				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, _get_icon(&"int"))
 
 
 func _complete_states(word: String, style_name: String) -> void:
@@ -300,6 +301,30 @@ func _complete_at_directives(word: String) -> void:
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@global var", "global var ", _completion_color, _get_icon(&"MemberAnnotation"))
 	if word.is_empty() or "@instance".begins_with(word):
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@instance var", "instance var ", _completion_color, _get_icon(&"MemberAnnotation"))
+
+
+func _get_prop_icon(prop_def: GdssProp) -> Texture2D:
+	if prop_def == null:
+		return _get_icon(&"MemberProperty")
+	match prop_def.type:
+		GDSS.Type.COLOR:
+			return _get_icon(&"Color")
+		GDSS.Type.INT:
+			return _get_icon(&"int")
+		GDSS.Type.FLOAT:
+			return _get_icon(&"float")
+		GDSS.Type.BOOLEAN:
+			return _get_icon(&"bool")
+		GDSS.Type.COMPOSITE4:
+			return _get_icon(&"Vector4i")
+		GDSS.Type.CURSOR:
+			return _get_icon(&"Mouse")
+		GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
+			return _get_icon(&"Animation")
+		GDSS.Type.ICON:
+			return _get_icon(&"ImageTexture")
+		_:
+			return _get_icon(&"MemberProperty")
 
 
 func _get_context() -> Dictionary:

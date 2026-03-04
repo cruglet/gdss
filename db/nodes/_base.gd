@@ -43,6 +43,9 @@ func get_enabled_props() -> Array[GdssProp]:
 		if list.has(component_name):
 			props.append_array(list.get(component_name).properties)
 	props.append_array(unique_properties)
+	
+	for icon_name: String in unique_icons:
+		props.append(GdssProp.create(icon_name, GDSS.Type.ICON, null, GdssProp.Category.ICON))
 	return props
 
 

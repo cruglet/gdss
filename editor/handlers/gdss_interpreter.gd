@@ -887,6 +887,10 @@ func _parse_value(parts: Array[String]) -> Variant:
 			return Vector4i(int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]))
 	if parts.size() == 1:
 		var token: String = parts[0].trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+		if token.to_lower() == "true":
+			return true
+		if token.to_lower() == "false":
+			return false
 		if token.begins_with("#") and Color.html_is_valid(token):
 			return Color.html(token)
 		if parts[0].is_valid_int():

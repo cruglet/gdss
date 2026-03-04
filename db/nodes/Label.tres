@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_Label" format=3 uid="uid://b12scqv5cg43q"]
 
 [ext_resource type="Script" uid="uid://wknty2e4q7ew" path="res://addons/gdss/db/nodes/Label.gd" id="1_fpf5r"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_iww60"]
 
 [resource]
 script = ExtResource("1_fpf5r")
@@ -10,9 +11,8 @@ enabled_components = Dictionary[String, bool]({
 "Editable Text": false,
 "Font Outlines": true,
 "Standard Fonts": true,
-"Standard Icon": false,
+"Standard Icon Colors": false,
 "Stylebox": true,
-"Tabs": false,
 "Transitionable": true
 })
 base_type = &"Label"

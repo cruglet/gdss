@@ -34,6 +34,22 @@ var composite_of: PackedStringArray = []:
 var category_subproperties: PackedStringArray
 
 
+static func create(
+	p_name: String,
+	p_type: GDSS.Type,
+	p_default_value: Variant,
+	p_category: Category,
+	) -> GdssProp:
+	
+	var prop: GdssProp = GdssProp.new()
+	prop.name = p_name
+	prop.type = p_type
+	prop.default_value = p_default_value
+	prop.category = p_category
+	
+	return prop
+
+
 func _get_property_list() -> Array[Dictionary]:
 	var props: Array[Dictionary]
 	props.append({

@@ -11,7 +11,7 @@ enabled_components = Dictionary[String, bool]({
 "Editable Text": true,
 "Font Outlines": false,
 "Standard Fonts": true,
-"Standard Icon": false,
+"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": true
 })

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_0ksfk")
 name = "icon_color"
-type = 9
+type = 3
 default_value = Color(1, 1, 1, 1)
 category = 1
 category_subproperties = PackedStringArray("icon_normal_color", "icon_focus_color", "icon_pressed_color", "icon_hover_color", "icon_hover_pressed_color", "icon_disabled_color", "icon_selected_color", "icon_hovered_color", "icon_unselected_color")
