@@ -1,0 +1,112 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://dfcvw6508sg8l"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_7gvi4"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_svkhe"]
+
+[sub_resource type="DPITexture" id="DPITexture_n71vp"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" d=\"m7 1v6h-6v2h6v6h2v-6h6v-2h-6v-6z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_o7ash"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 16 20\"><path fill=\"#b2b2b2\" stroke=\"#b2b2b2\" stroke-linejoin=\"round\" d=\"m3.564 15.218h8.872l-4.436-4.436z\"/></svg>
+"
+
+[sub_resource type="Gradient" id="Gradient_cpor3"]
+offsets = PackedFloat32Array(0, 0.16666667, 0.33333334, 0.5, 0.6666667, 0.8333333, 1)
+colors = PackedColorArray(1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_7mujx"]
+gradient = SubResource("Gradient_cpor3")
+width = 800
+height = 6
+
+[sub_resource type="DPITexture" id="DPITexture_m7hcn"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#e0e0e0\" d=\"M6 1a2 2 0 0 0-2 2v7H1v3a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V5h3V3a2 2 0 0 0-2-2z\"/><path fill-opacity=\".2\" d=\"M6 1a2 2 0 0 0-2 2v7H1v3a2 2 0 1 0 4 0V3a1 1 0 0 1 2 0v3h5V5H8V3a2 2 0 0 0-2-2zM2 11h2v2a1 1 0 0 1-2 0z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_gwcle"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m5 7 3 3 3-3\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_tav8g"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m6 11 3-3-3-3\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_7gvi4"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" fill-opacity=\".65\" d=\"M8 0a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_ewuop"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#fff\" stroke=\"#000003\" d=\"m.5.5v10l10-10z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_0hb4k"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\"><circle cx=\"6\" cy=\"6\" r=\"5\" fill=\"none\" stroke=\"#fff\"/><circle cx=\"6\" cy=\"6\" r=\"4\" fill=\"none\" stroke=\"#000\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_oox02"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\"><circle cx=\"6\" cy=\"6\" r=\"4\" fill=\"#fff\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_jku0x"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"gray\" d=\"M0 0v8h8V0zm8 8v8h8V8z\"/><path fill=\"#fff\" d=\"M8 0v8h8V0zm0 8H0v8h8z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_7406a"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" d=\"M5 8a4 4 0 1 1 4 4v2a6 6 0 1 0-6-6H1l3 4 3-4z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_svkhe"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" d=\"M10 3a1 1 0 0 0-4 0v2H5v2h1v5c0 .712.36 1.372 1 1.73V15h2v-1.27c.618-.36 1-1 1-1.73V7h1V5h-1V3zM7 7h2v5a1 1 0 0 1-2 0z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_jqfd5"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#eaeaea\" d=\"M6.5 2.5a5.5 5.5 0 0 0 0 11 5.5 5.5 0 0 0 0-11m6.5 0h2v11h-2z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_7pht3"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#eaeaea\" d=\"M.5 2.5h11v11H.5zm12 0h2v11h-2z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_8maj3"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><circle cx=\"8\" cy=\"8\" r=\"5.25\" fill=\"none\" stroke=\"#eaeaea\" stroke-width=\"1.75\"/><path fill=\"#eaeaea\" d=\"M4.9 4.9h6.2v6.2H4.9z\"/></svg>
+"
+
+[resource]
+script = ExtResource("1_7gvi4")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"ColorPicker"
+style_name = &"ColorPicker"
+is_static = true
+states = PackedStringArray("sample_focus", "picker_focus_rectangle", "picker_focus_circle")
+icons = PackedStringArray("menu_option", "folded_arrow", "expanded_arrow", "screen_picker", "shape_circle", "shape_rect", "shape_rect_wheel", "add_preset", "sample_bg", "sample_revert", "overbright_indicator", "bar_arrow", "picker_cursor", "picker_cursor_bg", "color_script", "color_hue")
+constants = PackedStringArray("margin", "sv_width", "sv_height", "h_width", "label_width", "center_slider_grabbers")
+colors = PackedStringArray("focused_not_editing_cursor_color")
+theme_defaults = Dictionary[String, Variant]({
+"add_preset": SubResource("DPITexture_n71vp"),
+"bar_arrow": SubResource("DPITexture_o7ash"),
+"center_slider_grabbers": 1,
+"color_hue": SubResource("GradientTexture2D_7mujx"),
+"color_script": SubResource("DPITexture_m7hcn"),
+"expanded_arrow": SubResource("DPITexture_gwcle"),
+"focused_not_editing_cursor_color": Color(1, 1, 1, 0.275),
+"folded_arrow": SubResource("DPITexture_tav8g"),
+"h_width": 30,
+"label_width": 10,
+"margin": 4,
+"menu_option": SubResource("DPITexture_7gvi4"),
+"overbright_indicator": SubResource("DPITexture_ewuop"),
+"picker_cursor": SubResource("DPITexture_0hb4k"),
+"picker_cursor_bg": SubResource("DPITexture_oox02"),
+"sample_bg": SubResource("DPITexture_jku0x"),
+"sample_revert": SubResource("DPITexture_7406a"),
+"screen_picker": SubResource("DPITexture_svkhe"),
+"shape_circle": SubResource("DPITexture_jqfd5"),
+"shape_rect": SubResource("DPITexture_7pht3"),
+"shape_rect_wheel": SubResource("DPITexture_8maj3"),
+"sv_height": 256,
+"sv_width": 256
+})

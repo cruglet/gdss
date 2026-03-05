@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://blycw2w0j2b23"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_ncv50"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_0u0ca"]
+
+[sub_resource type="DPITexture" id="DPITexture_gi8bl"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"48\"><path fill=\"gray\" fill-opacity=\".65\" d=\"M3.15 4v40h1.7V4z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_f34jq"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"30\" height=\"60\"><rect width=\"28\" height=\"58\" x=\"1\" y=\"1\" fill=\"#e0e0e0\" fill-opacity=\".6\" stroke=\"#000\" stroke-width=\".8\" rx=\"7\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_0u0ca"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"48\" height=\"8\"><path fill=\"none\" stroke=\"gray\" stroke-opacity=\".65\" stroke-width=\"1.7\" d=\"M4 4h40\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_ncv50"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"60\" height=\"30\"><rect width=\"58\" height=\"28\" x=\"1\" y=\"1\" fill=\"#e0e0e0\" fill-opacity=\".6\" stroke=\"#000\" stroke-width=\".8\" rx=\"7\"/></svg>
+"
+
+[resource]
+script = ExtResource("1_ncv50")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"SplitContainer"
+style_name = &"SplitContainer"
+is_static = true
+states = PackedStringArray("split_bar_background")
+icons = PackedStringArray("h_touch_dragger", "v_touch_dragger", "h_grabber", "v_grabber")
+constants = PackedStringArray("separation", "minimum_grab_thickness", "autohide")
+colors = PackedStringArray("touch_dragger_color", "touch_dragger_pressed_color", "touch_dragger_hover_color")
+theme_defaults = Dictionary[String, Variant]({
+"autohide": 1,
+"h_grabber": SubResource("DPITexture_gi8bl"),
+"h_touch_dragger": SubResource("DPITexture_f34jq"),
+"minimum_grab_thickness": 6,
+"separation": 12,
+"touch_dragger_color": Color(1, 1, 1, 0.3),
+"touch_dragger_hover_color": Color(1, 1, 1, 0.6),
+"touch_dragger_pressed_color": Color(1, 1, 1, 1),
+"v_grabber": SubResource("DPITexture_0u0ca"),
+"v_touch_dragger": SubResource("DPITexture_ncv50")
+})

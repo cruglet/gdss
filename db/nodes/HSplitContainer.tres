@@ -1,0 +1,32 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://ckfbe5fx5qsst"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_f34jq"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_gi8bl"]
+
+[sub_resource type="DPITexture" id="DPITexture_gi8bl"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"48\"><path fill=\"gray\" fill-opacity=\".65\" d=\"M3.15 4v40h1.7V4z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_f34jq"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"30\" height=\"60\"><rect width=\"28\" height=\"58\" x=\"1\" y=\"1\" fill=\"#e0e0e0\" fill-opacity=\".6\" stroke=\"#000\" stroke-width=\".8\" rx=\"7\"/></svg>
+"
+
+[resource]
+script = ExtResource("1_f34jq")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"HSplitContainer"
+style_name = &"HSplitContainer"
+is_static = true
+states = PackedStringArray("split_bar_background")
+icons = PackedStringArray("touch_dragger", "grabber")
+constants = PackedStringArray("separation", "minimum_grab_thickness", "autohide")
+theme_defaults = Dictionary[String, Variant]({
+"autohide": 1,
+"grabber": SubResource("DPITexture_gi8bl"),
+"minimum_grab_thickness": 6,
+"separation": 12,
+"touch_dragger": SubResource("DPITexture_f34jq")
+})

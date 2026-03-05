@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://snebi3mplvgi"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_es6s3"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_dxd64"]
+
+[sub_resource type="DPITexture" id="DPITexture_es6s3"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"10\" height=\"10\"><circle cx=\"5\" cy=\"5\" r=\"5\" fill=\"#fff\"/><circle cx=\"5\" cy=\"5\" r=\"3.667\" fill=\"#b2b2b2\" fill-opacity=\".65\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_pk5rf"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#fefffe\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".65\" stroke-width=\"2\" d=\"M11 4v7H4\"/><circle cx=\"7.5\" cy=\"7.5\" r=\"1.5\" fill=\"#b2b2b2\" fill-opacity=\".65\"/></svg>
+"
+
+[resource]
+script = ExtResource("1_es6s3")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"GraphNode"
+style_name = &"GraphNode"
+is_static = true
+states = PackedStringArray("panel", "panel_selected", "panel_focus", "titlebar", "titlebar_selected", "slot", "slot_selected")
+icons = PackedStringArray("port", "resizer")
+constants = PackedStringArray("separation", "port_h_offset")
+colors = PackedStringArray("resizer_color")
+theme_defaults = Dictionary[String, Variant]({
+"port": SubResource("DPITexture_es6s3"),
+"port_h_offset": 0,
+"resizer": SubResource("DPITexture_pk5rf"),
+"resizer_color": Color(0.875, 0.875, 0.875, 1),
+"separation": 2
+})

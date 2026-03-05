@@ -8,12 +8,16 @@ extends Resource
 @export var property_list: Dictionary[String, GdssProp]
 @export var method_list: Dictionary[String, GdssMethod]
 @export var component_list: Dictionary[String, GdssNodeComponent]
-
+@export var boolean_overrides: Dictionary[String, bool]
 
 @export_tool_button("Repopulate") var _repopulate: Callable:
 	get: return repopulate
 @export_tool_button("Repopulate (Hard)") var _repopulate_full: Callable:
 	get: return repopulate.bind(true)
+@export_tool_button("Populate Missing Nodes") var _populate_nodes: Callable:
+	get: return _populate_missing_nodes
+@export_tool_button("Remove Invalid Nodes") var _remove_invalid_nodes: Callable:
+	get: return _remove_invalid_nodes_fn
 
 @export_group("Resource Directories")
 @export_dir var methods_dir: String
@@ -74,36 +78,37 @@ func _set_nodes(new: bool = false) -> void:
 		for component: GdssNodeComponent in components:
 			if not node.enabled_components.has(component.component_name):
 				node.enabled_components.set(component.component_name, component.default_state)
+		if node.is_static and node.enabled_components.has("Transitionable"):
+			node.enabled_components["Transitionable"] = false
 		
 		var type: StringName = node.base_type
 		
-		node.states.clear()
-		for item_name: String in theme.get_stylebox_list(type):
-			node.states.append(item_name)
+		node.states = _get_theme_list(theme, type, "stylebox")
+		node.icons = _get_theme_list(theme, type, "icon")
+		node.font_sizes = _get_theme_list(theme, type, "font_size")
+		node.fonts = _get_theme_list(theme, type, "font")
+		node.constants = _get_theme_list(theme, type, "constant")
+		node.colors = _get_theme_list(theme, type, "color")
 		
-		node.icons.clear()
-		for item_name: String in theme.get_icon_list(type):
-			node.icons.append(item_name)
-		
-		node.font_sizes.clear()
-		for item_name: String in theme.get_font_size_list(type):
-			node.font_sizes.append(item_name)
-		
-		node.fonts.clear()
-		for item_name: String in theme.get_font_list(type):
-			node.fonts.append(item_name)
-		
-		node.constants.clear()
-		for item_name: String in theme.get_constant_list(type):
-			node.constants.append(item_name)
-		
-		node.colors.clear()
-		for item_name: String in theme.get_color_list(type):
-			node.colors.append(item_name)
+		node.theme_defaults.clear()
+		for item_name: String in node.constants:
+			node.theme_defaults[item_name] = theme.get_constant(item_name, type)
+		for item_name: String in node.colors:
+			node.theme_defaults[item_name] = theme.get_color(item_name, type)
+		for item_name: String in node.font_sizes:
+			node.theme_defaults[item_name] = theme.get_font_size(item_name, type)
+		for item_name: String in node.icons:
+			node.theme_defaults[item_name] = theme.get_icon(item_name, type)
+		for item_name: String in node.fonts:
+			node.theme_defaults[item_name] = theme.get_font(item_name, type)
 		
 		ResourceSaver.save(node, nodes_dir.path_join(node.resource_path.get_file()))
 	
 	node_list = nodes
+
+
+func _get_theme_list(theme: Theme, type: StringName, category: String) -> PackedStringArray:
+	return theme.call("get_" + category + "_list", type)
 
 
 func _set_methods(new: bool = false) -> void:
@@ -118,3 +123,48 @@ func _set_methods(new: bool = false) -> void:
 			methods.set(resource.method_name, resource)
 	
 	method_list = methods
+
+
+func _populate_missing_nodes() -> void:
+	var existing_types: PackedStringArray = []
+	var dir: DirAccess = DirAccess.open(nodes_dir)
+	for file_name: String in dir.get_files():
+		if not file_name.get_extension() == "tres":
+			continue
+		var resource: Resource = load(nodes_dir.path_join(file_name))
+		if resource is GdssNode:
+			existing_types.append(String(resource.base_type))
+	
+	var theme: Theme = ThemeDB.get_default_theme()
+	var theme_types: PackedStringArray = theme.get_type_list()
+	
+	for type: String in theme_types:
+		if not ClassDB.is_parent_class(StringName(type), &"Control") and type != "Control":
+			continue
+		if existing_types.has(type):
+			continue
+		var node: GdssNode_Base = GdssNode_Base.new()
+		node.base_type = StringName(type)
+		node.style_name = StringName(type)
+		node.is_static = true
+		ResourceSaver.save(node, nodes_dir.path_join(type + ".tres"))
+	
+	repopulate()
+
+
+func _remove_invalid_nodes_fn() -> void:
+	var theme: Theme = ThemeDB.get_default_theme()
+	var theme_types: PackedStringArray = theme.get_type_list()
+	
+	var dir: DirAccess = DirAccess.open(nodes_dir)
+	for file_name: String in dir.get_files():
+		if not file_name.get_extension() == "tres":
+			continue
+		var resource: Resource = load(nodes_dir.path_join(file_name))
+		if not resource is GdssNode:
+			continue
+		var type: String = String((resource as GdssNode).base_type)
+		if not theme_types.has(type):
+			DirAccess.remove_absolute(nodes_dir.path_join(file_name))
+	
+	repopulate()

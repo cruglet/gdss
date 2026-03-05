@@ -14,6 +14,7 @@ extends Resource
 @export_storage var fonts: PackedStringArray
 @export_storage var constants: PackedStringArray
 @export_storage var colors: PackedStringArray
+@export_storage var theme_defaults: Dictionary[String, Variant]
 
 var _props_cache: Array[GdssProp] = []
 var _props_dirty: bool = true
@@ -65,16 +66,21 @@ func get_enabled_props() -> Array[GdssProp]:
 	props.append_array(unique_properties)
 	
 	for item_name: String in constants:
-		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.INT, 0, GdssProp.Category.CONST)))
+		if overrides.has(item_name):
+			props.append(overrides[item_name])
+		elif db.boolean_overrides.has(item_name):
+			props.append(GdssProp.create(item_name, GDSS.Type.BOOLEAN, db.boolean_overrides[item_name], GdssProp.Category.CONST))
+		else:
+			props.append(GdssProp.create(item_name, GDSS.Type.INT, theme_defaults.get(item_name, 0), GdssProp.Category.CONST))
 	
 	for item_name: String in font_sizes:
-		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.INT, 0, GdssProp.Category.FONT_SIZE)))
+		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.INT, theme_defaults.get(item_name, 0), GdssProp.Category.FONT_SIZE)))
 	
 	for item_name: String in fonts:
-		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.FONT, null, GdssProp.Category.FONT)))
+		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.FONT, theme_defaults.get(item_name, null), GdssProp.Category.FONT)))
 	
 	for item_name: String in icons:
-		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.ICON, null, GdssProp.Category.ICON)))
+		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.ICON, theme_defaults.get(item_name, null), GdssProp.Category.ICON)))
 	
 	var grouped_colors: Dictionary = {}
 	for override_prop: GdssProp in overrides.values():
@@ -85,7 +91,7 @@ func get_enabled_props() -> Array[GdssProp]:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
 		elif not grouped_colors.has(item_name):
-			props.append(GdssProp.create(item_name, GDSS.Type.COLOR, Color.TRANSPARENT, GdssProp.Category.COLOR))
+			props.append(GdssProp.create(item_name, GDSS.Type.COLOR, theme_defaults.get(item_name, Color.TRANSPARENT), GdssProp.Category.COLOR))
 	
 	_props_cache = props
 	_props_dirty = false

@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="GdssNode_Button" format=4 uid="uid://4b0bbl36miuk"]
+[gd_resource type="Resource" script_class="GdssNode_Base" format=4 uid="uid://dhbyg1i27285g"]
 
-[ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_6y11i"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_xhgkr"]
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_iq0j1"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_4myeu"]
 
 [sub_resource type="Image" id="Image_6nk51"]
 data = {
@@ -594,29 +594,76 @@ cache/0/16/0/glyphs/67/size = Vector2(7, 5)
 cache/0/16/0/glyphs/67/uv_rect = Rect2(213, 68, 7, 5)
 cache/0/16/0/glyphs/67/texture_idx = 0
 
+[sub_resource type="FontVariation" id="FontVariation_os63r"]
+base_font = SubResource("FontFile_evhs8")
+variation_embolden = 1.2
+
+[sub_resource type="FontVariation" id="FontVariation_b0ulb"]
+base_font = SubResource("FontFile_evhs8")
+variation_embolden = 1.2
+variation_transform = Transform2D(1, 0.2, 0, 1, 0, 0)
+
+[sub_resource type="Image" id="Image_iq0j1"]
+data = {
+"data": PackedByteArray("/////////////////////w=="),
+"format": "RGBA8",
+"height": 2,
+"mipmaps": false,
+"width": 2
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_4myeu"]
+image = SubResource("Image_iq0j1")
+
+[sub_resource type="FontVariation" id="FontVariation_wt5qc"]
+base_font = SubResource("FontFile_evhs8")
+variation_transform = Transform2D(1, 0.2, 0, 1, 0, 0)
+
 [resource]
-script = ExtResource("1_6y11i")
+script = ExtResource("1_iq0j1")
 enabled_components = Dictionary[String, bool]({
 "Stylebox": true,
-"Transitionable": true
+"Transitionable": false
 })
-base_type = &"MenuButton"
-style_name = &"MenuButton"
-states = PackedStringArray("normal", "pressed", "hover", "disabled", "focus")
-font_sizes = PackedStringArray("font_size")
-fonts = PackedStringArray("font")
-constants = PackedStringArray("h_separation", "outline_size")
-colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_focus_color", "font_disabled_color", "font_outline_color")
+base_type = &"RichTextLabel"
+style_name = &"RichTextLabel"
+is_static = true
+states = PackedStringArray("focus", "normal")
+icons = PackedStringArray("horizontal_rule")
+font_sizes = PackedStringArray("normal_font_size", "bold_font_size", "italics_font_size", "bold_italics_font_size", "mono_font_size")
+fonts = PackedStringArray("normal_font", "bold_font", "italics_font", "bold_italics_font", "mono_font")
+constants = PackedStringArray("shadow_offset_x", "shadow_offset_y", "shadow_outline_size", "line_separation", "paragraph_separation", "table_h_separation", "table_v_separation", "outline_size", "text_highlight_h_padding", "text_highlight_v_padding", "underline_alpha", "strikethrough_alpha")
+colors = PackedStringArray("default_color", "font_selected_color", "selection_color", "font_shadow_color", "font_outline_color", "table_odd_row_bg", "table_even_row_bg", "table_border")
 theme_defaults = Dictionary[String, Variant]({
-"font": SubResource("FontFile_evhs8"),
-"font_color": Color(0.875, 0.875, 0.875, 1),
-"font_disabled_color": Color(1, 1, 1, 0.3),
-"font_focus_color": Color(0.95, 0.95, 0.95, 1),
-"font_hover_color": Color(0.95, 0.95, 0.95, 1),
+"bold_font": SubResource("FontVariation_os63r"),
+"bold_font_size": 16,
+"bold_italics_font": SubResource("FontVariation_b0ulb"),
+"bold_italics_font_size": 16,
+"default_color": Color(1, 1, 1, 1),
 "font_outline_color": Color(0, 0, 0, 1),
-"font_pressed_color": Color(1, 1, 1, 1),
-"font_size": 16,
-"h_separation": 4,
-"outline_size": 0
+"font_selected_color": Color(0, 0, 0, 0),
+"font_shadow_color": Color(0, 0, 0, 0),
+"horizontal_rule": SubResource("ImageTexture_4myeu"),
+"italics_font": SubResource("FontVariation_wt5qc"),
+"italics_font_size": 16,
+"line_separation": 0,
+"mono_font": SubResource("FontFile_evhs8"),
+"mono_font_size": 16,
+"normal_font": SubResource("FontFile_evhs8"),
+"normal_font_size": 16,
+"outline_size": 0,
+"paragraph_separation": 0,
+"selection_color": Color(0.1, 0.1, 1, 0.8),
+"shadow_offset_x": 1,
+"shadow_offset_y": 1,
+"shadow_outline_size": 1,
+"strikethrough_alpha": 50,
+"table_border": Color(0, 0, 0, 0),
+"table_even_row_bg": Color(0, 0, 0, 0),
+"table_h_separation": 3,
+"table_odd_row_bg": Color(0, 0, 0, 0),
+"table_v_separation": 3,
+"text_highlight_h_padding": 3,
+"text_highlight_v_padding": 3,
+"underline_alpha": 50
 })
-metadata/_custom_type_script = "uid://bysui7kt6peex"

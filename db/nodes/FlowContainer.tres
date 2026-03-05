@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://rr00jrte6fvu"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_hm4ov"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_ry8ny"]
+
+[resource]
+script = ExtResource("1_hm4ov")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"FlowContainer"
+style_name = &"FlowContainer"
+is_static = true
+constants = PackedStringArray("h_separation", "v_separation")
+theme_defaults = Dictionary[String, Variant]({
+"h_separation": 4,
+"v_separation": 4
+})

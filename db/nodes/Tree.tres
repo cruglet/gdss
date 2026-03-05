@@ -1,7 +1,27 @@
-[gd_resource type="Resource" script_class="GdssNode_Button" format=4 uid="uid://4b0bbl36miuk"]
+[gd_resource type="Resource" script_class="GdssNode_Base" format=4 uid="uid://6xn4voutsywg"]
 
-[ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_6y11i"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_xhgkr"]
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_ae1qe"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_nqr4y"]
+
+[sub_resource type="DPITexture" id="DPITexture_gwcle"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m5 7 3 3 3-3\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_tav8g"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m6 11 3-3-3-3\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_t1eyv"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m9 11-3-3 3-3\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_7tj1t"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><rect width=\"14\" height=\"14\" x=\"1\" y=\"1\" fill=\"#fff\" fill-opacity=\".75\" rx=\"2.333\"/><path fill=\"#1a1a1a\" d=\"m11.5 3.75-5.6 5.6-1.7-1.7-1.5 1.5 3.2 3.2 7.1-7.1z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_cuucd"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><rect width=\"14\" height=\"14\" x=\"1\" y=\"1\" fill=\"#fff\" fill-opacity=\".37\" rx=\"2.333\"/><path fill=\"#1a1a1a\" fill-opacity=\".5\" d=\"m11.5 3.75-5.6 5.6-1.7-1.7-1.5 1.5 3.2 3.2 7.1-7.1z\"/></svg>
+"
 
 [sub_resource type="Image" id="Image_6nk51"]
 data = {
@@ -594,29 +614,107 @@ cache/0/16/0/glyphs/67/size = Vector2(7, 5)
 cache/0/16/0/glyphs/67/uv_rect = Rect2(213, 68, 7, 5)
 cache/0/16/0/glyphs/67/texture_idx = 0
 
+[sub_resource type="DPITexture" id="DPITexture_ae1qe"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><rect width=\"14\" height=\"14\" x=\"1\" y=\"1\" fill=\"#fff\" fill-opacity=\".75\" rx=\"2.333\"/><path fill=\"#1a1a1a\" d=\"m3 7h10v2h-10z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_nqr4y"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><rect width=\"14\" height=\"14\" x=\"1\" y=\"1\" fill=\"#fff\" fill-opacity=\".37\" rx=\"2.333\"/><path fill=\"#1a1a1a\" fill-opacity=\".5\" d=\"m3 7h10v2h-10z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_hc64m"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"32\" height=\"24\" viewBox=\"0 0 8.467 6.35\"><defs><linearGradient id=\"a\"><stop offset=\"0\" stop-color=\"#fff\" stop-opacity=\".3\"/><stop offset=\"1\" stop-color=\"#fff\" stop-opacity=\"0\"/></linearGradient><linearGradient xlink:href=\"#a\" id=\"b\" x1=\"4.233\" x2=\"4.233\" y1=\"0\" y2=\"6.35\" gradientUnits=\"userSpaceOnUse\"/></defs><path fill=\"url(#b)\" d=\"M0 0H8.467V6.35H0z\" paint-order=\"fill markers stroke\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_4syhu"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".85\" stroke-width=\"2\" d=\"m2 4 4 4 4-4\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_dd1ar"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><rect width=\"14\" height=\"14\" x=\"1\" y=\"1\" fill=\"#1a1a1a\" fill-opacity=\".5\" rx=\"2.333\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_r7l2a"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><rect width=\"14\" height=\"14\" x=\"1\" y=\"1\" fill=\"#1a1a1a\" fill-opacity=\".25\" rx=\"2.333\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_s6he4"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#fff\" stroke-opacity=\".75\" stroke-width=\"2\" d=\"m4 6 4-3.5L12 6m0 4-4 3.5L4 10\"/></svg>
+"
+
 [resource]
-script = ExtResource("1_6y11i")
+script = ExtResource("1_ae1qe")
 enabled_components = Dictionary[String, bool]({
 "Stylebox": true,
-"Transitionable": true
+"Transitionable": false
 })
-base_type = &"MenuButton"
-style_name = &"MenuButton"
-states = PackedStringArray("normal", "pressed", "hover", "disabled", "focus")
-font_sizes = PackedStringArray("font_size")
-fonts = PackedStringArray("font")
-constants = PackedStringArray("h_separation", "outline_size")
-colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_focus_color", "font_disabled_color", "font_outline_color")
+base_type = &"Tree"
+style_name = &"Tree"
+is_static = true
+states = PackedStringArray("panel", "focus", "hovered", "hovered_dimmed", "hovered_selected", "hovered_selected_focus", "selected", "selected_focus", "cursor", "cursor_unfocused", "button_hover", "button_pressed", "title_button_normal", "title_button_pressed", "title_button_hover", "custom_button", "custom_button_pressed", "custom_button_hover")
+icons = PackedStringArray("checked", "checked_disabled", "unchecked", "unchecked_disabled", "indeterminate", "indeterminate_disabled", "updown", "select_arrow", "arrow", "arrow_collapsed", "arrow_collapsed_mirrored", "scroll_hint")
+font_sizes = PackedStringArray("font_size", "title_button_font_size")
+fonts = PackedStringArray("title_button_font", "font")
+constants = PackedStringArray("h_separation", "v_separation", "item_margin", "inner_item_margin_bottom", "inner_item_margin_left", "inner_item_margin_right", "inner_item_margin_top", "check_h_separation", "icon_h_separation", "button_margin", "draw_relationship_lines", "relationship_line_width", "parent_hl_line_width", "children_hl_line_width", "parent_hl_line_margin", "draw_guides", "dragging_unfold_wait_msec", "scroll_border", "scroll_speed", "outline_size", "icon_max_width", "scrollbar_margin_left", "scrollbar_margin_top", "scrollbar_margin_right", "scrollbar_margin_bottom", "scrollbar_h_separation", "scrollbar_v_separation")
+colors = PackedStringArray("title_button_color", "font_color", "font_hovered_color", "font_hovered_dimmed_color", "font_hovered_selected_color", "font_selected_color", "font_disabled_color", "font_outline_color", "guide_color", "drop_position_color", "relationship_line_color", "parent_hl_line_color", "children_hl_line_color", "custom_button_font_highlight", "scroll_hint_color")
 theme_defaults = Dictionary[String, Variant]({
+"arrow": SubResource("DPITexture_gwcle"),
+"arrow_collapsed": SubResource("DPITexture_tav8g"),
+"arrow_collapsed_mirrored": SubResource("DPITexture_t1eyv"),
+"button_margin": 4,
+"check_h_separation": 4,
+"checked": SubResource("DPITexture_7tj1t"),
+"checked_disabled": SubResource("DPITexture_cuucd"),
+"children_hl_line_color": Color(0.27, 0.27, 0.27, 1),
+"children_hl_line_width": 1,
+"custom_button_font_highlight": Color(0.95, 0.95, 0.95, 1),
+"dragging_unfold_wait_msec": 500,
+"draw_guides": 1,
+"draw_relationship_lines": 0,
+"drop_position_color": Color(1, 1, 1, 1),
 "font": SubResource("FontFile_evhs8"),
-"font_color": Color(0.875, 0.875, 0.875, 1),
-"font_disabled_color": Color(1, 1, 1, 0.3),
-"font_focus_color": Color(0.95, 0.95, 0.95, 1),
-"font_hover_color": Color(0.95, 0.95, 0.95, 1),
+"font_color": Color(0.7, 0.7, 0.7, 1),
+"font_disabled_color": Color(0.875, 0.875, 0.875, 0.5),
+"font_hovered_color": Color(0.95, 0.95, 0.95, 1),
+"font_hovered_dimmed_color": Color(0.875, 0.875, 0.875, 1),
+"font_hovered_selected_color": Color(1, 1, 1, 1),
 "font_outline_color": Color(0, 0, 0, 1),
-"font_pressed_color": Color(1, 1, 1, 1),
+"font_selected_color": Color(1, 1, 1, 1),
 "font_size": 16,
+"guide_color": Color(0.7, 0.7, 0.7, 0.25),
 "h_separation": 4,
-"outline_size": 0
+"icon_h_separation": 4,
+"icon_max_width": 0,
+"indeterminate": SubResource("DPITexture_ae1qe"),
+"indeterminate_disabled": SubResource("DPITexture_nqr4y"),
+"inner_item_margin_bottom": 0,
+"inner_item_margin_left": 0,
+"inner_item_margin_right": 0,
+"inner_item_margin_top": 0,
+"item_margin": 16,
+"outline_size": 0,
+"parent_hl_line_color": Color(0.27, 0.27, 0.27, 1),
+"parent_hl_line_margin": 0,
+"parent_hl_line_width": 1,
+"relationship_line_color": Color(0.27, 0.27, 0.27, 1),
+"relationship_line_width": 1,
+"scroll_border": 4,
+"scroll_hint": SubResource("DPITexture_hc64m"),
+"scroll_hint_color": Color(0, 0, 0, 1),
+"scroll_speed": 12,
+"scrollbar_h_separation": 4,
+"scrollbar_margin_bottom": -1,
+"scrollbar_margin_left": -1,
+"scrollbar_margin_right": -1,
+"scrollbar_margin_top": -1,
+"scrollbar_v_separation": 4,
+"select_arrow": SubResource("DPITexture_4syhu"),
+"title_button_color": Color(0.875, 0.875, 0.875, 1),
+"title_button_font": SubResource("FontFile_evhs8"),
+"title_button_font_size": 16,
+"unchecked": SubResource("DPITexture_dd1ar"),
+"unchecked_disabled": SubResource("DPITexture_r7l2a"),
+"updown": SubResource("DPITexture_s6he4"),
+"v_separation": 4
 })
-metadata/_custom_type_script = "uid://bysui7kt6peex"
+metadata/_custom_type_script = "uid://cauq5fy316yg5"

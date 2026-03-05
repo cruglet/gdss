@@ -1,0 +1,43 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://borpestmefeas"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_2eho4"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_vj61f"]
+
+[sub_resource type="DPITexture" id="DPITexture_sw0a3"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><circle cx=\"8\" cy=\"8\" r=\"7\" fill=\"#fefefe\" fill-opacity=\".75\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_4xadp"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><circle cx=\"8\" cy=\"8\" r=\"7\" fill=\"#fefefe\" fill-opacity=\".37\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_gapo2"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><circle cx=\"8\" cy=\"8\" r=\"7\" fill=\"#fefefe\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_2eho4"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"8\" height=\"4\"><path fill=\"#fff\" fill-opacity=\".25\" d=\"M0 3V1h16v2z\"/></svg>
+"
+
+[resource]
+script = ExtResource("1_2eho4")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"VSlider"
+style_name = &"VSlider"
+is_static = true
+states = PackedStringArray("slider", "grabber_area", "grabber_area_highlight")
+icons = PackedStringArray("grabber", "grabber_highlight", "grabber_disabled", "tick")
+constants = PackedStringArray("center_grabber", "grabber_offset", "tick_offset")
+theme_defaults = Dictionary[String, Variant]({
+"center_grabber": 0,
+"grabber": SubResource("DPITexture_sw0a3"),
+"grabber_disabled": SubResource("DPITexture_4xadp"),
+"grabber_highlight": SubResource("DPITexture_gapo2"),
+"grabber_offset": 0,
+"tick": SubResource("DPITexture_2eho4"),
+"tick_offset": 0
+})
+metadata/_custom_type_script = "uid://cauq5fy316yg5"

@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://d1necq8ef7gwq"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_v32o2"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_ekm82"]
+
+[sub_resource type="DPITexture" id="DPITexture_ekm82"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"8\"><path fill=\"none\" stroke=\"#fff\" stroke-width=\"2\" d=\"m12 2-4 3.5L4 2\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_v32o2"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"8\"><path fill=\"none\" stroke=\"#fff\" stroke-width=\"2\" d=\"m4 6 4-3.5L12 6\"/></svg>
+"
+
+[sub_resource type="ImageTexture" id="ImageTexture_fn4ed"]
+
+[resource]
+script = ExtResource("1_v32o2")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"SpinBox"
+style_name = &"SpinBox"
+is_static = true
+states = PackedStringArray("up_background", "up_background_hovered", "up_background_pressed", "up_background_disabled", "down_background", "down_background_hovered", "down_background_pressed", "down_background_disabled", "field_and_buttons_separator", "up_down_buttons_separator")
+icons = PackedStringArray("updown", "up", "up_hover", "up_pressed", "up_disabled", "down", "down_hover", "down_pressed", "down_disabled")
+constants = PackedStringArray("buttons_vertical_separation", "field_and_buttons_separation", "buttons_width", "set_min_buttons_width_from_icons")
+colors = PackedStringArray("up_icon_modulate", "up_hover_icon_modulate", "up_pressed_icon_modulate", "up_disabled_icon_modulate", "down_icon_modulate", "down_hover_icon_modulate", "down_pressed_icon_modulate", "down_disabled_icon_modulate")
+theme_defaults = Dictionary[String, Variant]({
+"buttons_vertical_separation": 0,
+"buttons_width": 16,
+"down": SubResource("DPITexture_ekm82"),
+"down_disabled": SubResource("DPITexture_ekm82"),
+"down_disabled_icon_modulate": Color(0.875, 0.875, 0.875, 0.5),
+"down_hover": SubResource("DPITexture_ekm82"),
+"down_hover_icon_modulate": Color(0.95, 0.95, 0.95, 1),
+"down_icon_modulate": Color(0.875, 0.875, 0.875, 1),
+"down_pressed": SubResource("DPITexture_ekm82"),
+"down_pressed_icon_modulate": Color(0.95, 0.95, 0.95, 1),
+"field_and_buttons_separation": 2,
+"set_min_buttons_width_from_icons": 1,
+"up": SubResource("DPITexture_v32o2"),
+"up_disabled": SubResource("DPITexture_v32o2"),
+"up_disabled_icon_modulate": Color(0.875, 0.875, 0.875, 0.5),
+"up_hover": SubResource("DPITexture_v32o2"),
+"up_hover_icon_modulate": Color(0.95, 0.95, 0.95, 1),
+"up_icon_modulate": Color(0.875, 0.875, 0.875, 1),
+"up_pressed": SubResource("DPITexture_v32o2"),
+"up_pressed_icon_modulate": Color(0.95, 0.95, 0.95, 1),
+"updown": SubResource("ImageTexture_fn4ed")
+})
+metadata/_custom_type_script = "uid://cauq5fy316yg5"

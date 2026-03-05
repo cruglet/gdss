@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://nkf062s4poon"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_fn4ed"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_86ord"]
+
+[sub_resource type="ImageTexture" id="ImageTexture_fn4ed"]
+
+[resource]
+script = ExtResource("1_fn4ed")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"HScrollBar"
+style_name = &"HScrollBar"
+is_static = true
+states = PackedStringArray("scroll", "scroll_focus", "grabber", "grabber_highlight", "grabber_pressed")
+icons = PackedStringArray("increment", "increment_highlight", "increment_pressed", "decrement", "decrement_highlight", "decrement_pressed")
+theme_defaults = Dictionary[String, Variant]({
+"decrement": SubResource("ImageTexture_fn4ed"),
+"decrement_highlight": SubResource("ImageTexture_fn4ed"),
+"decrement_pressed": SubResource("ImageTexture_fn4ed"),
+"increment": SubResource("ImageTexture_fn4ed"),
+"increment_highlight": SubResource("ImageTexture_fn4ed"),
+"increment_pressed": SubResource("ImageTexture_fn4ed")
+})
+metadata/_custom_type_script = "uid://cauq5fy316yg5"

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://d1g75tu06bjr2"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_23ayd"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_yywov"]
+
+[resource]
+script = ExtResource("1_23ayd")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"HBoxContainer"
+style_name = &"HBoxContainer"
+is_static = true
+constants = PackedStringArray("separation")
+theme_defaults = Dictionary[String, Variant]({
+"separation": 4
+})

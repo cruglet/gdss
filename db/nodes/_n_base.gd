@@ -1,5 +1,5 @@
 @tool
-class_name GdssNode_TabBar
+class_name GdssNode_Base
 extends GdssNode
 
 

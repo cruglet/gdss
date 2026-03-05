@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://dq84yqjeneito"]
+
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_63tf7"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_16kkt"]
+
+[sub_resource type="DPITexture" id="DPITexture_63tf7"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#fefffe\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".65\" stroke-width=\"2\" d=\"M4 11V4h7\"/><circle cx=\"7.5\" cy=\"7.5\" r=\"1.5\" fill=\"#b2b2b2\" fill-opacity=\".65\"/></svg>
+"
+
+[resource]
+script = ExtResource("1_63tf7")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": false
+})
+base_type = &"GraphEditMinimap"
+style_name = &"GraphEditMinimap"
+is_static = true
+states = PackedStringArray("panel", "camera", "node")
+icons = PackedStringArray("resizer")
+colors = PackedStringArray("resizer_color")
+theme_defaults = Dictionary[String, Variant]({
+"resizer": SubResource("DPITexture_63tf7"),
+"resizer_color": Color(1, 1, 1, 0.85)
+})

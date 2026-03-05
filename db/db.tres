@@ -14,58 +14,116 @@
 [ext_resource type="Resource" uid="uid://dfq872kabx1lx" path="res://addons/gdss/db/methods/texture.tres" id="9_vkhqo"]
 [ext_resource type="Resource" uid="uid://v3fvukce5m8m" path="res://addons/gdss/db/nodes/Button.tres" id="11_24g4u"]
 [ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="11_ig14j"]
+[ext_resource type="Resource" uid="uid://c01s35qcxoewf" path="res://addons/gdss/db/nodes/BoxContainer.tres" id="12_7gfsa"]
 [ext_resource type="Resource" uid="uid://d20mrkg1mjdgd" path="res://addons/gdss/db/nodes/CheckBox.tres" id="12_vke44"]
 [ext_resource type="Resource" uid="uid://blewkqxtfx42v" path="res://addons/gdss/db/nodes/CheckButton.tres" id="13_7n7pt"]
 [ext_resource type="Resource" uid="uid://rrskb0swqmvm" path="res://addons/gdss/db/nodes/CodeEdit.tres" id="14_nm68i"]
 [ext_resource type="Resource" uid="uid://cgfetyh5xiwre" path="res://addons/gdss/db/nodes/ColorPickerButton.tres" id="15_0ebdc"]
 [ext_resource type="Resource" uid="uid://cp7n82htiyw7k" path="res://addons/gdss/db/nodes/ItemList.tres" id="16_vv3f1"]
 [ext_resource type="Resource" uid="uid://b12scqv5cg43q" path="res://addons/gdss/db/nodes/Label.tres" id="17_mvt35"]
+[ext_resource type="Resource" uid="uid://dfcvw6508sg8l" path="res://addons/gdss/db/nodes/ColorPicker.tres" id="17_w28v3"]
 [ext_resource type="Resource" uid="uid://c0mcitl1dqjit" path="res://addons/gdss/db/nodes/LineEdit.tres" id="18_s2toh"]
 [ext_resource type="Resource" uid="uid://ubsnex8kqdd1" path="res://addons/gdss/db/nodes/LinkButton.tres" id="19_6rbdx"]
+[ext_resource type="Resource" uid="uid://rr00jrte6fvu" path="res://addons/gdss/db/nodes/FlowContainer.tres" id="19_auxe8"]
 [ext_resource type="Resource" uid="uid://4b0bbl36miuk" path="res://addons/gdss/db/nodes/MenuButton.tres" id="20_sxra3"]
+[ext_resource type="Resource" uid="uid://dwxuajhwsfisb" path="res://addons/gdss/db/nodes/FoldableContainer.tres" id="20_wbu53"]
+[ext_resource type="Resource" uid="uid://caewiq47i73y1" path="res://addons/gdss/db/nodes/GraphEdit.tres" id="21_dppck"]
 [ext_resource type="Resource" uid="uid://pm2x5syejo74" path="res://addons/gdss/db/nodes/OptionButton.tres" id="21_vm72y"]
+[ext_resource type="Resource" uid="uid://dq84yqjeneito" path="res://addons/gdss/db/nodes/GraphEditMinimap.tres" id="22_dl7k7"]
 [ext_resource type="Resource" uid="uid://ba3p6on4rccbq" path="res://addons/gdss/db/nodes/Panel.tres" id="22_v8gur"]
+[ext_resource type="Resource" uid="uid://dohut7mek0lx0" path="res://addons/gdss/db/nodes/GraphFrame.tres" id="23_66m1v"]
 [ext_resource type="Resource" uid="uid://cmvtwk5nv2ou4" path="res://addons/gdss/db/nodes/PanelContainer.tres" id="23_r8g22"]
+[ext_resource type="Resource" uid="uid://snebi3mplvgi" path="res://addons/gdss/db/nodes/GraphNode.tres" id="24_38ydi"]
 [ext_resource type="Resource" uid="uid://8d7cd8om78ko" path="res://addons/gdss/db/nodes/TabBar.tres" id="24_etjxy"]
+[ext_resource type="Resource" uid="uid://bhtsk2do4n8me" path="res://addons/gdss/db/nodes/GridContainer.tres" id="25_amle0"]
 [ext_resource type="Resource" uid="uid://chjiinriweygb" path="res://addons/gdss/db/nodes/TabContainer.tres" id="25_ucild"]
 [ext_resource type="Resource" uid="uid://6krdjud55uk8" path="res://addons/gdss/db/nodes/TextEdit.tres" id="26_am8mq"]
+[ext_resource type="Resource" uid="uid://d1g75tu06bjr2" path="res://addons/gdss/db/nodes/HBoxContainer.tres" id="26_mh3jv"]
+[ext_resource type="Resource" uid="uid://pb7jdh44066i" path="res://addons/gdss/db/nodes/HFlowContainer.tres" id="27_uolo4"]
 [ext_resource type="Resource" uid="uid://dohoynmmu05o" path="res://addons/gdss/db/props/anti_aliasing.tres" id="28_lxf86"]
+[ext_resource type="Resource" uid="uid://nkf062s4poon" path="res://addons/gdss/db/nodes/HScrollBar.tres" id="28_p4spd"]
 [ext_resource type="Resource" uid="uid://bw81w2ub4jtck" path="res://addons/gdss/db/props/bg_color.tres" id="29_fgtpw"]
+[ext_resource type="Resource" uid="uid://xd8t0qyrhf83" path="res://addons/gdss/db/nodes/HSeparator.tres" id="29_jqnxd"]
+[ext_resource type="Resource" uid="uid://dgkvu8oy3b41r" path="res://addons/gdss/db/nodes/HSlider.tres" id="30_4ucap"]
 [ext_resource type="Resource" uid="uid://baf7ce3gs2jv3" path="res://addons/gdss/db/props/border.tres" id="30_m1mbn"]
 [ext_resource type="Resource" uid="uid://q868h2lvtq21" path="res://addons/gdss/db/props/border_color.tres" id="31_6rrgx"]
+[ext_resource type="Resource" uid="uid://ckfbe5fx5qsst" path="res://addons/gdss/db/nodes/HSplitContainer.tres" id="31_co76n"]
 [ext_resource type="Resource" uid="uid://flt841skxt6l" path="res://addons/gdss/db/props/corner_detail.tres" id="32_xa356"]
 [ext_resource type="Resource" uid="uid://cyk5xlgeaiuwi" path="res://addons/gdss/db/props/corner_radius.tres" id="33_h65uo"]
 [ext_resource type="Resource" uid="uid://c2w3chwnlgn3c" path="res://addons/gdss/db/props/cursor.tres" id="34_c7yx5"]
 [ext_resource type="Resource" uid="uid://dmbeiejithhrk" path="res://addons/gdss/db/props/expand.tres" id="35_6r8de"]
 [ext_resource type="Resource" uid="uid://dumxdopjyi2u6" path="res://addons/gdss/db/props/font_color.tres" id="36_7gfsa"]
+[ext_resource type="Resource" uid="uid://c2jjsh6r4vrfs" path="res://addons/gdss/db/nodes/MarginContainer.tres" id="36_xlfko"]
+[ext_resource type="Resource" uid="uid://bc5nvsk1ym52s" path="res://addons/gdss/db/nodes/MenuBar.tres" id="37_oxlj6"]
 [ext_resource type="Resource" uid="uid://7rdt8cs04c00" path="res://addons/gdss/db/props/padding.tres" id="37_w28v3"]
 [ext_resource type="Resource" uid="uid://2fe4ykeh5di" path="res://addons/gdss/db/props/shadow.tres" id="38_auxe8"]
 [ext_resource type="Resource" uid="uid://dtfjy127omnii" path="res://addons/gdss/db/props/shadow_color.tres" id="39_wbu53"]
 [ext_resource type="Resource" uid="uid://bm34cnrewsno3" path="res://addons/gdss/db/props/skew_x.tres" id="40_dppck"]
 [ext_resource type="Resource" uid="uid://c0x5kfmolr1qc" path="res://addons/gdss/db/props/skew_y.tres" id="41_dl7k7"]
+[ext_resource type="Resource" uid="uid://dmmhhy2n73e75" path="res://addons/gdss/db/nodes/ProgressBar.tres" id="42_1bxit"]
 [ext_resource type="Resource" uid="uid://bd1gpuhft3450" path="res://addons/gdss/db/props/transition_func.tres" id="42_66m1v"]
 [ext_resource type="Resource" uid="uid://dxljxuc70lfm1" path="res://addons/gdss/db/props/transition_time.tres" id="43_38ydi"]
+[ext_resource type="Resource" uid="uid://dhbyg1i27285g" path="res://addons/gdss/db/nodes/RichTextLabel.tres" id="43_kvbea"]
 [ext_resource type="Resource" uid="uid://5sistwednw3k" path="res://addons/gdss/db/props/transition_type.tres" id="44_amle0"]
+[ext_resource type="Resource" uid="uid://bjbgvr8aksl4c" path="res://addons/gdss/db/nodes/ScrollContainer.tres" id="44_s6v8s"]
+[ext_resource type="Resource" uid="uid://d1necq8ef7gwq" path="res://addons/gdss/db/nodes/SpinBox.tres" id="45_xtx62"]
+[ext_resource type="Resource" uid="uid://blycw2w0j2b23" path="res://addons/gdss/db/nodes/SplitContainer.tres" id="46_j25vq"]
+[ext_resource type="Resource" uid="uid://6xn4voutsywg" path="res://addons/gdss/db/nodes/Tree.tres" id="50_gemp2"]
+[ext_resource type="Resource" uid="uid://bw5ogc4k2ivje" path="res://addons/gdss/db/nodes/VBoxContainer.tres" id="51_kg52b"]
+[ext_resource type="Resource" uid="uid://bhaocjq1v7wdj" path="res://addons/gdss/db/nodes/VFlowContainer.tres" id="52_ysp3t"]
+[ext_resource type="Resource" uid="uid://c35egrwgtf4y6" path="res://addons/gdss/db/nodes/VScrollBar.tres" id="53_26ojq"]
+[ext_resource type="Resource" uid="uid://p63627taqglh" path="res://addons/gdss/db/nodes/VSeparator.tres" id="54_7ec0k"]
+[ext_resource type="Resource" uid="uid://borpestmefeas" path="res://addons/gdss/db/nodes/VSlider.tres" id="55_vwm1m"]
+[ext_resource type="Resource" uid="uid://16vea0l0aex5" path="res://addons/gdss/db/nodes/VSplitContainer.tres" id="56_vgoqk"]
 
 [resource]
 script = ExtResource("1_dm4kf")
 node_list = Dictionary[String, ExtResource("1_yumic")]({
+"BoxContainer": ExtResource("12_7gfsa"),
 "Button": ExtResource("11_24g4u"),
 "CheckBox": ExtResource("12_vke44"),
 "CheckButton": ExtResource("13_7n7pt"),
 "CodeEdit": ExtResource("14_nm68i"),
+"ColorPicker": ExtResource("17_w28v3"),
 "ColorPickerButton": ExtResource("15_0ebdc"),
+"FlowContainer": ExtResource("19_auxe8"),
+"FoldableContainer": ExtResource("20_wbu53"),
+"GraphEdit": ExtResource("21_dppck"),
+"GraphEditMinimap": ExtResource("22_dl7k7"),
+"GraphFrame": ExtResource("23_66m1v"),
+"GraphNode": ExtResource("24_38ydi"),
+"GridContainer": ExtResource("25_amle0"),
+"HBoxContainer": ExtResource("26_mh3jv"),
+"HFlowContainer": ExtResource("27_uolo4"),
+"HScrollBar": ExtResource("28_p4spd"),
+"HSeparator": ExtResource("29_jqnxd"),
+"HSlider": ExtResource("30_4ucap"),
+"HSplitContainer": ExtResource("31_co76n"),
 "ItemList": ExtResource("16_vv3f1"),
 "Label": ExtResource("17_mvt35"),
 "LineEdit": ExtResource("18_s2toh"),
 "LinkButton": ExtResource("19_6rbdx"),
+"MarginContainer": ExtResource("36_xlfko"),
+"MenuBar": ExtResource("37_oxlj6"),
 "MenuButton": ExtResource("20_sxra3"),
 "OptionButton": ExtResource("21_vm72y"),
 "Panel": ExtResource("22_v8gur"),
 "PanelContainer": ExtResource("23_r8g22"),
+"ProgressBar": ExtResource("42_1bxit"),
+"RichTextLabel": ExtResource("43_kvbea"),
+"ScrollContainer": ExtResource("44_s6v8s"),
+"SpinBox": ExtResource("45_xtx62"),
+"SplitContainer": ExtResource("46_j25vq"),
 "TabBar": ExtResource("24_etjxy"),
 "TabContainer": ExtResource("25_ucild"),
-"TextEdit": ExtResource("26_am8mq")
+"TextEdit": ExtResource("26_am8mq"),
+"Tree": ExtResource("50_gemp2"),
+"VBoxContainer": ExtResource("51_kg52b"),
+"VFlowContainer": ExtResource("52_ysp3t"),
+"VScrollBar": ExtResource("53_26ojq"),
+"VSeparator": ExtResource("54_7ec0k"),
+"VSlider": ExtResource("55_vwm1m"),
+"VSplitContainer": ExtResource("56_vgoqk")
 })
 property_list = Dictionary[String, ExtResource("11_ig14j")]({
 "anti_aliasing": ExtResource("28_lxf86"),
@@ -97,6 +155,9 @@ method_list = Dictionary[String, ExtResource("1_yv5ta")]({
 component_list = Dictionary[String, ExtResource("1_miyk3")]({
 "Stylebox": ExtResource("3_nih4e"),
 "Transitionable": ExtResource("6_vkhqo")
+})
+boolean_overrides = Dictionary[String, bool]({
+"align_to_largest_stylebox": true
 })
 methods_dir = "res://addons/gdss/db/methods"
 nodes_dir = "res://addons/gdss/db/nodes"

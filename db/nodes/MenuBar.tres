@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="GdssNode_Button" format=4 uid="uid://4b0bbl36miuk"]
+[gd_resource type="Resource" script_class="GdssNode_Base" format=4 uid="uid://bc5nvsk1ym52s"]
 
-[ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_6y11i"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_xhgkr"]
+[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_8pw2s"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_1450r"]
 
 [sub_resource type="Image" id="Image_6nk51"]
 data = {
@@ -595,28 +595,29 @@ cache/0/16/0/glyphs/67/uv_rect = Rect2(213, 68, 7, 5)
 cache/0/16/0/glyphs/67/texture_idx = 0
 
 [resource]
-script = ExtResource("1_6y11i")
+script = ExtResource("1_8pw2s")
 enabled_components = Dictionary[String, bool]({
 "Stylebox": true,
-"Transitionable": true
+"Transitionable": false
 })
-base_type = &"MenuButton"
-style_name = &"MenuButton"
-states = PackedStringArray("normal", "pressed", "hover", "disabled", "focus")
+base_type = &"MenuBar"
+style_name = &"MenuBar"
+is_static = true
+states = PackedStringArray("normal", "hover", "pressed", "disabled")
 font_sizes = PackedStringArray("font_size")
 fonts = PackedStringArray("font")
-constants = PackedStringArray("h_separation", "outline_size")
-colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_focus_color", "font_disabled_color", "font_outline_color")
+constants = PackedStringArray("outline_size", "h_separation")
+colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color", "font_disabled_color", "font_outline_color")
 theme_defaults = Dictionary[String, Variant]({
 "font": SubResource("FontFile_evhs8"),
 "font_color": Color(0.875, 0.875, 0.875, 1),
-"font_disabled_color": Color(1, 1, 1, 0.3),
+"font_disabled_color": Color(0.875, 0.875, 0.875, 0.5),
 "font_focus_color": Color(0.95, 0.95, 0.95, 1),
 "font_hover_color": Color(0.95, 0.95, 0.95, 1),
+"font_hover_pressed_color": Color(1, 1, 1, 1),
 "font_outline_color": Color(0, 0, 0, 1),
 "font_pressed_color": Color(1, 1, 1, 1),
 "font_size": 16,
 "h_separation": 4,
 "outline_size": 0
 })
-metadata/_custom_type_script = "uid://bysui7kt6peex"

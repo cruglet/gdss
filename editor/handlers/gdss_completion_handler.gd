@@ -289,6 +289,8 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 				var v4: Vector4i = default
 				var hint: String = "%d %d %d %d" % [v4.x, v4.y, v4.z, v4.w]
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, hint, hint, _completion_color, _get_icon(&"MemberProperty"))
+		GDSS.Type.ICON, GDSS.Type.FONT:
+			pass
 		_:
 			var default: Variant = prop_def.default_value
 			if default != null:
