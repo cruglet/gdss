@@ -5,16 +5,16 @@
 
 [resource]
 script = ExtResource("1_58h13")
-states = PackedStringArray("normal", "focus", "read_only")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": true,
-"Font Outlines": false,
-"Standard Fonts": true,
-"Standard Icon Colors": false,
 "Stylebox": true,
 "Transitionable": true
 })
 base_type = &"LineEdit"
 style_name = &"LineEdit"
+states = PackedStringArray("normal", "focus", "read_only")
+icons = PackedStringArray("clear")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("minimum_character_width", "outline_size", "caret_width")
+colors = PackedStringArray("font_color", "font_selected_color", "font_uneditable_color", "font_placeholder_color", "font_outline_color", "caret_color", "selection_color", "clear_button_color", "clear_button_color_pressed")
 metadata/_custom_type_script = "uid://c1662rffs58ip"

@@ -1,10 +1,20 @@
 [gd_resource type="Resource" script_class="GdssNode_Button" format=3 uid="uid://cgfetyh5xiwre"]
 
 [ext_resource type="Script" uid="uid://bysui7kt6peex" path="res://addons/gdss/db/nodes/Button.gd" id="1_rb5jp"]
+[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_mfid5"]
 
 [resource]
 script = ExtResource("1_rb5jp")
-states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
+enabled_components = Dictionary[String, bool]({
+"Stylebox": true,
+"Transitionable": true
+})
 base_type = &"ColorPickerButton"
 style_name = &"ColorPickerButton"
+states = PackedStringArray("normal", "pressed", "hover", "disabled", "focus")
+icons = PackedStringArray("bg")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("h_separation", "outline_size")
+colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_focus_color", "font_disabled_color", "font_outline_color")
 metadata/_custom_type_script = "uid://bysui7kt6peex"

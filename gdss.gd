@@ -19,6 +19,7 @@ enum Type {
 	TRANSITION_TYPE,
 	TRANSITION_FUNC,
 	ICON,
+	FONT,
 }
 
 enum CursorType {

@@ -5,16 +5,11 @@
 
 [resource]
 script = ExtResource("1_xfoht")
-states = PackedStringArray("panel")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": false,
-"Standard Fonts": false,
-"Standard Icon Colors": false,
 "Stylebox": true,
 "Transitionable": false
 })
 base_type = &"Panel"
 style_name = &"Panel"
+states = PackedStringArray("panel")
 metadata/_custom_type_script = "uid://cyl4d1srrt0i5"

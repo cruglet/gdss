@@ -5,16 +5,16 @@
 
 [resource]
 script = ExtResource("1_yek1f")
-states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": true,
-"Standard Fonts": true,
-"Standard Icon": true,
 "Stylebox": true,
 "Transitionable": true
 })
 base_type = &"CheckBox"
 style_name = &"CheckBox"
+states = PackedStringArray("normal", "pressed", "disabled", "hover", "hover_pressed", "focus")
+icons = PackedStringArray("checked", "checked_disabled", "unchecked", "unchecked_disabled", "radio_checked", "radio_checked_disabled", "radio_unchecked", "radio_unchecked_disabled")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("h_separation", "check_v_offset", "outline_size")
+colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_hover_pressed_color", "font_focus_color", "font_disabled_color", "font_outline_color", "checkbox_checked_color", "checkbox_unchecked_color")
 metadata/_custom_type_script = "uid://bysui7kt6peex"

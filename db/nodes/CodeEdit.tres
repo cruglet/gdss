@@ -5,16 +5,16 @@
 
 [resource]
 script = ExtResource("1_mwofw")
-states = PackedStringArray("normal", "focus", "read_only")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": true,
-"Font Outlines": false,
-"Standard Fonts": true,
-"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": true
 })
 base_type = &"CodeEdit"
 style_name = &"CodeEdit"
+states = PackedStringArray("normal", "focus", "read_only", "completion")
+icons = PackedStringArray("tab", "space", "breakpoint", "bookmark", "executing_line", "can_fold", "folded", "can_fold_code_region", "folded_code_region", "folded_eol_icon", "completion_color_bg")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("completion_lines", "completion_max_width", "completion_scroll_width", "line_spacing", "outline_size")
+colors = PackedStringArray("background_color", "completion_background_color", "completion_selected_color", "completion_existing_color", "completion_scroll_color", "completion_scroll_hovered_color", "font_color", "font_selected_color", "font_readonly_color", "font_placeholder_color", "font_outline_color", "selection_color", "bookmark_color", "breakpoint_color", "executing_line_color", "current_line_color", "code_folding_color", "folded_code_region_color", "caret_color", "caret_background_color", "brace_mismatch_color", "line_number_color", "word_highlighted_color", "line_length_guideline_color", "search_result_color", "search_result_border_color")
 metadata/_custom_type_script = "uid://5yyds2fc3w4i"

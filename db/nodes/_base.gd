@@ -2,16 +2,30 @@
 @abstract class_name GdssNode
 extends Resource
 
-@export var states: PackedStringArray
 @export var enabled_components: Dictionary[String, bool]
 @export var unique_properties: Array[GdssProp]
-@export var unique_icons: PackedStringArray
 @export var base_type: StringName
 @export var style_name: StringName
 @export var is_static: bool = false
 
+@export_storage var states: PackedStringArray
+@export_storage var icons: PackedStringArray
+@export_storage var font_sizes: PackedStringArray
+@export_storage var fonts: PackedStringArray
+@export_storage var constants: PackedStringArray
+@export_storage var colors: PackedStringArray
+
+var _props_cache: Array[GdssProp] = []
+var _props_dirty: bool = true
+
+
 @abstract func get_events() -> PackedStringArray
 @abstract func get_active_state(canvas_item: CanvasItem) -> String
+
+
+func invalidate_props_cache() -> void:
+	_props_dirty = true
+	_props_cache.clear()
 
 
 func get_default_events() -> PackedStringArray:
@@ -35,18 +49,47 @@ func unbind_canvas_item(canvas_item: CanvasItem) -> void:
 
 
 func get_enabled_props() -> Array[GdssProp]:
+	if not _props_dirty:
+		return _props_cache
+	
 	var props: Array[GdssProp]
+	var db: GdssDB = GDSS.get_db()
+	var overrides: Dictionary[String, GdssProp] = db.property_list
+	
 	for component_name: String in enabled_components:
 		if enabled_components.get(component_name) == false:
 			continue
-		var list: Dictionary[String, GdssNodeComponent] = GDSS.get_db().component_list
-		if list.has(component_name):
-			props.append_array(list.get(component_name).properties)
+		if db.component_list.has(component_name):
+			props.append_array(db.component_list.get(component_name).properties)
+	
 	props.append_array(unique_properties)
 	
-	for icon_name: String in unique_icons:
-		props.append(GdssProp.create(icon_name, GDSS.Type.ICON, null, GdssProp.Category.ICON))
-	return props
+	for item_name: String in constants:
+		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.INT, 0, GdssProp.Category.CONST)))
+	
+	for item_name: String in font_sizes:
+		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.INT, 0, GdssProp.Category.FONT_SIZE)))
+	
+	for item_name: String in fonts:
+		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.FONT, null, GdssProp.Category.FONT)))
+	
+	for item_name: String in icons:
+		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.ICON, null, GdssProp.Category.ICON)))
+	
+	var grouped_colors: Dictionary = {}
+	for override_prop: GdssProp in overrides.values():
+		for subprop: String in override_prop.category_subproperties:
+			grouped_colors[subprop] = true
+	
+	for item_name: String in colors:
+		if overrides.has(item_name):
+			props.append(overrides[item_name])
+		elif not grouped_colors.has(item_name):
+			props.append(GdssProp.create(item_name, GDSS.Type.COLOR, Color.TRANSPARENT, GdssProp.Category.COLOR))
+	
+	_props_cache = props
+	_props_dirty = false
+	return _props_cache
 
 
 func _update_state(...a: Array) -> void:
@@ -56,7 +99,6 @@ func _update_state(...a: Array) -> void:
 func update_state(canvas_item: CanvasItem) -> void:
 	if not canvas_item:
 		return
-
 	if is_static:
 		for state: String in states:
 			var meta_key: StringName = "gdss_handler_" + state
@@ -68,7 +110,6 @@ func update_state(canvas_item: CanvasItem) -> void:
 			if canvas_item is CanvasItem:
 				canvas_item.queue_redraw()
 		return
-
 	var state: String = get_active_state(canvas_item)
 	if not canvas_item.has_meta("gdss_handler"):
 		return

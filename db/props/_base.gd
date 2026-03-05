@@ -9,6 +9,7 @@ enum Category {
 	FONT_SIZE,
 	NODE_PROPERTY,
 	ICON,
+	FONT,
 }
 
 var name: String = "":

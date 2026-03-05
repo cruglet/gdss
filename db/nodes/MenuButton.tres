@@ -5,16 +5,15 @@
 
 [resource]
 script = ExtResource("1_6y11i")
-states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": false,
-"Standard Fonts": true,
-"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": true
 })
 base_type = &"MenuButton"
 style_name = &"MenuButton"
+states = PackedStringArray("normal", "pressed", "hover", "disabled", "focus")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("h_separation", "outline_size")
+colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_focus_color", "font_disabled_color", "font_outline_color")
 metadata/_custom_type_script = "uid://bysui7kt6peex"

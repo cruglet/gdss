@@ -2,24 +2,30 @@
 
 [ext_resource type="Script" uid="uid://cnjiw44efikxu" path="res://addons/gdss/db/nodes/TabBar.gd" id="1_7ofum"]
 [ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_vcfeg"]
-[ext_resource type="Resource" uid="uid://c5jdflyjdwbwg" path="res://addons/gdss/db/props/tab_separation.tres" id="3_gxr1t"]
-[ext_resource type="Resource" uid="uid://c4w51yj0kdr4w" path="res://addons/gdss/db/props/tab_drop_mark_color.tres" id="5_as6dq"]
-[ext_resource type="Resource" uid="uid://cx6qs2n4cfl7i" path="res://addons/gdss/db/props/tab_side_margin.tres" id="5_gxr1t"]
+
+[sub_resource type="Resource" id="Resource_vcfeg"]
+script = ExtResource("2_vcfeg")
+name = "tab_separation"
+type = 0
+default_value = null
+category = 2
+category_subproperties = PackedStringArray()
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
 
 [resource]
 script = ExtResource("1_7ofum")
-states = PackedStringArray("panel", "tabbar_background", "tab_unselected", "tab_selected", "tab_hovered", "tab_disabled", "tab_focus")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": true,
-"Standard Fonts": true,
-"Standard Icon": true,
 "Stylebox": true,
 "Transitionable": false
 })
-unique_properties = Array[ExtResource("2_vcfeg")]([ExtResource("5_as6dq"), ExtResource("3_gxr1t"), ExtResource("5_gxr1t")])
+unique_properties = Array[ExtResource("2_vcfeg")]([SubResource("Resource_vcfeg")])
 base_type = &"TabContainer"
 style_name = &"TabContainer"
 is_static = true
+states = PackedStringArray("tab_selected", "tab_hovered", "tab_unselected", "tab_disabled", "tab_focus", "panel", "tabbar_background")
+icons = PackedStringArray("increment", "increment_highlight", "decrement", "decrement_highlight", "drop_mark", "menu", "menu_highlight")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("side_margin", "icon_separation", "icon_max_width", "outline_size")
+colors = PackedStringArray("font_selected_color", "font_hovered_color", "font_unselected_color", "font_disabled_color", "font_outline_color", "drop_mark_color", "icon_selected_color", "icon_hovered_color", "icon_unselected_color", "icon_disabled_color")
 metadata/_custom_type_script = "uid://cnjiw44efikxu"

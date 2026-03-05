@@ -5,16 +5,15 @@
 
 [resource]
 script = ExtResource("1_tgyt4")
-states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": true,
-"Standard Fonts": true,
-"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": true
 })
 base_type = &"Button"
 style_name = &"Button"
+states = PackedStringArray("normal", "hover", "pressed", "disabled", "focus")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("outline_size", "h_separation", "icon_max_width", "align_to_largest_stylebox")
+colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_focus_color", "font_hover_pressed_color", "font_disabled_color", "font_outline_color", "icon_normal_color", "icon_pressed_color", "icon_hover_color", "icon_hover_pressed_color", "icon_focus_color", "icon_disabled_color")
 metadata/_custom_type_script = "uid://bysui7kt6peex"

@@ -5,17 +5,16 @@
 
 [resource]
 script = ExtResource("1_sj36t")
-states = PackedStringArray("normal", "focus", "hover", "pressed", "hover_pressed", "disabled")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": true,
-"Standard Fonts": true,
-"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": true
 })
-unique_icons = PackedStringArray("checked", "checked_disabled", "unchecked", "unchecked_disabled", "checked_mirrored", "checked_disabled_mirrored", "unchecked_mirrored", "unchecked_disabled_mirrored")
 base_type = &"CheckButton"
 style_name = &"CheckButton"
+states = PackedStringArray("normal", "pressed", "disabled", "hover", "hover_pressed", "focus")
+icons = PackedStringArray("checked", "checked_disabled", "unchecked", "unchecked_disabled", "checked_mirrored", "checked_disabled_mirrored", "unchecked_mirrored", "unchecked_disabled_mirrored")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("h_separation", "check_v_offset", "outline_size")
+colors = PackedStringArray("font_color", "font_pressed_color", "font_hover_color", "font_hover_pressed_color", "font_focus_color", "font_disabled_color", "font_outline_color", "button_checked_color", "button_unchecked_color")
 metadata/_custom_type_script = "uid://bysui7kt6peex"

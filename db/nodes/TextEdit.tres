@@ -5,17 +5,16 @@
 
 [resource]
 script = ExtResource("1_t0voj")
-states = PackedStringArray("normal", "focus", "read_only")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": true,
-"Font Outlines": false,
-"Standard Fonts": true,
-"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": true
 })
-unique_icons = PackedStringArray("tab", "space")
 base_type = &"TextEdit"
 style_name = &"TextEdit"
+states = PackedStringArray("normal", "focus", "read_only")
+icons = PackedStringArray("tab", "space")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("line_spacing", "outline_size", "caret_width", "wrap_offset")
+colors = PackedStringArray("background_color", "font_color", "font_selected_color", "font_readonly_color", "font_placeholder_color", "font_outline_color", "selection_color", "current_line_color", "caret_color", "caret_background_color", "word_highlighted_color", "search_result_color", "search_result_border_color")
 metadata/_custom_type_script = "uid://5yyds2fc3w4i"

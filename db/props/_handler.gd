@@ -168,18 +168,21 @@ func _apply_overrides() -> void:
 			GdssProp.Category.CONST:
 				if val is int or val is float:
 					control.add_theme_constant_override(prop.name, int(val))
-			GdssProp.Category.ICON:
-				if val is Texture2D:
-					control.add_theme_icon_override(prop.name, val)
 			GdssProp.Category.FONT_SIZE:
 				if val is int or val is float:
 					control.add_theme_font_size_override(prop.name, int(val))
+			GdssProp.Category.FONT:
+				if val is Font:
+					control.add_theme_font_override(prop.name, val as Font)
+			GdssProp.Category.ICON:
+				if val is Texture2D:
+					control.add_theme_icon_override(prop.name, val)
 			GdssProp.Category.NODE_PROPERTY:
 				if prop.type == GDSS.Type.CURSOR:
-					if control is Control:
-						control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
+					control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
 				else:
 					control.set(prop.name, val)
+
 
 func _get_cursor_shape(type: String) -> Control.CursorShape:
 	match type:

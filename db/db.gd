@@ -25,7 +25,8 @@ func repopulate(new: bool = false) -> void:
 	_set_properties(new)
 	_set_nodes(new)
 	_set_methods(new)
-
+	for node: GdssNode in node_list.values():
+		node.invalidate_props_cache()
 
 
 func _set_properties(new: bool = false) -> void:
@@ -52,7 +53,6 @@ func _set_nodes(new: bool = false) -> void:
 		if not file_name.get_extension() == "tres":
 			continue
 		var resource: Resource = load(nodes_dir.path_join(file_name))
-	
 		if resource is GdssNode:
 			nodes.set(resource.base_type, resource)
 		elif resource is GdssNodeComponent:
@@ -62,6 +62,8 @@ func _set_nodes(new: bool = false) -> void:
 	var valid_component_names: PackedStringArray = []
 	for component: GdssNodeComponent in components:
 		valid_component_names.append(component.component_name)
+	
+	var theme: Theme = ThemeDB.get_default_theme()
 	
 	for node: GdssNode in nodes.values():
 		if new:
@@ -73,13 +75,33 @@ func _set_nodes(new: bool = false) -> void:
 			if not node.enabled_components.has(component.component_name):
 				node.enabled_components.set(component.component_name, component.default_state)
 		
-		var icon_list: PackedStringArray = ThemeDB.get_default_theme().get_icon_list(node.base_type)
+		var type: StringName = node.base_type
 		
-		node.unique_icons.clear()
+		node.states.clear()
+		for item_name: String in theme.get_stylebox_list(type):
+			node.states.append(item_name)
 		
-		for icon_name: String in icon_list:
-			if not node.unique_icons.has(icon_name):
-				node.unique_icons.append(icon_name)
+		node.icons.clear()
+		for item_name: String in theme.get_icon_list(type):
+			node.icons.append(item_name)
+		
+		node.font_sizes.clear()
+		for item_name: String in theme.get_font_size_list(type):
+			node.font_sizes.append(item_name)
+		
+		node.fonts.clear()
+		for item_name: String in theme.get_font_list(type):
+			node.fonts.append(item_name)
+		
+		node.constants.clear()
+		for item_name: String in theme.get_constant_list(type):
+			node.constants.append(item_name)
+		
+		node.colors.clear()
+		for item_name: String in theme.get_color_list(type):
+			node.colors.append(item_name)
+		
+		ResourceSaver.save(node, nodes_dir.path_join(node.resource_path.get_file()))
 	
 	node_list = nodes
 

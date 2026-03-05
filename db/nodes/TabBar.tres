@@ -2,25 +2,30 @@
 
 [ext_resource type="Script" uid="uid://cnjiw44efikxu" path="res://addons/gdss/db/nodes/TabBar.gd" id="1_rcl82"]
 [ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_klkbd"]
-[ext_resource type="Resource" uid="uid://c5jdflyjdwbwg" path="res://addons/gdss/db/props/tab_separation.tres" id="3_d5mhq"]
-[ext_resource type="Resource" uid="uid://c4w51yj0kdr4w" path="res://addons/gdss/db/props/tab_drop_mark_color.tres" id="4_yrjgm"]
-[ext_resource type="Resource" uid="uid://v2jem5bcopxk" path="res://addons/gdss/db/props/hover_switch_wait_msec.tres" id="5_yrjgm"]
+
+[sub_resource type="Resource" id="Resource_klkbd"]
+script = ExtResource("2_klkbd")
+name = "tab_separation"
+type = 0
+default_value = null
+category = 2
+category_subproperties = PackedStringArray()
+metadata/_custom_type_script = "uid://b7gagsyfvnai7"
 
 [resource]
 script = ExtResource("1_rcl82")
-states = PackedStringArray("tab_unselected", "tab_selected", "tab_hovered", "tab_disabled", "tab_focus", "button_pressed", "button_highlight")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": true,
-"Standard Fonts": true,
-"Standard Icon Colors": true,
 "Stylebox": true,
 "Transitionable": false
 })
-unique_properties = Array[ExtResource("2_klkbd")]([ExtResource("3_d5mhq"), ExtResource("4_yrjgm"), ExtResource("5_yrjgm")])
-unique_icons = PackedStringArray("increment", "increment_highlight", "decrement", "decrement_highlight", "drop_mark", "close")
+unique_properties = Array[ExtResource("2_klkbd")]([SubResource("Resource_klkbd")])
 base_type = &"TabBar"
 style_name = &"TabBar"
 is_static = true
+states = PackedStringArray("tab_selected", "tab_hovered", "tab_unselected", "tab_disabled", "tab_focus", "button_pressed", "button_highlight")
+icons = PackedStringArray("increment", "increment_highlight", "decrement", "decrement_highlight", "drop_mark", "close")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("h_separation", "icon_max_width", "outline_size", "hover_switch_wait_msec")
+colors = PackedStringArray("font_selected_color", "font_hovered_color", "font_unselected_color", "font_disabled_color", "font_outline_color", "drop_mark_color", "icon_selected_color", "icon_hovered_color", "icon_unselected_color", "icon_disabled_color")
 metadata/_custom_type_script = "uid://cnjiw44efikxu"

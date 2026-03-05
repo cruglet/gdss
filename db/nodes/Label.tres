@@ -5,16 +5,15 @@
 
 [resource]
 script = ExtResource("1_fpf5r")
-states = PackedStringArray("normal", "focus")
 enabled_components = Dictionary[String, bool]({
-"Base": true,
-"Editable Text": false,
-"Font Outlines": true,
-"Standard Fonts": true,
-"Standard Icon Colors": false,
 "Stylebox": true,
 "Transitionable": true
 })
 base_type = &"Label"
 style_name = &"Label"
+states = PackedStringArray("normal", "focus")
+font_sizes = PackedStringArray("font_size")
+fonts = PackedStringArray("font")
+constants = PackedStringArray("shadow_offset_x", "shadow_offset_y", "outline_size", "shadow_outline_size", "line_spacing")
+colors = PackedStringArray("font_color", "font_shadow_color", "font_outline_color")
 metadata/_custom_type_script = "uid://wknty2e4q7ew"
