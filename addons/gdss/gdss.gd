@@ -136,6 +136,20 @@ static func clear_instance_vars(node: Node) -> void:
 	GdssInterpreter._instance_vars.erase(node.get_instance_id())
 
 
+func _prompt_reload() -> void:
+	var dialog: ConfirmationDialog = ConfirmationDialog.new()
+	dialog.title = "GDSS Reload Recommended"
+	dialog.dialog_text = "GDSS has been enabled for the first time.\nIt is recommended you reload the project."
+	dialog.ok_button_text = "Reload Now"
+	dialog.cancel_button_text = "Later"
+	dialog.confirmed.connect(func() -> void:
+		EditorInterface.restart_editor(true)
+	)
+	dialog.canceled.connect(dialog.queue_free)
+	EditorInterface.get_base_control().add_child(dialog)
+	dialog.popup_centered()
+
+
 static func _refresh_affected(global_name: String) -> void:
 	var sentinel: String = "__gdss_global__" + global_name
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
@@ -194,7 +208,13 @@ static func get_db() -> GdssDB:
 
 func _enter_tree() -> void:
 	_inst = self
-
+	var is_first_run: bool = not ProjectSettings.has_setting("gdss/internal/initialized")
+	if is_first_run:
+		ProjectSettings.set_setting("gdss/internal/initialized", true)
+		ProjectSettings.save()
+		_prompt_reload()
+		return
+	
 	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
 	if not editor_settings.has_setting("gdss/editor/location"):
 		editor_settings.set_setting("gdss/editor/location", 0)
