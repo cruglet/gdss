@@ -246,10 +246,10 @@ func _enter_tree() -> void:
 			"hint": PROPERTY_HINT_FILE,
 			"hint_string": "*.gdssc"
 		})
-
+	
 	inspector_plugin = GdssInspectorPlugin.new()
 	gdss_editor = GDSS_EDITOR.instantiate()
-
+	
 	if _has_main_screen():
 		EditorInterface.get_editor_main_screen().add_child(gdss_editor)
 		_make_visible(false)

@@ -26,6 +26,10 @@ static func get_instance() -> GdssInterpreter:
 
 
 func _ready() -> void:
+	if not editor.is_running_as_plugin():
+		set_process(false)
+		return
+	
 	_inst = self
 	_build_defaults()
 	_load_from_file()
@@ -429,7 +433,7 @@ func _load_from_file() -> void:
 			if editor.get_code_edit().text != source:
 				if editor.get_code_edit().text_changed.is_connected(_on_text_changed):
 					editor.get_code_edit().text_changed.disconnect(_on_text_changed)
-				if editor._is_running_as_plugin():
+				if editor.is_running_as_plugin():
 					editor.get_code_edit().text = source
 				editor.get_code_edit().text_changed.connect(_on_text_changed)
 		parsed = interpret(source)

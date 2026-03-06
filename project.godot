@@ -25,6 +25,7 @@ enabled=PackedStringArray("res://addons/gdss/plugin.cfg")
 [gdss]
 
 internal/initialized=true
+editor/use_minimap=false
 
 [physics]
 

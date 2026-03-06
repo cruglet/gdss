@@ -4,9 +4,15 @@
 [ext_resource type="Script" uid="uid://ct5gmahfbd0cc" path="res://addons/gdss/editor/handlers/gdss_completion_handler.gd" id="2_vh56t"]
 [ext_resource type="Script" uid="uid://b8vfgh1l41n0a" path="res://addons/gdss/editor/handlers/gdss_highlight_handler.gd" id="2_wia40"]
 [ext_resource type="Script" uid="uid://d243kyxgy1fcy" path="res://addons/gdss/editor/handlers/gdss_interpreter.gd" id="4_squo2"]
+[ext_resource type="Texture2D" uid="uid://ceogrxr1lg3up" path="res://addons/gdss/editor/Map.svg" id="5_50ht1"]
 [ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/ActionCopy.svg" id="5_by7tt"]
 
-[node name="GdssEditor" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button")]
+[sub_resource type="GDScript" id="GDScript_by7tt"]
+
+[sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_50ht1"]
+script = SubResource("GDScript_by7tt")
+
+[node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button")]
 clip_contents = true
 custom_minimum_size = Vector2(550, 400)
 layout_mode = 3
@@ -20,6 +26,7 @@ code_edit = NodePath("VBoxContainer/MarginContainer/VBoxContainer/CodeEdit")
 error_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ErrorLabel")
 title_label = NodePath("VBoxContainer/TitleLabel")
 copy_button = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton")
+toggle_map_button = NodePath("VBoxContainer/TitleLabel/ToggleMapButton")
 
 [node name="GdssHighlightHandler" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor")]
 script = ExtResource("2_wia40")
@@ -46,6 +53,23 @@ layout_mode = 2
 text = "theme.gdss"
 horizontal_alignment = 1
 
+[node name="ToggleMapButton" type="Button" parent="VBoxContainer/TitleLabel" unique_id=1759196038]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -18.0
+offset_top = -3.5
+offset_right = -10.0
+offset_bottom = 4.5
+grow_horizontal = 0
+grow_vertical = 2
+theme_type_variation = &"FlatButton"
+toggle_mode = true
+icon = ExtResource("5_50ht1")
+
 [node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=1354428952]
 layout_mode = 2
 size_flags_vertical = 3
@@ -63,11 +87,13 @@ size_flags_vertical = 3
 scroll_smooth = true
 minimap_draw = true
 minimap_width = 100
+syntax_highlighter = SubResource("SyntaxHighlighter_50ht1")
 highlight_current_line = true
 draw_tabs = true
 line_folding = true
 gutters_draw_line_numbers = true
 code_completion_enabled = true
+code_completion_prefixes = Array[String](["@", ":", "	", "$", "B", "s", "a", "b", "c", "e", "f", "p", "t", "o", "h", "i", "C", "u", "r", "l", "w", "m", "F", "v", "G", "z", "g", "H", "d", "I", "L", "M", "O", "P", "R", "n", "S", "T", "V"])
 indent_automatic = true
 auto_brace_completion_enabled = true
 auto_brace_completion_highlight_matching = true
@@ -78,12 +104,14 @@ layout_mode = 2
 [node name="ErrorLabel" type="Label" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=1776208991]
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Error, Error!"
 text_overrun_behavior = 3
 
 [node name="CopyButton" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=1841896851]
 layout_mode = 2
 theme_type_variation = &"FlatButton"
+disabled = true
 icon = ExtResource("5_by7tt")
 
+[connection signal="toggled" from="VBoxContainer/TitleLabel/ToggleMapButton" to="." method="_on_toggle_map_button_toggled"]
 [connection signal="text_changed" from="VBoxContainer/MarginContainer/VBoxContainer/CodeEdit" to="." method="_on_text_changed"]
+[connection signal="pressed" from="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton" to="." method="_on_copy_button_pressed"]

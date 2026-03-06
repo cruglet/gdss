@@ -9,6 +9,7 @@ static var _code_editor_ref: CodeEdit
 @export var error_label: Label
 @export var title_label: Label
 @export var copy_button: Button
+@export var toggle_map_button: Button
 
 var err_line_num: int
 
@@ -21,8 +22,15 @@ var file_name: String:
 
 
 func _ready() -> void:
+	if not is_running_as_plugin():
+		set_process(false)
+		return
+	
 	name = "GDSS"
 	_code_editor_ref = code_edit
+	
+	if not is_running_as_plugin():
+		return
 	
 	error_label.add_theme_font_override(&"font", EditorInterface.get_editor_theme().get_font(&"expression", &"EditorFonts"))
 	error_label.add_theme_color_override(&"font_color", EditorInterface.get_editor_theme().get_color(&"error_color", &"Editor"))
@@ -33,11 +41,16 @@ func _ready() -> void:
 				code_edit.set_caret_line(err_line_num)
 	)
 	
-	if _is_running_as_plugin():
-		copy_button.icon = EditorInterface.get_editor_theme().get_icon(&"ActionCopy", &"EditorIcons")
+	copy_button.icon = EditorInterface.get_editor_theme().get_icon(&"ActionCopy", &"EditorIcons")
+	
+	if not ProjectSettings.has_setting("gdss/editor/use_minimap"):
+		ProjectSettings.set_setting("gdss/editor/use_minimap", true)
+	
+	toggle_map_button.button_pressed = ProjectSettings.get_setting("gdss/editor/use_minimap")
 	
 	title_label.text = file_name
 	code_edit.gui_input.connect(_on_code_edit_input)
+	_update_editor()
 
 
 func get_code_edit() -> CodeEdit:
@@ -105,5 +118,14 @@ func _on_copy_button_pressed() -> void:
 	DisplayServer.clipboard_set(error_label.text)
 
 
-func _is_running_as_plugin() -> bool:
-	return Engine.is_editor_hint() and not Engine.has_singleton("GdssRuntime")
+func is_running_as_plugin() -> bool:
+	return get_parent() is EditorDock
+
+
+func _on_toggle_map_button_toggled(toggled_on: bool) -> void:
+	ProjectSettings.set_setting("gdss/editor/use_minimap", toggled_on)
+	_update_editor()
+
+
+func _update_editor() -> void:
+	code_edit.minimap_draw = ProjectSettings.get_setting("gdss/editor/use_minimap")
