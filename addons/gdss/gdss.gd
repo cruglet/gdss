@@ -52,6 +52,7 @@ enum TransitionFunc {
 }
 
 static var _inst: EditorPlugin
+static var _db: GdssDB
 
 var debug_container: Container
 var debug_label: Label
@@ -61,8 +62,6 @@ var debug_repopulate_button: Button
 var gdss_editor: GdssEditor
 var inspector_plugin: GdssInspectorPlugin
 var gdss_dock: GdssDock
-
-var theme_hook: Control
 var was_in_distraction_free_mode: bool = false
 
 
@@ -76,9 +75,10 @@ var was_in_distraction_free_mode: bool = false
 static func get_global_var(name: String, fallback: Variant = null) -> Variant:
 	return GdssInterpreter.globals.get(name, fallback)
 
+
 ## Sets the value of a [b]global variable[/b] and triggers a refresh.
 ## [br][br]
-## This updates the global state and automatically notifies any objects or 
+## This updates the global state and automatically notifies any objects or
 ## UI elements that are currently "listening" to or affected by this variable.
 ## [codeblock]
 ## GDSS.set_global_var("player_score", 100)
@@ -87,10 +87,11 @@ static func set_global_var(name: String, value: Variant) -> void:
 	GdssInterpreter.globals[name] = value
 	_refresh_affected(name)
 
+
 ## Assigns an [b]instance-specific override[/b] for a GDSS variable on a Node.
 ## [br][br]
-## If the [param node] has a [code]gdss_handler[/code] meta-tag, this function will 
-## automatically apply the new value, emit change signals, and queue a redraw 
+## If the [param node] has a [code]gdss_handler[/code] meta-tag, this function will
+## automatically apply the new value, emit change signals, and queue a redraw
 ## if the node is a [CanvasItem].
 ## [codeblock]
 ## GDSS.set_instance_var(enemy_sprite, "modulate_color", Color.RED)
@@ -117,10 +118,11 @@ static func set_instance_var(node: Node, name: String, value: Variant) -> void:
 		if node is CanvasItem:
 			(node as CanvasItem).queue_redraw()
 
+
 ## Retrieves the value of a variable for a [b]specific Node instance[/b].
 ## [br][br]
-## This function checks for local overrides first. If no instance-specific 
-## value is found, it falls back to the default value defined in 
+## This function checks for local overrides first. If no instance-specific
+## value is found, it falls back to the default value defined in
 ## [code]_instance_defaults[/code].
 ## [codeblock]
 ## var speed = GDSS.get_instance_var(self, "move_speed", 200.0)
@@ -131,23 +133,10 @@ static func get_instance_var(node: Node, name: String, fallback: Variant = null)
 		return GdssInterpreter._instance_vars[id].get(name, fallback)
 	return GdssInterpreter._instance_defaults.get(name, fallback)
 
+
 ## Clears all GDSS instance variables from a specific node.
 static func clear_instance_vars(node: Node) -> void:
 	GdssInterpreter._instance_vars.erase(node.get_instance_id())
-
-
-func _prompt_reload() -> void:
-	var dialog: ConfirmationDialog = ConfirmationDialog.new()
-	dialog.title = "GDSS Reload Recommended"
-	dialog.dialog_text = "GDSS has been enabled for the first time.\nIt is recommended you reload the project."
-	dialog.ok_button_text = "Reload Now"
-	dialog.cancel_button_text = "Later"
-	dialog.confirmed.connect(func() -> void:
-		EditorInterface.restart_editor(true)
-	)
-	dialog.canceled.connect(dialog.queue_free)
-	EditorInterface.get_base_control().add_child(dialog)
-	dialog.popup_centered()
 
 
 static func _refresh_affected(global_name: String) -> void:
@@ -202,66 +191,28 @@ static func _get_gdss_methods() -> Dictionary[String, GdssMethod]:
 
 
 static func get_db() -> GdssDB:
-	var db: GdssDB = preload("uid://wmo287ce38ty")
-	return db
+	if not _db:
+		var db: GdssDB = load("uid://wmo287ce38ty")
+		if db == null:
+			db = GdssDB.new()
+		_db = db
+	return _db
 
 
 func _enter_tree() -> void:
 	_inst = self
+	var db: GdssDB = get_db()
+	if db != null and db.node_list.is_empty():
+		db.repopulate()
 	var is_first_run: bool = not ProjectSettings.has_setting("gdss/internal/initialized")
 	if is_first_run:
 		ProjectSettings.set_setting("gdss/internal/initialized", true)
 		ProjectSettings.save()
-		_prompt_reload()
+	_setup_settings()
+	if is_first_run:
+		_prompt_reload.call_deferred()
 		return
-	
-	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
-	if not editor_settings.has_setting("gdss/editor/location"):
-		editor_settings.set_setting("gdss/editor/location", 0)
-		editor_settings.set_initial_value("gdss/editor/location", 0, false)
-	editor_settings.add_property_info({
-		"name": "gdss/editor/location",
-		"type": TYPE_INT,
-		"hint": PROPERTY_HINT_ENUM,
-		"hint_string": "Dock,Main Screen"
-	})
-	editor_settings.settings_changed.connect(_on_editor_settings_changed)
-	
-	if not ProjectSettings.has_setting("gdss/storage/save_path"):
-		ProjectSettings.set_setting("gdss/storage/save_path", "res://theme.tgdss")
-		ProjectSettings.set_initial_value("gdss/storage/save_path", "res://theme.tgdss")
-		ProjectSettings.add_property_info({
-			"name": "gdss/storage/save_path",
-			"type": TYPE_STRING,
-			"hint": PROPERTY_HINT_FILE,
-			"hint_string": "*.tgdss,*.gdss"
-		})
-	
-	if not ProjectSettings.has_setting("gdss/storage/gdss_cache_path"):
-		ProjectSettings.set_setting("gdss/storage/gdss_cache_path", "user://gdss_cache.gdssc")
-		ProjectSettings.set_initial_value("gdss/storage/gdss_cache_path", "user://gdss_cache.gdssc")
-		ProjectSettings.add_property_info({
-			"name": "gdss/storage/gdss_cache_path",
-			"type": TYPE_STRING,
-			"hint": PROPERTY_HINT_FILE,
-			"hint_string": "*.gdssc"
-		})
-	
-	inspector_plugin = GdssInspectorPlugin.new()
-	gdss_editor = GDSS_EDITOR.instantiate()
-	
-	if _has_main_screen():
-		EditorInterface.get_editor_main_screen().add_child(gdss_editor)
-		_make_visible(false)
-	else:
-		gdss_dock = GdssDock.new()
-		gdss_dock.set_editor(gdss_editor)
-		add_dock(gdss_dock)
-
-	if DEBUG_MODE:
-		_debug_hook()
-	add_inspector_plugin(inspector_plugin)
-	add_autoload_singleton("GdssRuntime", "res://addons/gdss/runtime.gd")
+	_setup_editor()
 
 
 func _exit_tree() -> void:
@@ -278,7 +229,71 @@ func _exit_tree() -> void:
 	if inspector_plugin:
 		remove_inspector_plugin(inspector_plugin)
 		inspector_plugin = null
-	remove_autoload_singleton("GdssRuntime")
+	if ProjectSettings.has_setting("autoload/GdssRuntime"):
+		remove_autoload_singleton("GdssRuntime")
+
+
+func _setup_settings() -> void:
+	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
+	if not editor_settings.has_setting("gdss/editor/location"):
+		editor_settings.set_setting("gdss/editor/location", 0)
+		editor_settings.set_initial_value("gdss/editor/location", 0, false)
+	editor_settings.add_property_info({
+		"name": "gdss/editor/location",
+		"type": TYPE_INT,
+		"hint": PROPERTY_HINT_ENUM,
+		"hint_string": "Dock,Main Screen"
+	})
+	editor_settings.settings_changed.connect(_on_editor_settings_changed)
+	if not ProjectSettings.has_setting("gdss/storage/save_path"):
+		ProjectSettings.set_setting("gdss/storage/save_path", "res://theme.tgdss")
+		ProjectSettings.set_initial_value("gdss/storage/save_path", "res://theme.tgdss")
+		ProjectSettings.add_property_info({
+			"name": "gdss/storage/save_path",
+			"type": TYPE_STRING,
+			"hint": PROPERTY_HINT_FILE,
+			"hint_string": "*.tgdss,*.gdss"
+		})
+	if not ProjectSettings.has_setting("gdss/storage/gdss_cache_path"):
+		ProjectSettings.set_setting("gdss/storage/gdss_cache_path", "user://gdss_cache.gdssc")
+		ProjectSettings.set_initial_value("gdss/storage/gdss_cache_path", "user://gdss_cache.gdssc")
+		ProjectSettings.add_property_info({
+			"name": "gdss/storage/gdss_cache_path",
+			"type": TYPE_STRING,
+			"hint": PROPERTY_HINT_PLACEHOLDER_TEXT,
+			"hint_string": "user://gdss_cache.gdssc"
+		})
+
+
+func _setup_editor() -> void:
+	inspector_plugin = GdssInspectorPlugin.new()
+	gdss_editor = GDSS_EDITOR.instantiate()
+	if _has_main_screen():
+		EditorInterface.get_editor_main_screen().add_child(gdss_editor)
+		_make_visible(false)
+	else:
+		gdss_dock = GdssDock.new()
+		gdss_dock.set_editor(gdss_editor)
+		add_dock(gdss_dock)
+	if DEBUG_MODE:
+		_debug_hook()
+	add_inspector_plugin(inspector_plugin)
+	add_autoload_singleton("GdssRuntime", "res://addons/gdss/runtime.gd")
+
+
+func _prompt_reload() -> void:
+	var dialog: ConfirmationDialog = ConfirmationDialog.new()
+	dialog.title = "GDSS Reload Recommended"
+	dialog.dialog_text = "GDSS has been enabled for the first time.\nPlease reload the project to use it."
+	dialog.ok_button_text = "Reload Now"
+	dialog.cancel_button_text = "Later"
+	dialog.exclusive = false
+	dialog.confirmed.connect(func() -> void:
+		EditorInterface.restart_editor(true)
+	)
+	dialog.canceled.connect(dialog.queue_free)
+	EditorInterface.get_base_control().add_child(dialog)
+	dialog.popup_centered()
 
 
 func _on_editor_settings_changed() -> void:
@@ -319,7 +334,6 @@ func _debug_hook() -> void:
 	debug_container = HBoxContainer.new()
 	debug_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	EditorInterface.get_base_control().add_child(debug_container)
-
 	debug_label = Label.new()
 	debug_label.text = "GDSS Debug Mode is ON: "
 	debug_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -328,7 +342,6 @@ func _debug_hook() -> void:
 	debug_label.label_settings.shadow_color = Color(0, 0, 0, 1)
 	debug_label.label_settings.shadow_offset = Vector2.ZERO
 	debug_container.add_child(debug_label)
-
 	debug_refresh_button = Button.new()
 	debug_refresh_button.text = "Refresh"
 	debug_refresh_button.pressed.connect(func() -> void:
@@ -338,7 +351,6 @@ func _debug_hook() -> void:
 		EditorInterface.call_deferred(&"set_plugin_enabled", "gdss", true)
 	)
 	debug_container.add_child(debug_refresh_button)
-
 	debug_repopulate_button = Button.new()
 	debug_repopulate_button.text = "Repopulate (Nodes + Methods)"
 	debug_repopulate_button.pressed.connect(func() -> void:
@@ -346,14 +358,11 @@ func _debug_hook() -> void:
 		EditorInterface.get_editor_toaster().push_toast("Repopulated nodes + methods!", EditorToaster.SEVERITY_INFO)
 	)
 	debug_container.add_child(debug_repopulate_button)
-
 	debug_unhook_button = Button.new()
 	debug_unhook_button.text = "Unhook"
 	debug_unhook_button.pressed.connect(_debug_unhook)
 	debug_container.add_child(debug_unhook_button)
-
 	await get_tree().process_frame
-
 	debug_container.position = EditorInterface.get_base_control().size - debug_container.size - Vector2(20, 20)
 	print("[GDSS] Debug mode hooked!")
 	EditorInterface.get_editor_toaster().push_toast("GDSS reloaded!", EditorToaster.SEVERITY_INFO)

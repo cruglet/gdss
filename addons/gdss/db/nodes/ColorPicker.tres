@@ -3,16 +3,57 @@
 [ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_7gvi4"]
 [ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_svkhe"]
 
-[sub_resource type="DPITexture" id="DPITexture_7gvi4"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" fill-opacity=\".65\" d=\"M8 0a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4z\"/></svg>
+[sub_resource type="DPITexture" id="DPITexture_n71vp"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" d=\"m7 1v6h-6v2h6v6h2v-6h6v-2h-6v-6z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_o7ash"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 16 20\"><path fill=\"#b2b2b2\" stroke=\"#b2b2b2\" stroke-linejoin=\"round\" d=\"m3.564 15.218h8.872l-4.436-4.436z\"/></svg>
+"
+
+[sub_resource type="Gradient" id="Gradient_cpor3"]
+offsets = PackedFloat32Array(0, 0.16666667, 0.33333334, 0.5, 0.6666667, 0.8333333, 1)
+colors = PackedColorArray(1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_7mujx"]
+gradient = SubResource("Gradient_cpor3")
+width = 800
+height = 6
+
+[sub_resource type="DPITexture" id="DPITexture_m7hcn"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#e0e0e0\" d=\"M6 1a2 2 0 0 0-2 2v7H1v3a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V5h3V3a2 2 0 0 0-2-2z\"/><path fill-opacity=\".2\" d=\"M6 1a2 2 0 0 0-2 2v7H1v3a2 2 0 1 0 4 0V3a1 1 0 0 1 2 0v3h5V5H8V3a2 2 0 0 0-2-2zM2 11h2v2a1 1 0 0 1-2 0z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_gwcle"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m5 7 3 3 3-3\"/></svg>
 "
 
 [sub_resource type="DPITexture" id="DPITexture_tav8g"]
 _source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m6 11 3-3-3-3\"/></svg>
 "
 
-[sub_resource type="DPITexture" id="DPITexture_gwcle"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"none\" stroke=\"#b2b2b2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-opacity=\".45\" stroke-width=\"2\" d=\"m5 7 3 3 3-3\"/></svg>
+[sub_resource type="DPITexture" id="DPITexture_7gvi4"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" fill-opacity=\".65\" d=\"M8 0a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4zm0 6a2 2 0 0 0 0 4 2 2 0 0 0 0-4z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_ewuop"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#fff\" stroke=\"#000003\" d=\"m.5.5v10l10-10z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_0hb4k"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\"><circle cx=\"6\" cy=\"6\" r=\"5\" fill=\"none\" stroke=\"#fff\"/><circle cx=\"6\" cy=\"6\" r=\"4\" fill=\"none\" stroke=\"#000\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_oox02"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\"><circle cx=\"6\" cy=\"6\" r=\"4\" fill=\"#fff\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_jku0x"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"gray\" d=\"M0 0v8h8V0zm8 8v8h8V8z\"/><path fill=\"#fff\" d=\"M8 0v8h8V0zm0 8H0v8h8z\"/></svg>
+"
+
+[sub_resource type="DPITexture" id="DPITexture_7406a"]
+_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" d=\"M5 8a4 4 0 1 1 4 4v2a6 6 0 1 0-6-6H1l3 4 3-4z\"/></svg>
 "
 
 [sub_resource type="DPITexture" id="DPITexture_svkhe"]
@@ -30,47 +71,6 @@ _source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\">
 [sub_resource type="DPITexture" id="DPITexture_8maj3"]
 _source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><circle cx=\"8\" cy=\"8\" r=\"5.25\" fill=\"none\" stroke=\"#eaeaea\" stroke-width=\"1.75\"/><path fill=\"#eaeaea\" d=\"M4.9 4.9h6.2v6.2H4.9z\"/></svg>
 "
-
-[sub_resource type="DPITexture" id="DPITexture_n71vp"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" d=\"m7 1v6h-6v2h6v6h2v-6h6v-2h-6v-6z\"/></svg>
-"
-
-[sub_resource type="DPITexture" id="DPITexture_jku0x"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"gray\" d=\"M0 0v8h8V0zm8 8v8h8V8z\"/><path fill=\"#fff\" d=\"M8 0v8h8V0zm0 8H0v8h8z\"/></svg>
-"
-
-[sub_resource type="DPITexture" id="DPITexture_7406a"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#b2b2b2\" d=\"M5 8a4 4 0 1 1 4 4v2a6 6 0 1 0-6-6H1l3 4 3-4z\"/></svg>
-"
-
-[sub_resource type="DPITexture" id="DPITexture_ewuop"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#fff\" stroke=\"#000003\" d=\"m.5.5v10l10-10z\"/></svg>
-"
-
-[sub_resource type="DPITexture" id="DPITexture_o7ash"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 16 20\"><path fill=\"#b2b2b2\" stroke=\"#b2b2b2\" stroke-linejoin=\"round\" d=\"m3.564 15.218h8.872l-4.436-4.436z\"/></svg>
-"
-
-[sub_resource type="DPITexture" id="DPITexture_0hb4k"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\"><circle cx=\"6\" cy=\"6\" r=\"5\" fill=\"none\" stroke=\"#fff\"/><circle cx=\"6\" cy=\"6\" r=\"4\" fill=\"none\" stroke=\"#000\"/></svg>
-"
-
-[sub_resource type="DPITexture" id="DPITexture_oox02"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"12\" height=\"12\"><circle cx=\"6\" cy=\"6\" r=\"4\" fill=\"#fff\"/></svg>
-"
-
-[sub_resource type="DPITexture" id="DPITexture_m7hcn"]
-_source = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\"><path fill=\"#e0e0e0\" d=\"M6 1a2 2 0 0 0-2 2v7H1v3a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2V5h3V3a2 2 0 0 0-2-2z\"/><path fill-opacity=\".2\" d=\"M6 1a2 2 0 0 0-2 2v7H1v3a2 2 0 1 0 4 0V3a1 1 0 0 1 2 0v3h5V5H8V3a2 2 0 0 0-2-2zM2 11h2v2a1 1 0 0 1-2 0z\"/></svg>
-"
-
-[sub_resource type="Gradient" id="Gradient_cpor3"]
-offsets = PackedFloat32Array(0, 0.16666667, 0.33333334, 0.5, 0.6666667, 0.8333333, 1)
-colors = PackedColorArray(1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1)
-
-[sub_resource type="GradientTexture2D" id="GradientTexture2D_7mujx"]
-gradient = SubResource("Gradient_cpor3")
-width = 800
-height = 6
 
 [resource]
 script = ExtResource("1_7gvi4")

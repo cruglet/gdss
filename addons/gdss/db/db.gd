@@ -18,11 +18,22 @@ extends Resource
 	get: return _populate_missing_nodes
 @export_tool_button("Remove Invalid Nodes") var _remove_invalid_nodes: Callable:
 	get: return _remove_invalid_nodes_fn
+@export_tool_button("Clear Lists") var _clear_lists: Callable:
+	get: return clear_lists
+
 
 @export_group("Resource Directories")
 @export_dir var methods_dir: String
 @export_dir var nodes_dir: String
 @export_dir var props_dir: String
+
+
+func clear_lists() -> void:
+	node_list.clear()
+	method_list.clear()
+	component_list.clear()
+	property_list.clear()
+	ResourceSaver.save(self)
 
 
 func repopulate(new: bool = false) -> void:
@@ -31,6 +42,7 @@ func repopulate(new: bool = false) -> void:
 	_set_methods(new)
 	for node: GdssNode in node_list.values():
 		node.invalidate_props_cache()
+	ResourceSaver.save(self)
 
 
 func _set_properties(new: bool = false) -> void:
