@@ -21,6 +21,7 @@ var file_name: String:
 
 
 func _ready() -> void:
+	name = "GDSS"
 	_code_editor_ref = code_edit
 	
 	error_label.add_theme_font_override(&"font", EditorInterface.get_editor_theme().get_font(&"expression", &"EditorFonts"))
@@ -32,7 +33,8 @@ func _ready() -> void:
 				code_edit.set_caret_line(err_line_num)
 	)
 	
-	copy_button.icon = EditorInterface.get_editor_theme().get_icon(&"ActionCopy", &"EditorIcons")
+	if _is_running_as_plugin():
+		copy_button.icon = EditorInterface.get_editor_theme().get_icon(&"ActionCopy", &"EditorIcons")
 	
 	title_label.text = file_name
 	code_edit.gui_input.connect(_on_code_edit_input)
@@ -101,3 +103,7 @@ func has_unsaved_changes() -> bool:
 
 func _on_copy_button_pressed() -> void:
 	DisplayServer.clipboard_set(error_label.text)
+
+
+func _is_running_as_plugin() -> bool:
+	return Engine.is_editor_hint() and not Engine.has_singleton("GdssRuntime")

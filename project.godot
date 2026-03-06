@@ -14,6 +14,18 @@ config/name="GDSS (Demo)"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="uid://brsvagw6ydiae"
 
+[autoload]
+
+GdssRuntime="*uid://yu6lhnx763yp"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gdss/plugin.cfg")
+
+[gdss]
+
+internal/initialized=true
+
 [physics]
 
 3d/physics_engine="Jolt Physics"

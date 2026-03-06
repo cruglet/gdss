@@ -429,7 +429,8 @@ func _load_from_file() -> void:
 			if editor.get_code_edit().text != source:
 				if editor.get_code_edit().text_changed.is_connected(_on_text_changed):
 					editor.get_code_edit().text_changed.disconnect(_on_text_changed)
-				editor.get_code_edit().text = source
+				if editor._is_running_as_plugin():
+					editor.get_code_edit().text = source
 				editor.get_code_edit().text_changed.connect(_on_text_changed)
 		parsed = interpret(source)
 		parsed_changed.emit()

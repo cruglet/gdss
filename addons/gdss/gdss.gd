@@ -6,7 +6,7 @@ const DEBUG_MODE: bool = false
 const DEBUG_WAS_VISIBLE: StringName = &"gdss_was_visible"
 
 const GdssInspector = preload("uid://bhvd3stvftya8")
-const GDSS_EDITOR = preload("uid://c3jluwmuxtokv")
+const GDSS_EDITOR = preload("uid://bh4sv3ta53fmk")
 
 enum Type {
 	INT,

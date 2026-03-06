@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_hm4ov")
 enabled_components = Dictionary[String, bool]({
-"Stylebox": true,
+"Stylebox": false,
 "Transitionable": false
 })
 base_type = &"FlowContainer"

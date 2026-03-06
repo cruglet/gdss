@@ -80,6 +80,8 @@ func _set_nodes(new: bool = false) -> void:
 				node.enabled_components.set(component.component_name, component.default_state)
 		if node.is_static and node.enabled_components.has("Transitionable"):
 			node.enabled_components["Transitionable"] = false
+		if node.enabled_components.has("Stylebox") and node.states.is_empty():
+			node.enabled_components["Stylebox"] = false
 		
 		var type: StringName = node.base_type
 		

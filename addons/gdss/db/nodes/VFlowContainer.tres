@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("1_jlc1k")
 enabled_components = Dictionary[String, bool]({
-"Stylebox": true,
+"Stylebox": false,
 "Transitionable": false
 })
 base_type = &"VFlowContainer"
