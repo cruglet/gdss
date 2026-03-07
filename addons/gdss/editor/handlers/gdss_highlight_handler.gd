@@ -3,6 +3,7 @@ class_name GdssHighlightHandler
 extends Node
 
 @export var editor: CodeEdit
+@export var interpreter: GdssInterpreter
 
 var _highlighter: GdssCodeHighlighter
 var _nodes: Array[String] = []
@@ -24,6 +25,7 @@ func _ready() -> void:
 	_build_from_objects()
 	_setup_highlighter()
 	_parse_user_variables.call_deferred()
+	editor.text_changed.connect(_on_text_changed)
 
 
 func _build_from_objects() -> void:
@@ -323,7 +325,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					result[start] = {"color": col_keyword}
 				elif properties.has(word):
 					result[start] = {"color": col_member}
-				elif states.has(word):
+				elif is_after_colon and states.has(word):
 					result[start] = {"color": col_control_flow}
 				else:
 					result[start] = {"color": col_default}
@@ -379,7 +381,7 @@ func _parse_user_variables() -> void:
 	var instance_regex: RegEx = RegEx.new()
 	instance_regex.compile(r"@instance\s+var\s+(\w+)\s*:")
 	var local_regex: RegEx = RegEx.new()
-	local_regex.compile(r"^var\s+(\w+)\s*:")
+	local_regex.compile(r"(?:^|\s)var\s+(\w+)\s*:")
 	for line: String in editor.text.split("\n"):
 		var stripped: String = line.strip_edges()
 		var gm: RegExMatch = global_regex.search(stripped)

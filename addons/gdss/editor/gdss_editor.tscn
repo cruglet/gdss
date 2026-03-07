@@ -28,9 +28,10 @@ title_label = NodePath("VBoxContainer/TitleLabel")
 copy_button = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton")
 toggle_map_button = NodePath("VBoxContainer/TitleLabel/ToggleMapButton")
 
-[node name="GdssHighlightHandler" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor")]
+[node name="GdssHighlightHandler" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor", "interpreter")]
 script = ExtResource("2_wia40")
 editor = NodePath("../VBoxContainer/MarginContainer/VBoxContainer/CodeEdit")
+interpreter = NodePath("../GdssInterpreter")
 
 [node name="GdssCompletionHandler" type="Node" parent="." unique_id=1313950794 node_paths=PackedStringArray("editor")]
 script = ExtResource("2_vh56t")
