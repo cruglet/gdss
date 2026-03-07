@@ -144,6 +144,8 @@ func _on_parsed_changed() -> void:
 func _apply_overrides() -> void:
 	if ref == null:
 		return
+	if not ref.has_meta("gdss_handler"):
+		return
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return
