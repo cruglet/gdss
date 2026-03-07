@@ -55,3 +55,12 @@ Panel, PanelContainer {
 (not necessarily in order)
 - [ ] UI polish
 
+### Cloning
+I recommend using these commands to clone the repo (if you're using bash):
+```
+git clone https://github.com/cruglet/gdss.git
+cd gdss
+git ls-files 'addons/gdss/db/**/*.tres' | xargs git update-index --skip-worktree
+git update-index --skip-worktree addons/gdss/db/db.tres
+```
+
