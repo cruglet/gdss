@@ -78,6 +78,25 @@ func _on_code_edit_input(event: InputEvent) -> void:
 		EditorInterface.save_scene()
 		GdssInterpreter.get_instance().save_current()
 		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_I and key.is_command_or_control_pressed() and key.shift_pressed:
+		_convert_spaces_to_tabs()
+		code_edit.get_viewport().set_input_as_handled()
+
+
+func _convert_spaces_to_tabs() -> void:
+	var lines: PackedStringArray = code_edit.text.split("\n")
+	for i: int in lines.size():
+		var line: String = lines[i]
+		var tab_count: int = 0
+		while line.begins_with("    "):
+			line = line.substr(4)
+			tab_count += 1
+		lines[i] = "\t".repeat(tab_count) + line
+	var caret_line: int = code_edit.get_caret_line()
+	var caret_col: int = code_edit.get_caret_column()
+	code_edit.text = "\n".join(lines)
+	code_edit.set_caret_line(caret_line)
+	code_edit.set_caret_column(caret_col)
 
 
 static func get_code_editor() -> CodeEdit:
