@@ -162,9 +162,14 @@ func _apply_overrides() -> void:
 					set_content_margin(SIDE_BOTTOM, padding.w)
 			GdssProp.Category.COLOR:
 				if val is Color:
-					control.add_theme_color_override(prop.name, val)
-					for subprop: String in prop.category_subproperties:
-						control.add_theme_color_override(subprop, val)
+					if prop.category_subproperties.is_empty():
+						control.add_theme_color_override(prop.name, val)
+					else:
+						if gdss_node.colors.has(prop.name):
+							control.add_theme_color_override(prop.name, val)
+						for subprop: String in prop.category_subproperties:
+							if gdss_node.colors.has(subprop):
+								control.add_theme_color_override(subprop, val)
 			GdssProp.Category.CONST:
 				if val is int or val is float:
 					control.add_theme_constant_override(prop.name, int(val))

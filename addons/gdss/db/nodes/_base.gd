@@ -87,6 +87,17 @@ func get_enabled_props() -> Array[GdssProp]:
 		for subprop: String in override_prop.category_subproperties:
 			grouped_colors[subprop] = true
 	
+	for override_prop: GdssProp in overrides.values():
+		if override_prop.category_subproperties.is_empty():
+			continue
+		var any_match: bool = false
+		for subprop_name: String in override_prop.category_subproperties:
+			if colors.has(subprop_name):
+				any_match = true
+				break
+		if any_match:
+			props.append(override_prop)
+	
 	for item_name: String in colors:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
