@@ -284,7 +284,7 @@ func _setup_editor() -> void:
 func _prompt_reload() -> void:
 	var dialog: ConfirmationDialog = ConfirmationDialog.new()
 	dialog.title = "GDSS Reload Recommended"
-	dialog.dialog_text = "GDSS has been enabled for the first time.\nPlease reload the project to use it."
+	dialog.dialog_text = "GDSS has been enabled for the first time,\nplease reload the project to use it.\n(You may have to enable the plugin again)"
 	dialog.ok_button_text = "Reload Now"
 	dialog.cancel_button_text = "Later"
 	dialog.exclusive = false
