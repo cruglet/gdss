@@ -343,7 +343,7 @@ func _get_context() -> Dictionary:
 	
 	for i: int in range(caret_line):
 		var line: String = lines[i].strip_edges()
-		var comment_idx: int = line.find("//")
+		var comment_idx: int = line.find("#")
 		if comment_idx != -1:
 			line = line.substr(0, comment_idx).strip_edges()
 		if line.is_empty():
@@ -378,7 +378,7 @@ func _get_context() -> Dictionary:
 	
 	var caret_text: String = lines[caret_line] if caret_line < lines.size() else ""
 	var stripped: String = caret_text.strip_edges()
-	var comment_idx: int = stripped.find("//")
+	var comment_idx: int = stripped.find("#")
 	if comment_idx != -1:
 		stripped = stripped.substr(0, comment_idx).strip_edges()
 	

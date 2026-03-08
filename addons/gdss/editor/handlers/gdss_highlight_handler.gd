@@ -186,7 +186,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		while i < len:
 			var c: String = text[i]
 
-			if c == "/" and i + 1 < len and text[i + 1] == "/":
+			if c == "#":
 				result[i] = {"color": col_comment}
 				break
 

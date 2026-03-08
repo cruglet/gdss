@@ -84,7 +84,7 @@ func _on_error_check_timeout() -> void:
 func _strip_line_comment(s: String) -> String:
 	var search_from: int = 0
 	while true:
-		var idx: int = s.find("//", search_from)
+		var idx: int = s.find("#", search_from)
 		if idx == -1:
 			break
 		if idx == 0 or s[idx - 1] != ":":
@@ -501,7 +501,7 @@ func _extract_globals(source: String) -> Dictionary:
 		var comment_idx: int = -1
 		var search_from: int = 0
 		while true:
-			var idx: int = stripped.find("//", search_from)
+			var idx: int = stripped.find("#", search_from)
 			if idx == -1:
 				break
 			if idx == 0 or stripped[idx - 1] == " " or stripped[idx - 1] == "\t":
@@ -629,7 +629,7 @@ func _tokenize(source: String) -> Array[String]:
 		var comment_idx: int = -1
 		var search_from: int = 0
 		while true:
-			var idx: int = stripped.find("//", search_from)
+			var idx: int = stripped.find("#", search_from)
 			if idx == -1:
 				break
 			if idx == 0 or stripped[idx - 1] != ":":
