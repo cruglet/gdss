@@ -8,10 +8,10 @@
 [ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/ActionCopy.svg" id="5_by7tt"]
 [ext_resource type="Texture2D" uid="uid://c55pmw55mh1ut" path="res://addons/gdss/editor/Doc.svg" id="5_djuub"]
 
-[sub_resource type="GDScript" id="GDScript_50ht1"]
+[sub_resource type="GDScript" id="GDScript_djuub"]
 
-[sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_djuub"]
-script = SubResource("GDScript_50ht1")
+[sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_rjngg"]
+script = SubResource("GDScript_djuub")
 
 [node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button", "caret_pos_label", "zoom_percentage")]
 clip_contents = true
@@ -105,7 +105,7 @@ size_flags_vertical = 3
 scroll_smooth = true
 minimap_draw = true
 minimap_width = 100
-syntax_highlighter = SubResource("SyntaxHighlighter_djuub")
+syntax_highlighter = SubResource("SyntaxHighlighter_rjngg")
 highlight_current_line = true
 draw_tabs = true
 line_folding = true

@@ -82,14 +82,20 @@ func _on_error_check_timeout() -> void:
 
 
 func _strip_line_comment(s: String) -> String:
-	var search_from: int = 0
-	while true:
-		var idx: int = s.find("#", search_from)
-		if idx == -1:
-			break
-		if idx == 0 or s[idx - 1] != ":":
-			return s.substr(0, idx).strip_edges()
-		search_from = idx + 2
+	var in_quote: bool = false
+	var quote_char: String = ""
+	var i: int = 0
+	while i < s.length():
+		var c: String = s[i]
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+		elif c == "#":
+			return s.substr(0, i).strip_edges()
+		i += 1
 	return s
 
 
@@ -486,30 +492,17 @@ func _extract_globals(source: String) -> Dictionary:
 	globals.clear()
 	_global_defaults.clear()
 	_instance_defaults.clear()
-
 	var global_regex: RegEx = RegEx.new()
 	global_regex.compile(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
 	var instance_regex: RegEx = RegEx.new()
 	instance_regex.compile(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
 	var local_regex: RegEx = RegEx.new()
 	local_regex.compile(r"^var\s+(\w+)\s*:\s*(.+)")
-
 	var known_states: PackedStringArray = _collect_states()
-
 	for line: String in source.split("\n"):
-		var stripped: String = line.strip_edges()
-		var comment_idx: int = -1
-		var search_from: int = 0
-		while true:
-			var idx: int = stripped.find("#", search_from)
-			if idx == -1:
-				break
-			if idx == 0 or stripped[idx - 1] == " " or stripped[idx - 1] == "\t":
-				comment_idx = idx
-				break
-			search_from = idx + 2
-		if comment_idx != -1:
-			stripped = stripped.substr(0, comment_idx).strip_edges()
+		var stripped: String = _strip_line_comment(line.strip_edges())
+		if stripped.is_empty():
+			continue
 		var gm: RegExMatch = global_regex.search(stripped)
 		if gm:
 			var name: String = gm.get_string(1)
@@ -626,18 +619,7 @@ func _tokenize(source: String) -> Array[String]:
 		var stripped: String = line.strip_edges()
 		if stripped.begins_with("@global") or stripped.begins_with("@instance") or stripped.begins_with("var "):
 			continue
-		var comment_idx: int = -1
-		var search_from: int = 0
-		while true:
-			var idx: int = stripped.find("#", search_from)
-			if idx == -1:
-				break
-			if idx == 0 or stripped[idx - 1] != ":":
-				comment_idx = idx
-				break
-			search_from = idx + 2
-		if comment_idx != -1:
-			stripped = stripped.substr(0, comment_idx).strip_edges()
+		stripped = _strip_line_comment(stripped)
 		if stripped.is_empty():
 			continue
 		var current: String = ""
@@ -880,6 +862,7 @@ func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> voi
 
 
 func _parse_value(parts: Array[String]) -> Variant:
+	print("_parse_value parts: ", parts)
 	if parts.is_empty():
 		return ""
 	if parts.size() == 4:
@@ -898,10 +881,11 @@ func _parse_value(parts: Array[String]) -> Variant:
 			return false
 		if token.begins_with("#") and Color.html_is_valid(token):
 			return Color.html(token)
-		if parts[0].is_valid_int():
-			return int(parts[0])
-		if parts[0].is_valid_float():
-			return float(parts[0])
+		if token.is_valid_int():
+			return int(token)
+		if token.is_valid_float():
+			return float(token)
+		return token
 	return " ".join(parts)
 
 
