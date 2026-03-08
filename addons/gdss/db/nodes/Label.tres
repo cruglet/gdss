@@ -592,6 +592,7 @@ enabled_components = Dictionary[String, bool]({
 })
 base_type = &"Label"
 style_name = &"Label"
+is_static = true
 states = PackedStringArray("normal", "focus")
 font_sizes = PackedStringArray("font_size")
 fonts = PackedStringArray("font")

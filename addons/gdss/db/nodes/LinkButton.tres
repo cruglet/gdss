@@ -592,6 +592,7 @@ enabled_components = Dictionary[String, bool]({
 })
 base_type = &"LinkButton"
 style_name = &"LinkButton"
+is_static = true
 states = PackedStringArray("focus")
 font_sizes = PackedStringArray("font_size")
 fonts = PackedStringArray("font")
