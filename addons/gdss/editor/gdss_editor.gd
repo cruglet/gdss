@@ -148,3 +148,7 @@ func _on_toggle_map_button_toggled(toggled_on: bool) -> void:
 
 func _update_editor() -> void:
 	code_edit.minimap_draw = ProjectSettings.get_setting("gdss/editor/use_minimap")
+
+
+func _on_doc_button_pressed() -> void:
+	EditorInterface.get_script_editor().goto_help("class_name:GDSSDocumentation")

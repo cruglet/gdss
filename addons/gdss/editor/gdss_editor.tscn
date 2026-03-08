@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://d243kyxgy1fcy" path="res://addons/gdss/editor/handlers/gdss_interpreter.gd" id="4_squo2"]
 [ext_resource type="Texture2D" uid="uid://ceogrxr1lg3up" path="res://addons/gdss/editor/Map.svg" id="5_50ht1"]
 [ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/ActionCopy.svg" id="5_by7tt"]
+[ext_resource type="Texture2D" uid="uid://c55pmw55mh1ut" path="res://addons/gdss/editor/Doc.svg" id="5_djuub"]
 
 [sub_resource type="GDScript" id="GDScript_50ht1"]
 
@@ -26,7 +27,7 @@ code_edit = NodePath("VBoxContainer/MarginContainer/VBoxContainer/CodeEdit")
 error_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ErrorLabel")
 title_label = NodePath("VBoxContainer/TitleLabel")
 copy_button = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton")
-toggle_map_button = NodePath("VBoxContainer/TitleLabel/ToggleMapButton")
+toggle_map_button = NodePath("VBoxContainer/TitleLabel/HBoxContainer/ToggleMapButton")
 
 [node name="GdssHighlightHandler" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor", "interpreter")]
 script = ExtResource("2_wia40")
@@ -54,22 +55,36 @@ layout_mode = 2
 text = "theme.gdss"
 horizontal_alignment = 1
 
-[node name="ToggleMapButton" type="Button" parent="VBoxContainer/TitleLabel" unique_id=1759196038]
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/TitleLabel" unique_id=1437369522]
 layout_mode = 1
-anchors_preset = 6
-anchor_left = 1.0
-anchor_top = 0.5
+anchors_preset = 15
 anchor_right = 1.0
-anchor_bottom = 0.5
-offset_left = -18.0
-offset_top = -3.5
-offset_right = -10.0
-offset_bottom = 4.5
-grow_horizontal = 0
+anchor_bottom = 1.0
+grow_horizontal = 2
 grow_vertical = 2
+
+[node name="Control3" type="Control" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=2142818464]
+custom_minimum_size = Vector2(2, 0)
+layout_mode = 2
+
+[node name="DocButton" type="Button" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=1864495565]
+layout_mode = 2
+theme_type_variation = &"FlatButton"
+icon = ExtResource("5_djuub")
+
+[node name="Control" type="Control" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=822744024]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ToggleMapButton" type="Button" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=1759196038]
+layout_mode = 2
 theme_type_variation = &"FlatButton"
 toggle_mode = true
 icon = ExtResource("5_50ht1")
+
+[node name="Control2" type="Control" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=1429785962]
+custom_minimum_size = Vector2(2, 0)
+layout_mode = 2
 
 [node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=1354428952]
 layout_mode = 2
@@ -113,5 +128,9 @@ theme_type_variation = &"FlatButton"
 disabled = true
 icon = ExtResource("5_by7tt")
 
-[connection signal="toggled" from="VBoxContainer/TitleLabel/ToggleMapButton" to="." method="_on_toggle_map_button_toggled"]
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=2144018340]
+layout_mode = 2
+
+[connection signal="pressed" from="VBoxContainer/TitleLabel/HBoxContainer/DocButton" to="." method="_on_doc_button_pressed"]
+[connection signal="toggled" from="VBoxContainer/TitleLabel/HBoxContainer/ToggleMapButton" to="." method="_on_toggle_map_button_toggled"]
 [connection signal="pressed" from="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton" to="." method="_on_copy_button_pressed"]

@@ -1,6 +1,8 @@
 @tool
 class_name GDSS
 extends EditorPlugin
+## Looking for documentation on the plugin as a whole? See [GDSSDocumentation].
+
 
 const DEBUG_MODE: bool = false
 const DEBUG_WAS_VISIBLE: StringName = &"gdss_was_visible"
