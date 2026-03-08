@@ -13,7 +13,7 @@
 [sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_djuub"]
 script = SubResource("GDScript_50ht1")
 
-[node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button")]
+[node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button", "caret_pos_label", "zoom_percentage")]
 clip_contents = true
 custom_minimum_size = Vector2(550, 400)
 layout_mode = 3
@@ -28,6 +28,8 @@ error_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContaine
 title_label = NodePath("VBoxContainer/TitleLabel")
 copy_button = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton")
 toggle_map_button = NodePath("VBoxContainer/TitleLabel/HBoxContainer/ToggleMapButton")
+caret_pos_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CaretPosLabel")
+zoom_percentage = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ZoomPercentage")
 
 [node name="GdssHighlightHandler" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor", "interpreter")]
 script = ExtResource("2_wia40")
@@ -122,15 +124,32 @@ layout_mode = 2
 size_flags_horizontal = 3
 text_overrun_behavior = 3
 
+[node name="VSeparator" type="VSeparator" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=2015744822]
+visible = false
+layout_mode = 2
+
 [node name="CopyButton" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=1841896851]
 layout_mode = 2
 theme_type_variation = &"FlatButton"
 disabled = true
 icon = ExtResource("5_by7tt")
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=2144018340]
+[node name="VSeparator3" type="VSeparator" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=638451549]
 layout_mode = 2
+
+[node name="ZoomPercentage" type="Button" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=2002086943]
+layout_mode = 2
+theme_type_variation = &"FlatButton"
+text = "100%"
+
+[node name="VSeparator2" type="VSeparator" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=238645893]
+layout_mode = 2
+
+[node name="CaretPosLabel" type="Label" parent="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer" unique_id=932937793]
+layout_mode = 2
+text = "0:0"
 
 [connection signal="pressed" from="VBoxContainer/TitleLabel/HBoxContainer/DocButton" to="." method="_on_doc_button_pressed"]
 [connection signal="toggled" from="VBoxContainer/TitleLabel/HBoxContainer/ToggleMapButton" to="." method="_on_toggle_map_button_toggled"]
 [connection signal="pressed" from="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton" to="." method="_on_copy_button_pressed"]
+[connection signal="pressed" from="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ZoomPercentage" to="." method="_on_zoom_percentage_pressed"]
