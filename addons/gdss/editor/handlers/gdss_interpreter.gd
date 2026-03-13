@@ -862,7 +862,6 @@ func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> voi
 
 
 func _parse_value(parts: Array[String]) -> Variant:
-	print("_parse_value parts: ", parts)
 	if parts.is_empty():
 		return ""
 	if parts.size() == 4:
