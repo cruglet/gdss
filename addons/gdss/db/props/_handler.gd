@@ -8,6 +8,7 @@ var _slot_state: String = ""
 @export_storage var _ref_path: NodePath = NodePath()
 var _ref_node: CanvasItem = null
 var _ref_node_rt: CanvasItem = null
+var _applying: bool = false
 
 var ref: CanvasItem:
 	get:
@@ -131,6 +132,22 @@ func _on_parsed_changed() -> void:
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if method.returns_texture:
 			method.clear_live_textures()
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	if gdss_node != null and gdss_node.is_static:
+		for state: String in gdss_node.states:
+			var meta_key: StringName = "gdss_handler_" + state
+			if ref.has_meta(meta_key):
+				var box: GdssPropHandler = ref.get_meta(meta_key) as GdssPropHandler
+				box._apply_overrides()
+				box.emit_changed()
+		if ref is CanvasItem:
+			(ref as CanvasItem).queue_redraw()
+		if Engine.is_editor_hint():
+			ref.notify_property_list_changed()
+			var parent: Node = ref.get_parent()
+			if is_instance_valid(parent) and parent is CanvasItem:
+				(parent as CanvasItem).queue_redraw()
+		return
 	_apply_overrides()
 	emit_changed()
 	ref.queue_redraw()
@@ -141,14 +158,52 @@ func _on_parsed_changed() -> void:
 			(parent as CanvasItem).queue_redraw()
 
 
-func _apply_overrides() -> void:
+func _clear_overrides() -> void:
 	if ref == null:
-		return
-	if not ref.has_meta("gdss_handler"):
 		return
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return
+	var control: Control = ref as Control
+	for prop: GdssProp in gdss_node.get_enabled_props():
+		match prop.category:
+			GdssProp.Category.COLOR:
+				if prop.category_subproperties.is_empty():
+					control.remove_theme_color_override(prop.name)
+				else:
+					if gdss_node.colors.has(prop.name):
+						control.remove_theme_color_override(prop.name)
+					for subprop: String in prop.category_subproperties:
+						if gdss_node.colors.has(subprop):
+							control.remove_theme_color_override(subprop)
+			GdssProp.Category.CONST:
+				control.remove_theme_constant_override(prop.name)
+			GdssProp.Category.FONT_SIZE:
+				control.remove_theme_font_size_override(prop.name)
+			GdssProp.Category.FONT:
+				control.remove_theme_font_override(prop.name)
+			GdssProp.Category.ICON:
+				control.remove_theme_icon_override(prop.name)
+
+
+func _apply_overrides() -> void:
+	if ref == null or _applying:
+		return
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	if gdss_node == null:
+		return
+	var is_bound: bool = false
+	if gdss_node.is_static:
+		for state: String in gdss_node.states:
+			if ref.has_meta("gdss_handler_" + state):
+				is_bound = true
+				break
+	else:
+		is_bound = ref.has_meta("gdss_handler")
+	if not is_bound:
+		return
+	_applying = true
+	_clear_overrides()
 	var control: Control = ref as Control
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		var val: Variant = _get_val(prop.name, prop.get_default_value())
@@ -165,19 +220,29 @@ func _apply_overrides() -> void:
 			GdssProp.Category.COLOR:
 				if val is Color:
 					if prop.category_subproperties.is_empty():
-						control.add_theme_color_override(prop.name, val)
+						var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+						if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
+							control.add_theme_color_override(prop.name, val)
 					else:
 						if gdss_node.colors.has(prop.name):
-							control.add_theme_color_override(prop.name, val)
+							var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+							if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
+								control.add_theme_color_override(prop.name, val)
 						for subprop: String in prop.category_subproperties:
 							if gdss_node.colors.has(subprop):
-								control.add_theme_color_override(subprop, val)
+								var theme_def: Variant = gdss_node.theme_defaults.get(subprop, null)
+								if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
+									control.add_theme_color_override(subprop, val)
 			GdssProp.Category.CONST:
 				if val is int or val is float:
-					control.add_theme_constant_override(prop.name, int(val))
+					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+					if not (theme_def is int and int(val) == int(theme_def)):
+						control.add_theme_constant_override(prop.name, int(val))
 			GdssProp.Category.FONT_SIZE:
 				if val is int or val is float:
-					control.add_theme_font_size_override(prop.name, int(val))
+					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+					if not (theme_def is int and int(val) == int(theme_def)):
+						control.add_theme_font_size_override(prop.name, int(val))
 			GdssProp.Category.FONT:
 				if val is Font:
 					control.add_theme_font_override(prop.name, val as Font)
@@ -189,6 +254,7 @@ func _apply_overrides() -> void:
 					control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
 				else:
 					control.set(prop.name, val)
+	_applying = false
 
 
 func _get_cursor_shape(type: String) -> Control.CursorShape:
@@ -546,6 +612,11 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 				return GdssInterpreter._instance_vars[id][name]
 		if GdssInterpreter._instance_defaults.has(name):
 			return GdssInterpreter._instance_defaults[name]
+		return fallback
+	if s.begins_with("__gdss_local__"):
+		var name: String = s.substr("__gdss_local__".length())
+		if GdssInterpreter._local_vars.has(name):
+			return GdssInterpreter._local_vars[name]
 		return fallback
 	if s.begins_with("__gdss_local_method__"):
 		var name: String = s.substr("__gdss_local_method__".length())

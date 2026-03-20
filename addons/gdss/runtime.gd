@@ -63,12 +63,14 @@ func _refresh_tree(node: Node) -> void:
 			if node.has_meta(meta_key):
 				var box: GdssPropHandler = node.get_meta(meta_key) as GdssPropHandler
 				box._tweened_values.clear()
+				box._apply_overrides()
 				box.emit_changed()
 				if node is CanvasItem:
 					(node as CanvasItem).queue_redraw()
 	elif node.has_meta("gdss_handler"):
 		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
 		box._tweened_values.clear()
+		box._apply_overrides()
 		box.emit_changed()
 		if node is CanvasItem:
 			(node as CanvasItem).queue_redraw()

@@ -527,8 +527,7 @@ func _extract_globals(source: String) -> Dictionary:
 			var tokens: Array[String] = _tokenize_value(raw)
 			var consumed: Array = _consume_value(tokens, 0, known_states)
 			local_vars[lm.get_string(1)] = consumed[0]
-			if consumed[0] is Dictionary:
-				_local_vars[lm.get_string(1)] = consumed[0]
+			_local_vars[lm.get_string(1)] = consumed[0]
 	return local_vars
 
 
@@ -574,8 +573,7 @@ func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array
 				if val is Dictionary:
 					result.append("__gdss_local_method__" + key)
 				else:
-					for part: String in str(val).split(" ", false):
-						result.append(part)
+					result.append("__gdss_local__" + key)
 				continue
 			if globals.has(key):
 				result.append("__gdss_global__" + key)
