@@ -57,23 +57,26 @@ func _refresh_all_handlers() -> void:
 
 func _refresh_tree(node: Node) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
-	if gdss_node != null and gdss_node.is_static:
-		for state: String in gdss_node.states:
-			var meta_key: StringName = "gdss_handler_" + state
-			if node.has_meta(meta_key):
-				var box: GdssPropHandler = node.get_meta(meta_key) as GdssPropHandler
+	if gdss_node != null:
+		if gdss_node.is_static:
+			for state: String in gdss_node.states:
+				if node.has_meta("gdss_handler_" + state):
+					var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem, state)
+					if box == null:
+						continue
+					box._tweened_values.clear()
+					box._apply_overrides()
+					box.emit_changed()
+			if node is CanvasItem:
+				(node as CanvasItem).queue_redraw()
+		elif node.has_meta(&"gdss_handler"):
+			var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
+			if box != null:
 				box._tweened_values.clear()
 				box._apply_overrides()
 				box.emit_changed()
 				if node is CanvasItem:
 					(node as CanvasItem).queue_redraw()
-	elif node.has_meta("gdss_handler"):
-		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
-		box._tweened_values.clear()
-		box._apply_overrides()
-		box.emit_changed()
-		if node is CanvasItem:
-			(node as CanvasItem).queue_redraw()
 	for child: Node in node.get_children():
 		_refresh_tree(child)
 

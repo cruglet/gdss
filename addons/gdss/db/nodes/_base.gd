@@ -52,19 +52,16 @@ func unbind_canvas_item(canvas_item: CanvasItem) -> void:
 func get_enabled_props() -> Array[GdssProp]:
 	if not _props_dirty:
 		return _props_cache
-	
-	var props: Array[GdssProp]
+	var props: Array[GdssProp] = []
 	var db: GdssDB = GDSS.get_db()
 	var overrides: Dictionary[String, GdssProp] = db.property_list
-	
 	for component_name: String in enabled_components:
-		if enabled_components.get(component_name) == false:
+		if not enabled_components[component_name]:
 			continue
-		if db.component_list.has(component_name):
-			props.append_array(db.component_list.get(component_name).properties)
-	
+		var component: GdssNodeComponent = db.component_list.get(component_name)
+		if component != null:
+			props.append_array(component.properties)
 	props.append_array(unique_properties)
-	
 	for item_name: String in constants:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
@@ -72,38 +69,30 @@ func get_enabled_props() -> Array[GdssProp]:
 			props.append(GdssProp.create(item_name, GDSS.Type.BOOLEAN, db.boolean_overrides[item_name], GdssProp.Category.CONST))
 		else:
 			props.append(GdssProp.create(item_name, GDSS.Type.INT, theme_defaults.get(item_name, 0), GdssProp.Category.CONST))
-	
 	for item_name: String in font_sizes:
 		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.INT, theme_defaults.get(item_name, 0), GdssProp.Category.FONT_SIZE)))
-	
 	for item_name: String in fonts:
 		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.FONT, theme_defaults.get(item_name, null), GdssProp.Category.FONT)))
-	
 	for item_name: String in icons:
 		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.ICON, theme_defaults.get(item_name, null), GdssProp.Category.ICON)))
-	
 	var grouped_colors: Dictionary = {}
-	for override_prop: GdssProp in overrides.values():
-		for subprop: String in override_prop.category_subproperties:
-			grouped_colors[subprop] = true
-	
+	var subprop_overrides: Array[GdssProp] = []
 	for override_prop: GdssProp in overrides.values():
 		if override_prop.category_subproperties.is_empty():
 			continue
 		var any_match: bool = false
 		for subprop_name: String in override_prop.category_subproperties:
+			grouped_colors[subprop_name] = true
 			if colors.has(subprop_name):
 				any_match = true
-				break
 		if any_match:
-			props.append(override_prop)
-	
+			subprop_overrides.append(override_prop)
+	props.append_array(subprop_overrides)
 	for item_name: String in colors:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
 		elif not grouped_colors.has(item_name):
 			props.append(GdssProp.create(item_name, GDSS.Type.COLOR, theme_defaults.get(item_name, Color.TRANSPARENT), GdssProp.Category.COLOR))
-	
 	_props_cache = props
 	_props_dirty = false
 	return _props_cache
@@ -121,14 +110,16 @@ func update_state(canvas_item: CanvasItem) -> void:
 			var meta_key: StringName = "gdss_handler_" + state
 			if not canvas_item.has_meta(meta_key):
 				continue
-			var box: GdssPropHandler = canvas_item.get_meta(meta_key) as GdssPropHandler
+			var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item, state)
+			if box == null:
+				continue
 			box._apply_overrides()
 			box.emit_changed()
-			if canvas_item is CanvasItem:
-				canvas_item.queue_redraw()
+			canvas_item.queue_redraw()
 		return
-	var state: String = get_active_state(canvas_item)
-	if not canvas_item.has_meta("gdss_handler"):
+	if not canvas_item.has_meta(&"gdss_handler"):
 		return
-	var box: GdssPropHandler = canvas_item.get_meta("gdss_handler") as GdssPropHandler
-	box.current_state = state
+	var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item)
+	if box == null:
+		return
+	box.current_state = get_active_state(canvas_item)

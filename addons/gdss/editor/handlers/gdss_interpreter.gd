@@ -13,6 +13,8 @@ static var _local_vars: Dictionary = {}
 var _last_modified: int = 0
 var _saving: bool = false
 var col_error_bg: Color = Color.RED
+var _cached_states: PackedStringArray = []
+var _composite_map_cache: Dictionary = {}
 static var _inst: GdssInterpreter
 
 @export var editor: GdssEditor
@@ -56,6 +58,22 @@ func _notification(what: int) -> void:
 		_last_modified = modified
 		_load_from_file()
 		_force_viewport_redraw()
+
+
+func _get_known_states() -> PackedStringArray:
+	if not _cached_states.is_empty():
+		return _cached_states
+	_cached_states = _collect_states()
+	return _cached_states
+
+
+func _collect_states() -> PackedStringArray:
+	var states: PackedStringArray = []
+	for node: GdssNode in GDSS._get_gdss_nodes().values():
+		for variant: String in node.states:
+			if not states.has(variant):
+				states.append(variant)
+	return states
 
 
 func _on_editor_file_saved() -> void:
@@ -238,7 +256,7 @@ func check_errors(source: String) -> Array[Array]:
 	var errors: Array[Array] = []
 	var lines: PackedStringArray = source.split("\n")
 	var known_selectors: Array = GDSS._get_gdss_nodes().keys()
-	var known_states: PackedStringArray = _collect_states()
+	var known_states: PackedStringArray = _get_known_states()
 	var known_methods: Dictionary = GDSS._get_gdss_methods()
 	var brace_depth: int = 0
 	var brace_open_lines: Array[int] = []
@@ -429,6 +447,8 @@ func _force_viewport_redraw() -> void:
 
 
 func _load_from_file() -> void:
+	_cached_states.clear()
+	_composite_map_cache.clear()
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	var data: Dictionary = GdssStorage.load_data()
 	if data.is_empty():
@@ -447,7 +467,13 @@ func _load_from_file() -> void:
 
 
 func _build_defaults() -> void:
+	_composite_map_cache.clear()
+	_cached_states.clear()
+	var db: GdssDB = GDSS.get_db()
+	if db.node_list.is_empty():
+		db.repopulate()
 	var known_states: PackedStringArray = _collect_states()
+	_cached_states = known_states
 	for selector: String in GDSS._get_gdss_nodes():
 		var node: GdssNode = GDSS._get_gdss_nodes().get(selector)
 		_ensure_selector(_defaults, selector, known_states)
@@ -458,21 +484,23 @@ func _build_defaults() -> void:
 
 
 func _build_composite_map(selector: String) -> Dictionary:
+	if _composite_map_cache.has(selector):
+		return _composite_map_cache[selector]
 	var map: Dictionary = {}
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(selector)
-	if gdss_node == null:
-		return map
-	for prop: GdssProp in gdss_node.get_enabled_props():
-		if not prop.is_composite():
-			continue
-		for i: int in prop.composite_of.size():
-			map[prop.composite_of[i]] = {"prop": prop.name, "index": i}
+	if gdss_node != null:
+		for prop: GdssProp in gdss_node.get_enabled_props():
+			if not prop.is_composite():
+				continue
+			for i: int in prop.composite_of.size():
+				map[prop.composite_of[i]] = {"prop": prop.name, "index": i}
+	_composite_map_cache[selector] = map
 	return map
 
 
 func interpret(source: String) -> Dictionary[String, Dictionary]:
 	var globals: Dictionary = _extract_globals(source)
-	var known_states: PackedStringArray = _collect_states()
+	var known_states: PackedStringArray = _get_known_states()
 	var result: Dictionary[String, Dictionary] = {}
 	for selector: String in _defaults:
 		result[selector] = {}
@@ -498,7 +526,7 @@ func _extract_globals(source: String) -> Dictionary:
 	instance_regex.compile(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
 	var local_regex: RegEx = RegEx.new()
 	local_regex.compile(r"^var\s+(\w+)\s*:\s*(.+)")
-	var known_states: PackedStringArray = _collect_states()
+	var known_states: PackedStringArray = _get_known_states()
 	for line: String in source.split("\n"):
 		var stripped: String = _strip_line_comment(line.strip_edges())
 		if stripped.is_empty():
@@ -583,15 +611,6 @@ func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array
 				continue
 		result.append(token)
 	return result
-
-
-func _collect_states() -> PackedStringArray:
-	var states: PackedStringArray = []
-	for node: GdssNode in GDSS._get_gdss_nodes().values():
-		for variant: String in node.states:
-			if not states.has(variant):
-				states.append(variant)
-	return states
 
 
 func _collect_selector_group(tokens: Array[String], pos: int, known_states: PackedStringArray) -> Array:
@@ -889,6 +908,10 @@ func _parse_value(parts: Array[String]) -> Variant:
 
 
 func _set_prop(result: Dictionary, selector: String, state: String, prop: String, value: Variant) -> void:
+	if not result.has(selector):
+		return
+	if not result[selector].has(state):
+		result[selector][state] = {}
 	var composite_map: Dictionary = _build_composite_map(selector)
 	if composite_map.has(prop):
 		var info: Dictionary = composite_map[prop]

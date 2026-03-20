@@ -10,6 +10,10 @@ var _ref_node: CanvasItem = null
 var _ref_node_rt: CanvasItem = null
 var _applying: bool = false
 
+var _entry_cache: Dictionary = {}
+var _entry_cache_dirty: bool = true
+var _entry_cache_classes: PackedStringArray = []
+
 var ref: CanvasItem:
 	get:
 		if Engine.is_editor_hint():
@@ -126,9 +130,15 @@ func _on_ref_tree_exiting_rt() -> void:
 	_ref_node_rt = null
 
 
+func _invalidate_entry_cache() -> void:
+	_entry_cache_dirty = true
+	_entry_cache.clear()
+
+
 func _on_parsed_changed() -> void:
 	if ref == null:
 		return
+	_invalidate_entry_cache()
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if method.returns_texture:
 			method.clear_live_textures()
@@ -138,6 +148,7 @@ func _on_parsed_changed() -> void:
 			var meta_key: StringName = "gdss_handler_" + state
 			if ref.has_meta(meta_key):
 				var box: GdssPropHandler = ref.get_meta(meta_key) as GdssPropHandler
+				box._invalidate_entry_cache()
 				box._apply_overrides()
 				box.emit_changed()
 		if ref is CanvasItem:
@@ -199,13 +210,14 @@ func _apply_overrides() -> void:
 				is_bound = true
 				break
 	else:
-		is_bound = ref.has_meta("gdss_handler")
+		is_bound = ref.has_meta(&"gdss_handler")
 	if not is_bound:
 		return
 	_applying = true
 	_clear_overrides()
 	var control: Control = ref as Control
-	for prop: GdssProp in gdss_node.get_enabled_props():
+	var enabled_props: Array[GdssProp] = gdss_node.get_enabled_props()
+	for prop: GdssProp in enabled_props:
 		var val: Variant = _get_val(prop.name, prop.get_default_value())
 		if val == null:
 			val = prop.get_default_value()
@@ -482,23 +494,26 @@ func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
 func _resolve_entry() -> Dictionary:
 	if ref == null:
 		return {}
+	var current_classes: PackedStringArray = ref.get_meta(&"gdss_classes", PackedStringArray()) as PackedStringArray
+	if not _entry_cache_dirty and _entry_cache_classes == current_classes:
+		return _entry_cache
 	var parsed: Dictionary[String, Dictionary] = GdssInterpreter.parsed
 	var selector: String = ref.get_class()
 	if not parsed.has(selector):
 		return {}
-
 	var entry: Dictionary = parsed[selector]
-
-	if not ref.has_meta("gdss_classes"):
+	if current_classes.is_empty():
+		_entry_cache = entry
+		_entry_cache_classes = current_classes
+		_entry_cache_dirty = false
 		return entry
-
-	var gdss_classes: PackedStringArray = ref.get_meta("gdss_classes") as PackedStringArray
-	for gdss_class_name: String in gdss_classes:
+	for gdss_class_name: String in current_classes:
 		var override: Dictionary = _find_class_in_tree(parsed[selector].get("_classes", {}), gdss_class_name)
-		if override.is_empty():
-			continue
-		entry = _merge_entries(entry, override)
-
+		if not override.is_empty():
+			entry = _merge_entries(entry, override)
+	_entry_cache = entry
+	_entry_cache_classes = current_classes
+	_entry_cache_dirty = false
 	return entry
 
 
@@ -571,9 +586,9 @@ func _get_parsed_val(key: String, state: String, fallback: Variant) -> Variant:
 	if entry.is_empty():
 		return fallback
 	var raw: Variant = null
-	if entry.has(state) and entry[state].has(key):
+	if entry.has(state) and (entry[state] as Dictionary).has(key):
 		raw = entry[state][key]
-	elif entry.has("all") and entry["all"].has(key):
+	elif entry.has("all") and (entry["all"] as Dictionary).has(key):
 		raw = entry["all"][key]
 	else:
 		return fallback
@@ -636,9 +651,9 @@ func _get_val(key: String, fallback: Variant = null) -> Variant:
 		return fallback
 	var state: String = _get_state()
 	var raw: Variant = null
-	if entry.has(state) and entry[state].has(key):
+	if entry.has(state) and (entry[state] as Dictionary).has(key):
 		raw = entry[state][key]
-	elif entry.has("all") and entry["all"].has(key):
+	elif entry.has("all") and (entry["all"] as Dictionary).has(key):
 		raw = entry["all"][key]
 	else:
 		return fallback
@@ -646,8 +661,7 @@ func _get_val(key: String, fallback: Variant = null) -> Variant:
 		var mn: String = (raw as Dictionary)["__gdss_method__"]
 		var method: GdssMethod = GDSS._get_gdss_methods().get(mn)
 		if method != null and method.returns_texture:
-			var node_id: int = ref.get_instance_id()
-			var tween_tex: Texture2D = method.get_live_texture(node_id, "tween:" + key)
+			var tween_tex: Texture2D = method.get_live_texture(ref.get_instance_id(), "tween:" + key)
 			if tween_tex != null:
 				return tween_tex
 	return _resolve_value(raw, fallback, state)
@@ -677,36 +691,33 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return
-
 	var vals: Dictionary = {}
-	for prop: GdssProp in gdss_node.get_enabled_props():
+	var props: Array[GdssProp] = gdss_node.get_enabled_props()
+	for prop: GdssProp in props:
 		var v: Variant = _get_val(prop.name, prop.get_default_value())
 		vals[prop.name] = v if v != null else prop.get_default_value()
-
 	var expand: Vector4 = Vector4(vals.get("expand", Vector4i.ZERO))
 	rect = rect.grow_individual(expand.x, expand.z, expand.y, expand.w)
 	if not rect.has_area():
 		return
-	
 	var corner_radius: Vector4 = Vector4(vals.get("corner_radius", Vector4i.ZERO))
 	var anti_aliasing: bool = vals.get("anti_aliasing", true)
 	var aa_size: float = 1.0 if anti_aliasing else 0.0
 	var detail: int = max(1, int(vals.get("corner_detail", 8)))
 	var skew_x: float = vals.get("skew_x", 0.0)
 	var skew_y: float = vals.get("skew_y", 0.0)
-	
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
 	var shadow_src: Variant = vals.get("shadow_color", Color(0, 0, 0, 0.4))
 	var shadow_size: float = float(shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
 	if shadow_size > 1.0:
 		var shadow_outer: Rect2 = rect.grow(shadow_size)
+		var fitted: Vector4 = _fit_corners(corner_radius, rect)
 		if shadow_src is GradientTexture2D:
-			_draw_linear_gradient_ring(to_canvas_item, shadow_src as GradientTexture2D, rect, shadow_outer, _fit_corners(corner_radius, rect), detail, skew_x, skew_y, true)
+			_draw_linear_gradient_ring(to_canvas_item, shadow_src as GradientTexture2D, rect, shadow_outer, fitted, detail, skew_x, skew_y, true)
 		elif shadow_src is Texture2D:
-			_draw_textured_ring(to_canvas_item, rect, shadow_outer, _fit_corners(corner_radius, rect), shadow_src as Texture2D, detail, skew_x, skew_y, true)
+			_draw_textured_ring(to_canvas_item, rect, shadow_outer, fitted, shadow_src as Texture2D, detail, skew_x, skew_y, true)
 		elif shadow_src is Color:
-			_draw_ring_raw(to_canvas_item, rect, shadow_outer, _fit_corners(corner_radius, rect), _fit_corners(corner_radius, shadow_outer), shadow_src as Color, true, detail, skew_x, skew_y)
-
+			_draw_ring_raw(to_canvas_item, rect, shadow_outer, fitted, _fit_corners(corner_radius, shadow_outer), shadow_src as Color, true, detail, skew_x, skew_y)
 	var bg: Variant = vals.get("bg_color", Color.TRANSPARENT)
 	if bg is GradientTexture2D:
 		_draw_linear_gradient_rect(to_canvas_item, bg as GradientTexture2D, rect, corner_radius, detail, skew_x, skew_y)
@@ -714,7 +725,6 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 		_draw_texture_in_rect(to_canvas_item, bg as Texture2D, rect, corner_radius, detail, skew_x, skew_y)
 	elif bg is Color and (bg as Color).a > 0.0:
 		_draw_rect(to_canvas_item, rect, bg as Color, corner_radius, aa_size, detail, skew_x, skew_y)
-
 	var border: Vector4 = Vector4(vals.get("border", Vector4i.ZERO))
 	var border_src: Variant = vals.get("border_color", Color.TRANSPARENT)
 	var has_border: bool = border.x > 0 or border.y > 0 or border.z > 0 or border.w > 0

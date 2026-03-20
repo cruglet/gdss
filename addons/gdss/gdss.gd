@@ -108,17 +108,20 @@ static func set_instance_var(node: Node, name: String, value: Variant) -> void:
 		for state: String in gdss_node.states:
 			var meta_key: StringName = "gdss_handler_" + state
 			if node.has_meta(meta_key):
-				var box: GdssPropHandler = node.get_meta(meta_key) as GdssPropHandler
+				var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem, state)
+				if box == null:
+					continue
 				box._apply_overrides()
 				box.emit_changed()
 				if node is CanvasItem:
 					(node as CanvasItem).queue_redraw()
-	elif node.has_meta("gdss_handler"):
-		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
-		box._apply_overrides()
-		box.emit_changed()
-		if node is CanvasItem:
-			(node as CanvasItem).queue_redraw()
+	elif node.has_meta(&"gdss_handler"):
+		var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
+		if box != null:
+			box._apply_overrides()
+			box.emit_changed()
+			if node is CanvasItem:
+				(node as CanvasItem).queue_redraw()
 
 
 ## Retrieves the value of a variable for a [b]specific Node instance[/b].
@@ -153,17 +156,16 @@ static func _refresh_affected_tree(node: Node, sentinel: String) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
 	if gdss_node != null and gdss_node.is_static:
 		for state: String in gdss_node.states:
-			var meta_key: StringName = "gdss_handler_" + state
-			if node.has_meta(meta_key):
-				var box: GdssPropHandler = node.get_meta(meta_key) as GdssPropHandler
-				if _handler_uses_sentinel(box, sentinel):
+			if node.has_meta("gdss_handler_" + state):
+				var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem, state)
+				if box != null and _handler_uses_sentinel(box, sentinel):
 					box._apply_overrides()
 					box.emit_changed()
 					if node is CanvasItem:
 						(node as CanvasItem).queue_redraw()
-	elif node.has_meta("gdss_handler"):
-		var box: GdssPropHandler = node.get_meta("gdss_handler") as GdssPropHandler
-		if _handler_uses_sentinel(box, sentinel):
+	elif node.has_meta(&"gdss_handler"):
+		var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
+		if box != null and _handler_uses_sentinel(box, sentinel):
 			box._apply_overrides()
 			box.emit_changed()
 			if node is CanvasItem:

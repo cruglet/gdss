@@ -2,6 +2,16 @@
 class_name GdssNodeHandler
 extends Object
 
+static var _registry: Dictionary = {}
+
+
+static func _key(canvas_item: CanvasItem, state: String = "") -> String:
+	return "%d:%s" % [canvas_item.get_instance_id(), state]
+
+
+static func get_handler(canvas_item: CanvasItem, state: String = "") -> GdssPropHandler:
+	return _registry.get(_key(canvas_item, state))
+
 
 static func bind(canvas_item: CanvasItem) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
@@ -12,21 +22,25 @@ static func bind(canvas_item: CanvasItem) -> void:
 		return
 	if gdss_node.is_static:
 		for state: String in gdss_node.states:
-			var meta_key: StringName = "gdss_handler_" + state
-			if not canvas_item.has_meta(meta_key):
-				var new_box: GdssPropHandler = GdssPropHandler.new()
-				canvas_item.set_meta(meta_key, new_box)
-				new_box._slot_state = state
-				control.add_theme_stylebox_override(state, new_box)
-			var box: GdssPropHandler = canvas_item.get_meta(meta_key) as GdssPropHandler
-			box.ref = canvas_item
+			var k: String = _key(canvas_item, state)
+			var box: GdssPropHandler = _registry.get(k)
+			if box == null:
+				box = GdssPropHandler.new()
+				_registry[k] = box
 			box._slot_state = state
+			box.ref = canvas_item
+			canvas_item.set_meta("gdss_handler_" + state, true)
+			control.add_theme_stylebox_override(state, box)
 			box._apply_overrides()
 		gdss_node.bind_canvas_item(canvas_item)
 		return
-	var box: GdssPropHandler = GdssPropHandler.new()
-	canvas_item.set_meta("gdss_handler", box)
+	var k: String = _key(canvas_item)
+	var box: GdssPropHandler = _registry.get(k)
+	if box == null:
+		box = GdssPropHandler.new()
+		_registry[k] = box
 	box.ref = canvas_item
+	canvas_item.set_meta(&"gdss_handler", true)
 	for state: String in gdss_node.states:
 		control.remove_theme_stylebox_override(state)
 		control.add_theme_stylebox_override(state, box)
@@ -42,6 +56,25 @@ static func unbind(canvas_item: CanvasItem) -> void:
 	var control: Control = canvas_item as Control
 	if control == null:
 		return
+	_clear_overrides_for(control, gdss_node)
+	for state: String in gdss_node.states:
+		control.remove_theme_stylebox_override(state)
+		var meta_key: StringName = "gdss_handler_" + state
+		if canvas_item.has_meta(meta_key):
+			canvas_item.remove_meta(meta_key)
+		_registry.erase(_key(canvas_item, state))
+	if canvas_item.has_meta(&"gdss_handler"):
+		canvas_item.remove_meta(&"gdss_handler")
+	_registry.erase(_key(canvas_item))
+	gdss_node.unbind_canvas_item(canvas_item)
+	GDSS.clear_instance_vars(canvas_item)
+	if Engine.is_editor_hint():
+		var edited_scene: Node = EditorInterface.get_edited_scene_root()
+		if edited_scene != null:
+			EditorInterface.mark_scene_as_unsaved()
+
+
+static func _clear_overrides_for(control: Control, gdss_node: GdssNode) -> void:
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		match prop.category:
 			GdssProp.Category.COLOR:
@@ -61,17 +94,3 @@ static func unbind(canvas_item: CanvasItem) -> void:
 				control.remove_theme_font_override(prop.name)
 			GdssProp.Category.ICON:
 				control.remove_theme_icon_override(prop.name)
-	for state: String in gdss_node.states:
-		control.remove_theme_stylebox_override(state)
-		var meta_key: StringName = "gdss_handler_" + state
-		if canvas_item.has_meta(meta_key):
-			canvas_item.remove_meta(meta_key)
-	if canvas_item.has_meta("gdss_handler"):
-		canvas_item.remove_meta("gdss_handler")
-	gdss_node.unbind_canvas_item(canvas_item)
-	GDSS.clear_instance_vars(canvas_item)
-	if Engine.is_editor_hint():
-		EditorInterface.get_edited_scene_root().get_tree().get_edited_scene_root()
-		var edited_scene: Node = EditorInterface.get_edited_scene_root()
-		if edited_scene != null:
-			EditorInterface.mark_scene_as_unsaved()
