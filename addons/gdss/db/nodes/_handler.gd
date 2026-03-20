@@ -31,7 +31,7 @@ static func bind(canvas_item: CanvasItem) -> void:
 			box.ref = canvas_item
 			canvas_item.set_meta("gdss_handler_" + state, true)
 			control.add_theme_stylebox_override(state, box)
-			box._apply_overrides()
+			box._apply_overrides(false)
 			if Engine.is_editor_hint():
 				var interp: GdssInterpreter = GdssInterpreter.get_instance()
 				if is_instance_valid(interp) and not interp.parsed_changed.is_connected(box._on_parsed_changed):

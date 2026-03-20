@@ -230,13 +230,11 @@ func _clear_overrides() -> void:
 				control.remove_theme_constant_override(prop.name)
 			GdssProp.Category.FONT_SIZE:
 				control.remove_theme_font_size_override(prop.name)
-			GdssProp.Category.FONT:
-				control.remove_theme_font_override(prop.name)
 			GdssProp.Category.ICON:
 				control.remove_theme_icon_override(prop.name)
 
 
-func _apply_overrides() -> void:
+func _apply_overrides(clear: bool = true) -> void:
 	if ref == null or _applying:
 		return
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
@@ -253,7 +251,8 @@ func _apply_overrides() -> void:
 	if not is_bound:
 		return
 	_applying = true
-	_clear_overrides()
+	if clear:
+		_clear_overrides()
 	var control: Control = ref as Control
 	var enabled_props: Array[GdssProp] = gdss_node.get_enabled_props()
 	for prop: GdssProp in enabled_props:
