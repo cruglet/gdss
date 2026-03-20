@@ -546,6 +546,8 @@ func _tokenize_value(raw: String) -> Array[String]:
 			in_quote = true
 			quote_char = ch
 			current += ch
+		elif ch == "#" and not in_quote:
+			break
 		elif ch in ["{", "}", ":", ",", "(", ")"]:
 			if not current.strip_edges().is_empty():
 				tokens.append(current.strip_edges())

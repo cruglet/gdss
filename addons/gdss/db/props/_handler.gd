@@ -462,7 +462,16 @@ func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
 	var resolved: Array[Variant] = []
 	for raw: String in raw_args:
 		var stripped: String = (raw as String).strip_edges()
-		if stripped.begins_with("$"):
+		if stripped.begins_with("__gdss_global__"):
+			var key: String = stripped.substr("__gdss_global__".length())
+			resolved.append(GdssInterpreter.globals.get(key, null))
+		elif stripped.begins_with("__gdss_instance__"):
+			var key: String = stripped.substr("__gdss_instance__".length())
+			if ref != null and GdssInterpreter._instance_vars.has(ref.get_instance_id()):
+				resolved.append(GdssInterpreter._instance_vars[ref.get_instance_id()].get(key, null))
+			else:
+				resolved.append(GdssInterpreter._instance_defaults.get(key, null))
+		elif stripped.begins_with("$"):
 			var key: String = stripped.substr(1)
 			if GdssInterpreter.globals.has(key):
 				resolved.append(GdssInterpreter.globals[key])
@@ -471,41 +480,23 @@ func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
 			else:
 				resolved.append(GdssInterpreter._instance_defaults.get(key, null))
 		else:
-			resolved.append(method._resolve_arg(stripped) if method != null else stripped)
+			var unquoted: String = stripped.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+			resolved.append(method._resolve_arg(unquoted) if method != null else unquoted)
 	return resolved
 
 
 func _call_method(descriptor: Dictionary, fallback: Variant, state_key: String = "") -> Variant:
 	if descriptor.has("__resolved__"):
 		return descriptor["__resolved__"]
-
 	var name: String = descriptor["__gdss_method__"]
-	var raw_args: Array = descriptor.get("args", [])
 	var method: GdssMethod = GDSS._get_gdss_methods().get(name)
 	if method == null:
 		return fallback
-
-	var resolved_args: Array[Variant] = []
-	for raw: Variant in raw_args:
-		var stripped: String = (raw as String).strip_edges()
-		if stripped.begins_with("$"):
-			var key: String = stripped.substr(1)
-			if GdssInterpreter.globals.has(key):
-				resolved_args.append(GdssInterpreter.globals[key])
-			elif ref != null and GdssInterpreter._instance_vars.has(ref.get_instance_id()):
-				var iv: Dictionary = GdssInterpreter._instance_vars[ref.get_instance_id()]
-				resolved_args.append(iv.get(key, GdssInterpreter._instance_defaults.get(key, null)))
-			else:
-				resolved_args.append(GdssInterpreter._instance_defaults.get(key, null))
-		else:
-			resolved_args.append(method._resolve_arg(stripped))
-
+	var resolved_args: Array[Variant] = _resolve_method_args(descriptor)
 	var node_id: int = ref.get_instance_id() if ref != null else -1
-
 	if method.returns_texture:
 		var result: Variant = method.call_method(resolved_args, node_id, state_key)
 		return result if result != null else fallback
-
 	return method.call_method(resolved_args, node_id, state_key)
 
 
@@ -564,7 +555,7 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 	return raw
 
 
-func _get_val(key: String, fallback: Variant) -> Variant:
+func _get_val(key: String, fallback: Variant = null) -> Variant:
 	if ref == null:
 		return fallback
 	if _tweened_values.has(key):
