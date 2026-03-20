@@ -104,6 +104,61 @@ func _connect_ref_signals(v: CanvasItem) -> void:
 			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 
 
+func _on_global_changed() -> void:
+	if ref == null or _applying:
+		return
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	if gdss_node == null:
+		return
+	_applying = true
+	var control: Control = ref as Control
+	for prop: GdssProp in gdss_node.get_enabled_props():
+		if prop.category == GdssProp.Category.STYLE:
+			continue
+		var val: Variant = _get_val(prop.name, prop.get_default_value())
+		if val == null:
+			val = prop.get_default_value()
+		match prop.category:
+			GdssProp.Category.COLOR:
+				if val is Color:
+					if prop.category_subproperties.is_empty():
+						var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+						if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
+							control.add_theme_color_override(prop.name, val)
+					else:
+						if gdss_node.colors.has(prop.name):
+							var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+							if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
+								control.add_theme_color_override(prop.name, val)
+						for subprop: String in prop.category_subproperties:
+							if gdss_node.colors.has(subprop):
+								var theme_def: Variant = gdss_node.theme_defaults.get(subprop, null)
+								if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
+									control.add_theme_color_override(subprop, val)
+			GdssProp.Category.CONST:
+				if val is int or val is float:
+					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+					if not (theme_def is int and int(val) == int(theme_def)):
+						control.add_theme_constant_override(prop.name, int(val))
+			GdssProp.Category.FONT_SIZE:
+				if val is int or val is float:
+					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+					if not (theme_def is int and int(val) == int(theme_def)):
+						control.add_theme_font_size_override(prop.name, int(val))
+			GdssProp.Category.FONT:
+				if val is Font:
+					control.add_theme_font_override(prop.name, val as Font)
+			GdssProp.Category.ICON:
+				if val is Texture2D:
+					control.add_theme_icon_override(prop.name, val)
+			GdssProp.Category.NODE_PROPERTY:
+				if prop.type == GDSS.Type.CURSOR:
+					control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
+				else:
+					control.set(prop.name, val)
+	_applying = false
+
+
 func _on_ref_renamed() -> void:
 	if is_instance_valid(_ref_node) and _ref_node.is_inside_tree():
 		_ref_path = _ref_node.get_path()
@@ -138,30 +193,14 @@ func _invalidate_entry_cache() -> void:
 func _on_parsed_changed() -> void:
 	if ref == null:
 		return
-	_invalidate_entry_cache()
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if method.returns_texture:
 			method.clear_live_textures()
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
-	if gdss_node != null and gdss_node.is_static:
-		for state: String in gdss_node.states:
-			var meta_key: StringName = "gdss_handler_" + state
-			if ref.has_meta(meta_key):
-				var box: GdssPropHandler = ref.get_meta(meta_key) as GdssPropHandler
-				box._invalidate_entry_cache()
-				box._apply_overrides()
-				box.emit_changed()
-		if ref is CanvasItem:
-			(ref as CanvasItem).queue_redraw()
-		if Engine.is_editor_hint():
-			ref.notify_property_list_changed()
-			var parent: Node = ref.get_parent()
-			if is_instance_valid(parent) and parent is CanvasItem:
-				(parent as CanvasItem).queue_redraw()
-		return
+	_invalidate_entry_cache()
 	_apply_overrides()
 	emit_changed()
-	ref.queue_redraw()
+	if ref is CanvasItem:
+		(ref as CanvasItem).queue_redraw()
 	if Engine.is_editor_hint():
 		ref.notify_property_list_changed()
 		var parent: Node = ref.get_parent()
@@ -521,8 +560,6 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 	raw = _resolve_sentinel(raw, fallback)
 	if raw is Dictionary:
 		var d: Dictionary = raw as Dictionary
-		if d.has("__resolved__"):
-			return d["__resolved__"]
 		if d.has("__gdss_method__"):
 			return _call_method(d, fallback, state_key)
 	if raw is String:
@@ -567,8 +604,6 @@ func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
 
 
 func _call_method(descriptor: Dictionary, fallback: Variant, state_key: String = "") -> Variant:
-	if descriptor.has("__resolved__"):
-		return descriptor["__resolved__"]
 	var name: String = descriptor["__gdss_method__"]
 	var method: GdssMethod = GDSS._get_gdss_methods().get(name)
 	if method == null:
@@ -657,13 +692,6 @@ func _get_val(key: String, fallback: Variant = null) -> Variant:
 		raw = entry["all"][key]
 	else:
 		return fallback
-	if raw is Dictionary and (raw as Dictionary).has("__gdss_method__"):
-		var mn: String = (raw as Dictionary)["__gdss_method__"]
-		var method: GdssMethod = GDSS._get_gdss_methods().get(mn)
-		if method != null and method.returns_texture:
-			var tween_tex: Texture2D = method.get_live_texture(ref.get_instance_id(), "tween:" + key)
-			if tween_tex != null:
-				return tween_tex
 	return _resolve_value(raw, fallback, state)
 
 

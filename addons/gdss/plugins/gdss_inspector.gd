@@ -81,15 +81,17 @@ class GdssClassesProperty extends EditorProperty:
 			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(obj.get_class())
 			if gdss_node != null and gdss_node.is_static:
 				for state: String in gdss_node.states:
-					var meta_key: StringName = "gdss_handler_" + state
-					if canvas_item.has_meta(meta_key):
-						var box: GdssPropHandler = canvas_item.get_meta(meta_key) as GdssPropHandler
+					if canvas_item.has_meta("gdss_handler_" + state):
+						var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item, state)
+						if box == null:
+							continue
 						box._apply_overrides()
 						box.emit_changed()
-			elif canvas_item.has_meta("gdss_handler"):
-				var box: GdssPropHandler = canvas_item.get_meta("gdss_handler") as GdssPropHandler
-				box._apply_overrides()
-				box.emit_changed()
+			elif canvas_item.has_meta(&"gdss_handler"):
+				var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item)
+				if box != null:
+					box._apply_overrides()
+					box.emit_changed()
 			canvas_item.queue_redraw()
 
 

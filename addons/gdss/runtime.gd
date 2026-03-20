@@ -65,6 +65,7 @@ func _refresh_tree(node: Node) -> void:
 					if box == null:
 						continue
 					box._tweened_values.clear()
+					box._invalidate_entry_cache()
 					box._apply_overrides()
 					box.emit_changed()
 			if node is CanvasItem:
@@ -73,6 +74,7 @@ func _refresh_tree(node: Node) -> void:
 			var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
 			if box != null:
 				box._tweened_values.clear()
+				box._invalidate_entry_cache()
 				box._apply_overrides()
 				box.emit_changed()
 				if node is CanvasItem:

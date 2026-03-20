@@ -32,6 +32,10 @@ static func bind(canvas_item: CanvasItem) -> void:
 			canvas_item.set_meta("gdss_handler_" + state, true)
 			control.add_theme_stylebox_override(state, box)
 			box._apply_overrides()
+			if Engine.is_editor_hint():
+				var interp: GdssInterpreter = GdssInterpreter.get_instance()
+				if is_instance_valid(interp) and not interp.parsed_changed.is_connected(box._on_parsed_changed):
+					interp.parsed_changed.connect(box._on_parsed_changed)
 		gdss_node.bind_canvas_item(canvas_item)
 		return
 	var k: String = _key(canvas_item)
@@ -57,6 +61,12 @@ static func unbind(canvas_item: CanvasItem) -> void:
 	if control == null:
 		return
 	_clear_overrides_for(control, gdss_node)
+	if Engine.is_editor_hint():
+		var interp: GdssInterpreter = GdssInterpreter.get_instance()
+		for state: String in gdss_node.states:
+			var box: GdssPropHandler = _registry.get(_key(canvas_item, state))
+			if box != null and is_instance_valid(interp) and interp.parsed_changed.is_connected(box._on_parsed_changed):
+				interp.parsed_changed.disconnect(box._on_parsed_changed)
 	for state: String in gdss_node.states:
 		control.remove_theme_stylebox_override(state)
 		var meta_key: StringName = "gdss_handler_" + state

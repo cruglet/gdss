@@ -155,18 +155,20 @@ static func _refresh_affected(global_name: String) -> void:
 static func _refresh_affected_tree(node: Node, sentinel: String) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
 	if gdss_node != null and gdss_node.is_static:
+		var is_bound: bool = false
 		for state: String in gdss_node.states:
 			if node.has_meta("gdss_handler_" + state):
+				is_bound = true
 				var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem, state)
-				if box != null and _handler_uses_sentinel(box, sentinel):
-					box._apply_overrides()
+				if box != null:
+					box._on_global_changed()
 					box.emit_changed()
-					if node is CanvasItem:
-						(node as CanvasItem).queue_redraw()
+		if is_bound and node is CanvasItem:
+			(node as CanvasItem).queue_redraw()
 	elif node.has_meta(&"gdss_handler"):
 		var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
-		if box != null and _handler_uses_sentinel(box, sentinel):
-			box._apply_overrides()
+		if box != null:
+			box._on_global_changed()
 			box.emit_changed()
 			if node is CanvasItem:
 				(node as CanvasItem).queue_redraw()
@@ -183,6 +185,12 @@ static func _handler_uses_sentinel(box: GdssPropHandler, sentinel: String) -> bo
 			var val: Variant = entry[state][key]
 			if val is String and (val as String) == sentinel:
 				return true
+			if val is Dictionary:
+				var d: Dictionary = val as Dictionary
+				if d.has("__gdss_method__"):
+					for arg: Variant in d.get("args", []):
+						if arg is String and (arg as String) == sentinel:
+							return true
 	return false
 
 
