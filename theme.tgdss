@@ -1,3 +1,109 @@
-BoxContainer {
-	separation: 0
+# GDSS Demo theme!
+
+@global var accent: "#8e00ff"
+@global var accent_dark: "#5a00cc"
+@instance var card_color: "#101027"
+
+var radius: 10
+var subtle_border: "#ffffff22"
+var text_bright: "#fff"
+var text_dim: "#aaa"
+
+Button {
+	bg_color: linear_gradient($accent, $accent_dark, -45)
+	border_color: $subtle_border
+	border: 1 1 1 1
+	corner_radius: $radius $radius $radius $radius
+	font_color: $text_bright
+	font_size: 15
+	padding: 12 12 6 6
+	cursor: POINTING
+
+	transition_time: 0.2
+	transition_type: EASE_OUT
+	transition_func: QUINT
+
+	:hover {
+		bg_color: linear_gradient($accent, $accent_dark, 45)
+		expand: 2 2 2 2
+	}
+
+	:pressed {
+		bg_color: $accent_dark
+		expand: 0 0 0 0
+	}
+
+	:disabled {
+		bg_color: "#333333"
+		font_color: $text_dim
+	}
+
+	# Transparent with a colored border
+	GhostButton {
+		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
+		border_color: $accent
+		border: 2 2 2 2
+		font_color: $accent
+		
+		:hover {
+			bg_color: rgba(0.55, 0.0, 1.0, 0.15)
+			font_color: $text_bright
+		}
+	}
+
+	# Pill shaped
+	PillButton {
+		corner_radius: 999 999 999 999
+		padding: 16 16 8 8
+	}
+}
+
+Panel, PanelContainer {
+	bg_color: $card_color
+	border_color: $subtle_border
+	border: 1 1 1 1
+	corner_radius: $radius $radius $radius $radius
+
+	# Elevated card with a gradient
+	CardPanel {
+		bg_color: linear_gradient("#1f1f3a", "#0d0d1a", 160)
+		border_color: $accent
+		border: 1 1 1 1
+	}
+}
+
+Label {
+	font_color: $text_bright 
+	font_size: 12
+	
+	TitleLabel {
+		font_size: 28
+		font_color: $accent
+	}
+	
+	SubtitleLabel {
+		font_size: 16
+		font_color: $text_dim 
+	}
+}
+
+LineEdit {
+	bg_color: "#111111"
+	border_color: $subtle_border
+	border: 1 1 1 1
+	corner_radius: $radius $radius $radius $radius
+	font_color: $text_bright
+	font_size: 14
+	padding: 8 8 8 8
+	cursor: IBEAM
+	selection_color: $accent
+
+	transition_time: 0.15
+	transition_type: EASE_OUT
+	transition_func: SINE
+
+	:focus {
+		border_color: $accent
+		border: 2 2 2 2
+	}
 }

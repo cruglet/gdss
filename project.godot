@@ -11,12 +11,18 @@ config_version=5
 [application]
 
 config/name="GDSS (Demo)"
+run/main_scene="uid://uvfpssgyx1xt"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="uid://brsvagw6ydiae"
 
 [autoload]
 
 GdssRuntime="*uid://yu6lhnx763yp"
+
+[display]
+
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
 
 [editor_plugins]
 
