@@ -1,4 +1,5 @@
 # GDSS: Godot stylesheets
+DEVELOPMENT ON HOLD UNTIL https://github.com/godotengine/godot/pull/114285 IS MERGED.
 
 An experimental CSS-like styling system for Godot 4. This was originally not intended for public use. However, upon further developing it into something more stable and sophisticated I've
 decided to open source it in case anyone would like to use it or help support the development of it.
