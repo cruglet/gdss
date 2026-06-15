@@ -92,7 +92,7 @@ static func set_global_var(name: String, value: Variant) -> void:
 
 ## Assigns an [b]instance-specific override[/b] for a GDSS variable on a Node.
 ## [br][br]
-## If the [param node] has a [code]gdss_handler[/code] meta-tag, this function will
+## If the [param node] is currently bound to GDSS, this function will
 ## automatically apply the new value, emit change signals, and queue a redraw
 ## if the node is a [CanvasItem].
 ## [codeblock]
@@ -103,25 +103,8 @@ static func set_instance_var(node: Node, name: String, value: Variant) -> void:
 	if not GdssInterpreter._instance_vars.has(id):
 		GdssInterpreter._instance_vars[id] = {}
 	GdssInterpreter._instance_vars[id][name] = value
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class()) if node is CanvasItem else null
-	if gdss_node != null and gdss_node.is_static:
-		for state: String in gdss_node.states:
-			var meta_key: StringName = "gdss_handler_" + state
-			if node.has_meta(meta_key):
-				var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem, state)
-				if box == null:
-					continue
-				box._apply_overrides()
-				box.emit_changed()
-				if node is CanvasItem:
-					(node as CanvasItem).queue_redraw()
-	elif node.has_meta(&"gdss_handler"):
-		var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
-		if box != null:
-			box._apply_overrides()
-			box.emit_changed()
-			if node is CanvasItem:
-				(node as CanvasItem).queue_redraw()
+	if node is CanvasItem:
+		GdssNodeHandler.refresh(node as CanvasItem)
 
 
 ## Retrieves the value of a variable for a [b]specific Node instance[/b].
@@ -144,54 +127,23 @@ static func clear_instance_vars(node: Node) -> void:
 	GdssInterpreter._instance_vars.erase(node.get_instance_id())
 
 
-static func _refresh_affected(global_name: String) -> void:
-	var sentinel: String = "__gdss_global__" + global_name
+static func _refresh_affected(_global_name: String) -> void:
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
 	if tree == null:
 		return
-	_refresh_affected_tree(tree.root, sentinel)
+	_refresh_affected_tree(tree.root)
 
 
-static func _refresh_affected_tree(node: Node, sentinel: String) -> void:
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
-	if gdss_node != null and gdss_node.is_static:
-		var is_bound: bool = false
-		for state: String in gdss_node.states:
-			if node.has_meta("gdss_handler_" + state):
-				is_bound = true
-				var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem, state)
-				if box != null:
-					box._on_global_changed()
-					box.emit_changed()
-		if is_bound and node is CanvasItem:
-			(node as CanvasItem).queue_redraw()
-	elif node.has_meta(&"gdss_handler"):
-		var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
-		if box != null:
+static func _refresh_affected_tree(node: Node) -> void:
+	if node is CanvasItem:
+		var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(node as CanvasItem)
+		for box: GdssPropHandler in handlers:
 			box._on_global_changed()
 			box.emit_changed()
-			if node is CanvasItem:
-				(node as CanvasItem).queue_redraw()
+		if not handlers.is_empty():
+			(node as CanvasItem).queue_redraw()
 	for child: Node in node.get_children():
-		_refresh_affected_tree(child, sentinel)
-
-
-static func _handler_uses_sentinel(box: GdssPropHandler, sentinel: String) -> bool:
-	var entry: Dictionary = box._resolve_entry()
-	for state: String in entry:
-		if not entry[state] is Dictionary:
-			continue
-		for key: String in entry[state]:
-			var val: Variant = entry[state][key]
-			if val is String and (val as String) == sentinel:
-				return true
-			if val is Dictionary:
-				var d: Dictionary = val as Dictionary
-				if d.has("__gdss_method__"):
-					for arg: Variant in d.get("args", []):
-						if arg is String and (arg as String) == sentinel:
-							return true
-	return false
+		_refresh_affected_tree(child)
 
 
 static func _get_gdss_nodes() -> Dictionary[String, GdssNode]:
@@ -228,6 +180,8 @@ func _enter_tree() -> void:
 
 
 func _exit_tree() -> void:
+	if scene_changed.is_connected(_on_scene_changed):
+		scene_changed.disconnect(_on_scene_changed)
 	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
 	if editor_settings.settings_changed.is_connected(_on_editor_settings_changed):
 		editor_settings.settings_changed.disconnect(_on_editor_settings_changed)
@@ -291,6 +245,13 @@ func _setup_editor() -> void:
 		_debug_hook()
 	add_inspector_plugin(inspector_plugin)
 	add_autoload_singleton("GdssRuntime", "res://addons/gdss/runtime.gd")
+	if not scene_changed.is_connected(_on_scene_changed):
+		scene_changed.connect(_on_scene_changed)
+	GdssNodeHandler.rebind_tree.bind(EditorInterface.get_edited_scene_root()).call_deferred()
+
+
+func _on_scene_changed(scene_root: Node) -> void:
+	GdssNodeHandler.rebind_tree(scene_root)
 
 
 func _prompt_reload() -> void:

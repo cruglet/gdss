@@ -7,7 +7,6 @@ func _ready() -> void:
 	_ensure_parsed()
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	get_tree().node_added.connect(_on_node_added)
-	_bind_tree(get_tree().root)
 	_bind_tree.bind(get_tree().root).call_deferred()
 
 	if Engine.is_editor_hint() and OS.is_debug_build():
@@ -56,29 +55,15 @@ func _refresh_all_handlers() -> void:
 
 
 func _refresh_tree(node: Node) -> void:
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
-	if gdss_node != null:
-		if gdss_node.is_static:
-			for state: String in gdss_node.states:
-				if node.has_meta("gdss_handler_" + state):
-					var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem, state)
-					if box == null:
-						continue
-					box._tweened_values.clear()
-					box._invalidate_entry_cache()
-					box._apply_overrides()
-					box.emit_changed()
-			if node is CanvasItem:
-				(node as CanvasItem).queue_redraw()
-		elif node.has_meta(&"gdss_handler"):
-			var box: GdssPropHandler = GdssNodeHandler.get_handler(node as CanvasItem)
-			if box != null:
-				box._tweened_values.clear()
-				box._invalidate_entry_cache()
-				box._apply_overrides()
-				box.emit_changed()
-				if node is CanvasItem:
-					(node as CanvasItem).queue_redraw()
+	if node is CanvasItem:
+		var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(node as CanvasItem)
+		for box: GdssPropHandler in handlers:
+			box._tweened_values.clear()
+			box._invalidate_entry_cache()
+			box._apply_overrides()
+			box.emit_changed()
+		if not handlers.is_empty():
+			(node as CanvasItem).queue_redraw()
 	for child: Node in node.get_children():
 		_refresh_tree(child)
 
@@ -126,12 +111,9 @@ func _try_bind(canvas_item: CanvasItem) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if not gdss_node:
 		return
-	if not canvas_item.get_meta("gdss_enabled", false):
-		return
-	_rt_bind_ci(canvas_item)
+	if not canvas_item.is_in_group(GdssNodeHandler.GROUP):
+		if not canvas_item.get_meta("gdss_enabled", false):
+			return
+		canvas_item.add_to_group(GdssNodeHandler.GROUP)
+	GdssNodeHandler.bind(canvas_item)
 	gdss_node.update_state(canvas_item)
-
-
-func _rt_bind_ci(canvas_item: CanvasItem) -> void:
-	if GDSS._get_gdss_nodes().has(canvas_item.get_class()):
-		GdssNodeHandler.bind(canvas_item)

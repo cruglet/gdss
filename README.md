@@ -1,6 +1,4 @@
 # GDSS: Godot stylesheets
-DEVELOPMENT ON HOLD UNTIL https://github.com/godotengine/godot/pull/114285 IS MERGED.
-
 An experimental CSS-like styling system for Godot 4. This was originally not intended for public use. However, upon further developing it into something more stable and sophisticated I've
 decided to open source it in case anyone would like to use it or help support the development of it.
 
@@ -55,13 +53,3 @@ Panel, PanelContainer {
 ### TODO
 (not necessarily in order)
 - [ ] UI polish
-
-### Cloning
-I recommend using these commands to clone the repo (if you're using bash):
-```
-git clone https://github.com/cruglet/gdss.git
-cd gdss
-git ls-files 'addons/gdss/db/**/*.tres' | xargs git update-index --skip-worktree
-git update-index --skip-worktree addons/gdss/db/db.tres
-```
-

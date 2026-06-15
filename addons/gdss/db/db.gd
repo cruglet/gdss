@@ -79,9 +79,8 @@ func _set_nodes(new: bool = false) -> void:
 	for component: GdssNodeComponent in components:
 		valid_component_names.append(component.component_name)
 	
-	var theme: Theme = ThemeDB.get_default_theme()
-	
 	for node: GdssNode in nodes.values():
+		node.invalidate_theme_cache()
 		if new:
 			node.enabled_components.clear()
 		for component_name: String in node.enabled_components.keys():
@@ -94,35 +93,7 @@ func _set_nodes(new: bool = false) -> void:
 			node.enabled_components["Transitionable"] = false
 		if node.enabled_components.has("Stylebox") and node.states.is_empty():
 			node.enabled_components["Stylebox"] = false
-		
-		var type: StringName = node.base_type
-		
-		node.states = _get_theme_list(theme, type, "stylebox")
-		node.icons = _get_theme_list(theme, type, "icon")
-		node.font_sizes = _get_theme_list(theme, type, "font_size")
-		node.fonts = _get_theme_list(theme, type, "font")
-		node.constants = _get_theme_list(theme, type, "constant")
-		node.colors = _get_theme_list(theme, type, "color")
-		
-		node.theme_defaults.clear()
-		for item_name: String in node.constants:
-			node.theme_defaults[item_name] = theme.get_constant(item_name, type)
-		for item_name: String in node.colors:
-			node.theme_defaults[item_name] = theme.get_color(item_name, type)
-		for item_name: String in node.font_sizes:
-			node.theme_defaults[item_name] = theme.get_font_size(item_name, type)
-		for item_name: String in node.icons:
-			node.theme_defaults[item_name] = theme.get_icon(item_name, type)
-		for item_name: String in node.fonts:
-			node.theme_defaults[item_name] = theme.get_font(item_name, type)
-		
-		ResourceSaver.save(node, nodes_dir.path_join(node.resource_path.get_file()))
-	
 	node_list = nodes
-
-
-func _get_theme_list(theme: Theme, type: StringName, category: String) -> PackedStringArray:
-	return theme.call("get_" + category + "_list", type)
 
 
 func _set_methods(new: bool = false) -> void:

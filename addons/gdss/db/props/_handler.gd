@@ -5,7 +5,7 @@ extends StyleBox
 static var _texture_cache: Dictionary = {}
 var _slot_state: String = ""
 
-@export_storage var _ref_path: NodePath = NodePath()
+var _ref_path: NodePath = NodePath()
 var _ref_node: CanvasItem = null
 var _ref_node_rt: CanvasItem = null
 var _applying: bool = false
@@ -13,6 +13,9 @@ var _applying: bool = false
 var _entry_cache: Dictionary = {}
 var _entry_cache_dirty: bool = true
 var _entry_cache_classes: PackedStringArray = []
+
+var _animatable_cache: Dictionary = {}
+var _animatable_dirty: bool = true
 
 var ref: CanvasItem:
 	get:
@@ -147,7 +150,9 @@ func _on_global_changed() -> void:
 						control.add_theme_font_size_override(prop.name, int(val))
 			GdssProp.Category.FONT:
 				if val is Font:
-					control.add_theme_font_override(prop.name, val as Font)
+					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+					if not (theme_def is Font and val == theme_def):
+						control.add_theme_font_override(prop.name, val as Font)
 			GdssProp.Category.ICON:
 				if val is Texture2D:
 					control.add_theme_icon_override(prop.name, val)
@@ -187,7 +192,8 @@ func _on_ref_tree_exiting_rt() -> void:
 
 func _invalidate_entry_cache() -> void:
 	_entry_cache_dirty = true
-	_entry_cache.clear()
+	_entry_cache = {}
+	_animatable_dirty = true
 
 
 func _on_parsed_changed() -> void:
@@ -240,15 +246,7 @@ func _apply_overrides(clear: bool = true) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
 		return
-	var is_bound: bool = false
-	if gdss_node.is_static:
-		for state: String in gdss_node.states:
-			if ref.has_meta("gdss_handler_" + state):
-				is_bound = true
-				break
-	else:
-		is_bound = ref.has_meta(&"gdss_handler")
-	if not is_bound:
+	if not ref.is_in_group(GdssNodeHandler.GROUP):
 		return
 	_applying = true
 	if clear:
@@ -295,7 +293,9 @@ func _apply_overrides(clear: bool = true) -> void:
 						control.add_theme_font_size_override(prop.name, int(val))
 			GdssProp.Category.FONT:
 				if val is Font:
-					control.add_theme_font_override(prop.name, val as Font)
+					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+					if not (theme_def is Font and val == theme_def):
+						control.add_theme_font_override(prop.name, val as Font)
 			GdssProp.Category.ICON:
 				if val is Texture2D:
 					control.add_theme_icon_override(prop.name, val)
@@ -317,17 +317,20 @@ func _get_cursor_shape(type: String) -> Control.CursorShape:
 
 
 func _get_animatable_props() -> Dictionary:
-	var result: Dictionary = {}
+	if not _animatable_dirty:
+		return _animatable_cache
+	_animatable_cache.clear()
 	if ref == null:
-		return result
+		return _animatable_cache
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
 	if gdss_node == null:
-		return result
+		return _animatable_cache
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		match prop.type:
 			GDSS.Type.COLOR, GDSS.Type.COMPOSITE4, GDSS.Type.FLOAT, GDSS.Type.INT:
-				result[prop.name] = prop
-	return result
+				_animatable_cache[prop.name] = prop
+	_animatable_dirty = false
+	return _animatable_cache
 
 
 func _start_transition(from_state: String, to_state: String) -> void:
@@ -721,6 +724,8 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	var vals: Dictionary = {}
 	var props: Array[GdssProp] = gdss_node.get_enabled_props()
 	for prop: GdssProp in props:
+		if prop.category != GdssProp.Category.STYLE:
+			continue
 		var v: Variant = _get_val(prop.name, prop.get_default_value())
 		vals[prop.name] = v if v != null else prop.get_default_value()
 	var expand: Vector4 = Vector4(vals.get("expand", Vector4i.ZERO))
@@ -813,11 +818,12 @@ func _draw_linear_gradient_rect(to_canvas_item: RID, tex: GradientTexture2D, rec
 	var grad: Gradient = tex.gradient
 	var angle: float = tex.fill_from.angle_to_point(tex.fill_to)
 	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, _fit_corners(corner_radii, rect), detail), rect, skew_x, skew_y)
+	var dir: Vector2 = Vector2(cos(angle), sin(angle))
 	var colors: PackedColorArray
 	colors.resize(points.size())
 	for i: int in points.size():
 		var p: Vector2 = points[i]
-		var t: float = ((p - rect.position) / rect.size).dot(Vector2(cos(angle), sin(angle))) * 0.5 + 0.5
+		var t: float = ((p - rect.position) / rect.size).dot(dir) * 0.5 + 0.5
 		colors[i] = grad.sample(clampf(t, 0.0, 1.0))
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, colors)
 
@@ -831,6 +837,7 @@ func _draw_linear_gradient_ring(to_canvas_item: RID, tex: GradientTexture2D, inn
 	var inner_fitted: Vector4 = _fit_corners(corner_radii, inner_rect)
 	var inner_points: PackedVector2Array = _apply_skew(_get_rounded_rect(inner_rect, inner_fitted, detail), inner_rect, skew_x, skew_y)
 	var outer_points: PackedVector2Array = _apply_skew(_get_rounded_rect(outer_rect, outer_fitted, detail), outer_rect, skew_x, skew_y)
+	var dir: Vector2 = Vector2(cos(angle), sin(angle))
 	var n: int = max(inner_points.size(), outer_points.size())
 	for i: int in n:
 		var i0: int = i % inner_points.size()
@@ -846,7 +853,7 @@ func _draw_linear_gradient_ring(to_canvas_item: RID, tex: GradientTexture2D, inn
 		quad_colors.resize(4)
 		for j: int in 4:
 			var p: Vector2 = quad[j]
-			var t: float = ((p - outer_rect.position) / outer_rect.size).dot(Vector2(cos(angle), sin(angle))) * 0.5 + 0.5
+			var t: float = ((p - outer_rect.position) / outer_rect.size).dot(dir) * 0.5 + 0.5
 			var col: Color = c1.lerp(c2, clampf(t, 0.0, 1.0))
 			var is_outer: bool = j == 1 or j == 2
 			if fade and is_outer:

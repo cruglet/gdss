@@ -8,13 +8,57 @@ extends Resource
 @export var style_name: StringName
 @export var is_static: bool = false
 
-@export_storage var states: PackedStringArray
-@export_storage var icons: PackedStringArray
-@export_storage var font_sizes: PackedStringArray
-@export_storage var fonts: PackedStringArray
-@export_storage var constants: PackedStringArray
-@export_storage var colors: PackedStringArray
-@export_storage var theme_defaults: Dictionary[String, Variant]
+var states: PackedStringArray:
+	get:
+		_ensure_theme()
+		return _states
+	set(_v):
+		pass
+var icons: PackedStringArray:
+	get:
+		_ensure_theme()
+		return _icons
+	set(_v):
+		pass
+var font_sizes: PackedStringArray:
+	get:
+		_ensure_theme()
+		return _font_sizes
+	set(_v):
+		pass
+var fonts: PackedStringArray:
+	get:
+		_ensure_theme()
+		return _fonts
+	set(_v):
+		pass
+var constants: PackedStringArray:
+	get:
+		_ensure_theme()
+		return _constants
+	set(_v):
+		pass
+var colors: PackedStringArray:
+	get:
+		_ensure_theme()
+		return _colors
+	set(_v):
+		pass
+var theme_defaults: Dictionary[String, Variant]:
+	get:
+		_ensure_theme()
+		return _theme_defaults
+	set(_v):
+		pass
+
+var _states: PackedStringArray
+var _icons: PackedStringArray
+var _font_sizes: PackedStringArray
+var _fonts: PackedStringArray
+var _constants: PackedStringArray
+var _colors: PackedStringArray
+var _theme_defaults: Dictionary[String, Variant]
+var _theme_dirty: bool = true
 
 var _props_cache: Array[GdssProp] = []
 var _props_dirty: bool = true
@@ -22,6 +66,35 @@ var _props_dirty: bool = true
 
 @abstract func get_events() -> PackedStringArray
 @abstract func get_active_state(canvas_item: CanvasItem) -> String
+
+
+func _ensure_theme() -> void:
+	if not _theme_dirty:
+		return
+	var theme: Theme = ThemeDB.get_default_theme()
+	var type: StringName = base_type
+	_states = theme.get_stylebox_list(type)
+	_icons = theme.get_icon_list(type)
+	_font_sizes = theme.get_font_size_list(type)
+	_fonts = theme.get_font_list(type)
+	_constants = theme.get_constant_list(type)
+	_colors = theme.get_color_list(type)
+	_theme_defaults.clear()
+	for item_name: String in _constants:
+		_theme_defaults[item_name] = theme.get_constant(item_name, type)
+	for item_name: String in _colors:
+		_theme_defaults[item_name] = theme.get_color(item_name, type)
+	for item_name: String in _font_sizes:
+		_theme_defaults[item_name] = theme.get_font_size(item_name, type)
+	for item_name: String in _icons:
+		_theme_defaults[item_name] = theme.get_icon(item_name, type)
+	for item_name: String in _fonts:
+		_theme_defaults[item_name] = theme.get_font(item_name, type)
+	_theme_dirty = false
+
+
+func invalidate_theme_cache() -> void:
+	_theme_dirty = true
 
 
 func invalidate_props_cache() -> void:
@@ -105,21 +178,13 @@ func _update_state(...a: Array) -> void:
 func update_state(canvas_item: CanvasItem) -> void:
 	if not canvas_item:
 		return
+	var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(canvas_item)
+	if handlers.is_empty():
+		return
 	if is_static:
-		for state: String in states:
-			var meta_key: StringName = "gdss_handler_" + state
-			if not canvas_item.has_meta(meta_key):
-				continue
-			var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item, state)
-			if box == null:
-				continue
+		for box: GdssPropHandler in handlers:
 			box._apply_overrides()
 			box.emit_changed()
-			canvas_item.queue_redraw()
+		canvas_item.queue_redraw()
 		return
-	if not canvas_item.has_meta(&"gdss_handler"):
-		return
-	var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item)
-	if box == null:
-		return
-	box.current_state = get_active_state(canvas_item)
+	handlers[0].current_state = get_active_state(canvas_item)
