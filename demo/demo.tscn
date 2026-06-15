@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://7aqgkk5uecxp" path="res://demo/demo.gd" id="1_dar0o"]
 [ext_resource type="Script" uid="uid://d1lmce7v2gcj6" path="res://addons/gdss/db/props/_handler.gd" id="1_ytiva"]
 
-[sub_resource type="StyleBox" id="StyleBox_onvmd"]
+[sub_resource type="StyleBox" id="StyleBox_ytiva"]
 resource_local_to_scene = false
 resource_name = ""
 content_margin_left = 0.0
@@ -3272,7 +3272,8 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBox_onvmd")
+theme_override_styles/panel = SubResource("StyleBox_ytiva")
+metadata/gdss_classes = PackedStringArray()
 
 [node name="CenterContainer" type="CenterContainer" parent="." unique_id=2076911254]
 layout_mode = 1
