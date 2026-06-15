@@ -9,104 +9,266 @@ class GdssEnabledProperty extends EditorProperty:
 
 	func _init() -> void:
 		checkbox = CheckBox.new()
-		checkbox.text = "On"
+		checkbox.text = "Enabled"
+		checkbox.tooltip_text = "Style this node with GDSS (adds it to the \"gdss\" group)."
 		add_child(checkbox)
 		add_focusable(checkbox)
 		checkbox.toggled.connect(_on_toggled)
 
+	func _ready() -> void:
+		_update_property.call_deferred()
+
 	func _update_property() -> void:
+		var obj: Object = get_edited_object()
+		if obj == null:
+			return
 		_updating = true
-		checkbox.set_pressed_no_signal(get_edited_object().get_meta("gdss_enabled", false))
+		checkbox.set_pressed_no_signal((obj as Node).is_in_group(GdssNodeHandler.GROUP))
 		_updating = false
 
 	func _on_toggled(value: bool) -> void:
 		if _updating:
 			return
 		var obj: Object = get_edited_object()
+		if obj == null:
+			return
 		var undo_redo: EditorUndoRedoManager = EditorInterface.get_editor_undo_redo()
-		undo_redo.create_action("Toggle GDSS Enabled")
-		undo_redo.add_do_method(obj, &"set_meta", &"gdss_enabled", value)
-		undo_redo.add_undo_method(obj, &"set_meta", &"gdss_enabled", not value)
-		undo_redo.add_do_method(GdssNodeHandler, &"bind" if value else &"unbind", obj)
-		undo_redo.add_undo_method(GdssNodeHandler, &"unbind" if value else &"bind", obj)
+		undo_redo.create_action("Toggle GDSS")
+		if value:
+			undo_redo.add_do_method(obj, &"add_to_group", GdssNodeHandler.GROUP, true)
+			undo_redo.add_undo_method(obj, &"remove_from_group", GdssNodeHandler.GROUP)
+			undo_redo.add_do_method(GdssNodeHandler, &"bind", obj)
+			undo_redo.add_undo_method(GdssNodeHandler, &"unbind", obj)
+		else:
+			undo_redo.add_do_method(obj, &"remove_from_group", GdssNodeHandler.GROUP)
+			undo_redo.add_undo_method(obj, &"add_to_group", GdssNodeHandler.GROUP, true)
+			undo_redo.add_do_method(GdssNodeHandler, &"unbind", obj)
+			undo_redo.add_undo_method(GdssNodeHandler, &"bind", obj)
 		undo_redo.add_do_method(obj, &"notify_property_list_changed")
 		undo_redo.add_undo_method(obj, &"notify_property_list_changed")
 		undo_redo.commit_action()
 
-	func _set_enabled(obj: Object, value: bool) -> void:
-		obj.set_meta("gdss_enabled", value)
-		if value:
-			GdssNodeHandler.bind(obj as CanvasItem)
-		else:
-			GdssNodeHandler.unbind(obj as CanvasItem)
-		emit_changed("gdss_enabled", value)
-		obj.call_deferred(&"notify_property_list_changed")
-
 
 class GdssClassesProperty extends EditorProperty:
-	var edit: LineEdit
+	const PAGE_SIZE: int = 10
+	const CUSTOM_ID: int = -1
+
+	var _rows: VBoxContainer
+	var _pager: HBoxContainer
+	var _page_label: Label
+	var _empty_label: Label
+	var _node_type: String = ""
+	var _values: PackedStringArray = []
+	var _page: int = 0
 	var _updating: bool = false
 
 	func _init() -> void:
-		edit = LineEdit.new()
-		add_child(edit)
-		add_focusable(edit)
-		edit.text_submitted.connect(_on_submitted)
+		var root: VBoxContainer = VBoxContainer.new()
+		root.size_flags_horizontal = SIZE_EXPAND_FILL
+		add_child(root)
+		set_bottom_editor(root)
+		_empty_label = Label.new()
+		_empty_label.text = "No classes assigned."
+		_empty_label.modulate = Color(1, 1, 1, 0.5)
+		root.add_child(_empty_label)
+		_rows = VBoxContainer.new()
+		_rows.size_flags_horizontal = SIZE_EXPAND_FILL
+		root.add_child(_rows)
+		_pager = HBoxContainer.new()
+		var prev_button: Button = Button.new()
+		_apply_icon(prev_button, &"Back", "<")
+		prev_button.pressed.connect(_change_page.bind(-1))
+		_pager.add_child(prev_button)
+		_page_label = Label.new()
+		_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_page_label.size_flags_horizontal = SIZE_EXPAND_FILL
+		_pager.add_child(_page_label)
+		var next_button: Button = Button.new()
+		_apply_icon(next_button, &"Forward", ">")
+		next_button.pressed.connect(_change_page.bind(1))
+		_pager.add_child(next_button)
+		root.add_child(_pager)
+		var add_button: Button = Button.new()
+		add_button.text = "Add Class"
+		_apply_icon(add_button, &"Add", "")
+		add_button.pressed.connect(_on_add)
+		root.add_child(add_button)
+
+	func _apply_icon(button: Button, icon_name: StringName, fallback_text: String) -> void:
+		if Engine.is_editor_hint():
+			var theme: Theme = EditorInterface.get_editor_theme()
+			if theme.has_icon(icon_name, &"EditorIcons"):
+				button.icon = theme.get_icon(icon_name, &"EditorIcons")
+				button.flat = true
+				return
+		if button.text.is_empty():
+			button.text = fallback_text
+
+	func _ready() -> void:
+		_sync.call_deferred()
 
 	func _update_property() -> void:
+		_sync()
+
+	func _sync() -> void:
+		var obj: Object = get_edited_object()
+		if obj == null:
+			return
+		_node_type = (obj as Node).get_class()
+		_values = (obj.get_meta(&"gdss_classes", PackedStringArray()) as PackedStringArray).duplicate()
+		_page = clampi(_page, 0, _page_count() - 1)
+		_rebuild()
+
+	func _page_count() -> int:
+		return maxi(1, ceili(float(_values.size()) / PAGE_SIZE))
+
+	func _rebuild() -> void:
+		if not is_inside_tree():
+			return
 		_updating = true
 		var obj: Object = get_edited_object()
-		var arr: PackedStringArray = obj.get_meta("gdss_classes", PackedStringArray())
-		edit.text = " ".join(arr)
+		if obj != null:
+			_node_type = (obj as Node).get_class()
+		for child: Node in _rows.get_children():
+			child.queue_free()
+		var existing: PackedStringArray = GdssInterpreter.get_class_names(_node_type)
+		var start: int = _page * PAGE_SIZE
+		var end: int = mini(start + PAGE_SIZE, _values.size())
+		for i: int in range(start, end):
+			_rows.add_child(_make_row(i, existing))
+		var paged: bool = _values.size() > PAGE_SIZE
+		_pager.visible = paged
+		_empty_label.visible = _values.is_empty()
+		if paged:
+			_page_label.text = "Page %d / %d" % [_page + 1, _page_count()]
 		_updating = false
 
-	func _on_submitted(text: String) -> void:
+	func _make_row(index: int, existing: PackedStringArray) -> Control:
+		var value: String = _values[index]
+		var row: HBoxContainer = HBoxContainer.new()
+		row.size_flags_horizontal = SIZE_EXPAND_FILL
+		var option: OptionButton = OptionButton.new()
+		option.size_flags_horizontal = SIZE_EXPAND_FILL
+		var selected: int = -1
+		for class_name_entry: String in existing:
+			option.add_item(class_name_entry)
+			if class_name_entry == value:
+				selected = option.item_count - 1
+		if option.item_count > 0:
+			option.add_separator()
+		option.add_item("Custom…")
+		option.set_item_id(option.item_count - 1, CUSTOM_ID)
+		var is_custom: bool = not value.is_empty() and selected == -1
+		var line: LineEdit = LineEdit.new()
+		line.placeholder_text = "custom class"
+		line.size_flags_horizontal = SIZE_EXPAND_FILL
+		line.text = value if is_custom else ""
+		line.visible = is_custom
+		option.select(option.item_count - 1 if is_custom else selected)
+		option.item_selected.connect(_on_option_selected.bind(index, option, line))
+		line.text_submitted.connect(func(_submitted: String) -> void: _commit_line(index, option, line))
+		line.focus_exited.connect(_commit_line.bind(index, option, line))
+		row.add_child(option)
+		row.add_child(line)
+		var up_button: Button = Button.new()
+		_apply_icon(up_button, &"MoveUp", "↑")
+		up_button.tooltip_text = "Move up"
+		up_button.disabled = index == 0
+		up_button.pressed.connect(_move.bind(index, -1))
+		row.add_child(up_button)
+		var down_button: Button = Button.new()
+		_apply_icon(down_button, &"MoveDown", "↓")
+		down_button.tooltip_text = "Move down"
+		down_button.disabled = index == _values.size() - 1
+		down_button.pressed.connect(_move.bind(index, 1))
+		row.add_child(down_button)
+		var remove_button: Button = Button.new()
+		_apply_icon(remove_button, &"Remove", "X")
+		remove_button.tooltip_text = "Remove class"
+		remove_button.pressed.connect(_on_remove.bind(index))
+		row.add_child(remove_button)
+		return row
+
+	func _on_option_selected(item_index: int, row_index: int, option: OptionButton, line: LineEdit) -> void:
 		if _updating:
 			return
+		if option.get_item_id(item_index) == CUSTOM_ID:
+			line.visible = true
+			line.grab_focus()
+			return
+		line.visible = false
+		_set_value(row_index, option.get_item_text(item_index))
+
+	func _commit_line(index: int, option: OptionButton, line: LineEdit) -> void:
+		if _updating or not is_instance_valid(option) or not is_instance_valid(line):
+			return
+		if option.get_selected_id() != CUSTOM_ID:
+			return
+		_set_value(index, line.text)
+
+	func _set_value(index: int, text: String) -> void:
+		if _updating or index < 0 or index >= _values.size():
+			return
+		var trimmed: String = text.strip_edges()
+		if _values[index] == trimmed:
+			return
+		_values[index] = trimmed
+		_commit()
+
+	func _on_add() -> void:
+		_values.append("")
+		_page = (_values.size() - 1) / PAGE_SIZE
+		_commit()
+		_rebuild.call_deferred()
+
+	func _on_remove(index: int) -> void:
+		if index < 0 or index >= _values.size():
+			return
+		_values.remove_at(index)
+		_commit()
+		_rebuild.call_deferred()
+
+	func _move(index: int, delta: int) -> void:
+		var target: int = index + delta
+		if index < 0 or target < 0 or index >= _values.size() or target >= _values.size():
+			return
+		var moved: String = _values[index]
+		_values[index] = _values[target]
+		_values[target] = moved
+		_commit()
+		_rebuild.call_deferred()
+
+	func _change_page(delta: int) -> void:
+		_page = clampi(_page + delta, 0, _page_count() - 1)
+		_rebuild()
+
+	func _commit() -> void:
 		var obj: Object = get_edited_object()
-		var old_val: PackedStringArray = obj.get_meta("gdss_classes", PackedStringArray())
-		var new_val: PackedStringArray = PackedStringArray(text.split(" ", false))
-		if new_val == old_val:
+		if obj == null:
+			return
+		var old_val: PackedStringArray = obj.get_meta(&"gdss_classes", PackedStringArray())
+		if old_val == _values:
 			return
 		var undo_redo: EditorUndoRedoManager = EditorInterface.get_editor_undo_redo()
 		undo_redo.create_action("Set GDSS Classes")
-		undo_redo.add_do_method(self, &"_set_classes", obj, new_val)
-		undo_redo.add_undo_method(self, &"_set_classes", obj, old_val)
+		undo_redo.add_do_method(obj, &"set_meta", &"gdss_classes", _values.duplicate())
+		undo_redo.add_undo_method(obj, &"set_meta", &"gdss_classes", old_val)
+		undo_redo.add_do_method(GdssNodeHandler, &"refresh", obj)
+		undo_redo.add_undo_method(GdssNodeHandler, &"refresh", obj)
 		undo_redo.commit_action()
-
-	func _set_classes(obj: Object, value: PackedStringArray) -> void:
-		obj.set_meta("gdss_classes", value)
-		if obj is CanvasItem:
-			var canvas_item: CanvasItem = obj as CanvasItem
-			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(obj.get_class())
-			if gdss_node != null and gdss_node.is_static:
-				for state: String in gdss_node.states:
-					if canvas_item.has_meta("gdss_handler_" + state):
-						var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item, state)
-						if box == null:
-							continue
-						box._apply_overrides()
-						box.emit_changed()
-			elif canvas_item.has_meta(&"gdss_handler"):
-				var box: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item)
-				if box != null:
-					box._apply_overrides()
-					box.emit_changed()
-			canvas_item.queue_redraw()
 
 
 func _can_handle(object: Object) -> bool:
-	return object is Control
+	return object is Control and GDSS._get_gdss_nodes().has(object.get_class())
 
 
 func _parse_property(object: Object, type: Variant.Type, name: String, hint_type: PropertyHint, hint_string: String, usage_flags: int, wide: bool) -> bool:
-	var is_enabled: bool = object.get_meta("gdss_enabled", false)
+	var is_enabled: bool = (object as Node).is_in_group(GdssNodeHandler.GROUP)
 
 	if name == "theme":
 		var enabled_prop: GdssEnabledProperty = GdssEnabledProperty.new()
 		enabled_prop.set_label("Use GDSS")
 		add_custom_control(enabled_prop)
-
 		if is_enabled:
 			var classes_prop: GdssClassesProperty = GdssClassesProperty.new()
 			classes_prop.set_label("Classes")

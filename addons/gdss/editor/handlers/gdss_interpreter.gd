@@ -27,6 +27,24 @@ static func get_instance() -> GdssInterpreter:
 	return _inst
 
 
+static func get_class_names(node_type: String) -> PackedStringArray:
+	var names: PackedStringArray = []
+	if not parsed.has(node_type):
+		return names
+	_collect_class_names(parsed[node_type].get("_classes", {}), names)
+	names.sort()
+	return names
+
+
+static func _collect_class_names(classes: Dictionary, names: PackedStringArray) -> void:
+	for class_key: String in classes:
+		if not names.has(class_key):
+			names.append(class_key)
+		var entry: Variant = classes[class_key]
+		if entry is Dictionary:
+			_collect_class_names((entry as Dictionary).get("_classes", {}), names)
+
+
 func _ready() -> void:
 	if not editor.is_running_as_plugin():
 		set_process(false)
