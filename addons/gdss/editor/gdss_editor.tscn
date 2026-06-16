@@ -7,13 +7,14 @@
 [ext_resource type="Texture2D" uid="uid://ceogrxr1lg3up" path="res://addons/gdss/editor/Map.svg" id="5_50ht1"]
 [ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/ActionCopy.svg" id="5_by7tt"]
 [ext_resource type="Texture2D" uid="uid://c55pmw55mh1ut" path="res://addons/gdss/editor/Doc.svg" id="5_djuub"]
+[ext_resource type="Script" path="res://addons/gdss/editor/gdss_outline.gd" id="9_outln"]
 
 [sub_resource type="GDScript" id="GDScript_djuub"]
 
 [sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_rjngg"]
 script = SubResource("GDScript_djuub")
 
-[node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button", "caret_pos_label", "zoom_percentage")]
+[node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button", "caret_pos_label", "zoom_percentage", "outline")]
 clip_contents = true
 custom_minimum_size = Vector2(550, 400)
 layout_mode = 3
@@ -23,22 +24,23 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_52mtl")
-code_edit = NodePath("VBoxContainer/MarginContainer/VBoxContainer/CodeEdit")
+code_edit = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/CodeEdit")
 error_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ErrorLabel")
 title_label = NodePath("VBoxContainer/TitleLabel")
 copy_button = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton")
 toggle_map_button = NodePath("VBoxContainer/TitleLabel/HBoxContainer/ToggleMapButton")
 caret_pos_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CaretPosLabel")
 zoom_percentage = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ZoomPercentage")
+outline = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/GdssOutline")
 
 [node name="GdssHighlightHandler" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor", "interpreter")]
 script = ExtResource("2_wia40")
-editor = NodePath("../VBoxContainer/MarginContainer/VBoxContainer/CodeEdit")
+editor = NodePath("../VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/CodeEdit")
 interpreter = NodePath("../GdssInterpreter")
 
 [node name="GdssCompletionHandler" type="Node" parent="." unique_id=1313950794 node_paths=PackedStringArray("editor")]
 script = ExtResource("2_vh56t")
-editor = NodePath("../VBoxContainer/MarginContainer/VBoxContainer/CodeEdit")
+editor = NodePath("../VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/CodeEdit")
 
 [node name="GdssInterpreter" type="Node" parent="." unique_id=1840043936 node_paths=PackedStringArray("editor")]
 script = ExtResource("4_squo2")
@@ -99,8 +101,20 @@ theme_override_constants/margin_bottom = 8
 [node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/MarginContainer" unique_id=834145104]
 layout_mode = 2
 
-[node name="CodeEdit" type="CodeEdit" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=1444390585]
+[node name="HSplitContainer" type="HSplitContainer" parent="VBoxContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
+size_flags_vertical = 3
+split_offset = 160
+
+[node name="GdssOutline" type="VBoxContainer" parent="VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer" node_paths=PackedStringArray("code_edit")]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+script = ExtResource("9_outln")
+code_edit = NodePath("../CodeEdit")
+
+[node name="CodeEdit" type="CodeEdit" parent="VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer" unique_id=1444390585]
+layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 scroll_smooth = true
 minimap_draw = true

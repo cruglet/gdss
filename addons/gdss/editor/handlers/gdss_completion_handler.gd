@@ -5,14 +5,24 @@ extends Node
 @export var editor: CodeEdit
 @export_group("Icons")
 
+var gdss_editor: GdssEditor
+
 var _nodes: Array[String] = []
 var _properties: Dictionary = {}
 var _states: Dictionary = {}
 var _property_meta: Dictionary = {}
 var _user_variables: Array[String] = []
+var _variable_lines: Dictionary = {}
 var _methods: Array[GdssMethod] = []
+var _last_hover_word: String = ""
 
 var _completion_color: Color
+
+static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*:")
+static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*:")
+static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*:")
+static var _re_node_open: RegEx = RegEx.create_from_string(r"^([\w][\w\s,]*)(?::(\w+))?\s*\{")
+static var _re_variant_open: RegEx = RegEx.create_from_string(r"^:([\w][\w\s,:]*)?\s*\{")
 
 const BUILTIN_COLORS: Array[String] = [
 	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
@@ -21,11 +31,16 @@ const BUILTIN_COLORS: Array[String] = [
 
 
 func _ready() -> void:
+	gdss_editor = get_parent() as GdssEditor
 	_completion_color = EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/completion_font_color")
 	_build_from_objects()
 	editor.code_completion_requested.connect(_on_completion_requested)
 	editor.text_changed.connect(_on_text_changed)
-	editor.code_completion_requested
+	editor.symbol_lookup_on_click = true
+	editor.symbol_validate.connect(_on_symbol_validate)
+	editor.symbol_lookup.connect(_on_symbol_lookup)
+	editor.gui_input.connect(_on_editor_gui_input)
+	_parse_user_variables.call_deferred()
 
 
 func _build_from_objects() -> void:
@@ -76,7 +91,7 @@ func _on_text_changed() -> void:
 	if word.is_empty():
 		var context: Dictionary = _get_context()
 		var type: String = context.get("type", "")
-		if type == "property_value":
+		if type == "property_value" or type == "variant_decl":
 			editor.request_code_completion(true)
 			return
 		editor.cancel_code_completion()
@@ -333,14 +348,8 @@ func _get_context() -> Dictionary:
 	var caret_line: int = editor.get_caret_line()
 	var lines: PackedStringArray = editor.text.split("\n")
 	
-	var node_open_regex: RegEx = RegEx.new()
-	node_open_regex.compile(r"^([\w][\w\s,]*)(?::(\w+))?\s*\{")
-	
-	var variant_open_regex: RegEx = RegEx.new()
-	variant_open_regex.compile(r"^:([\w][\w\s,:]*)?\s*\{")
-	
 	var stack: Array[Dictionary] = []
-	
+
 	for i: int in range(caret_line):
 		var line: String = lines[i].strip_edges()
 		var comment_idx: int = line.find("#")
@@ -349,7 +358,7 @@ func _get_context() -> Dictionary:
 		if line.is_empty():
 			continue
 
-		var m: RegExMatch = node_open_regex.search(line)
+		var m: RegExMatch = _re_node_open.search(line)
 		if m:
 			var raw_selector: String = m.get_string(1)
 			var first_selector: String = raw_selector.split(",")[0].strip_edges()
@@ -360,7 +369,7 @@ func _get_context() -> Dictionary:
 			})
 			continue
 
-		var vm: RegExMatch = variant_open_regex.search(line)
+		var vm: RegExMatch = _re_variant_open.search(line)
 		if vm:
 			var raw_variant: String = vm.get_string(1)
 			var first_variant: String = raw_variant.split(",")[0].strip_edges().trim_prefix(":")
@@ -430,26 +439,89 @@ func _get_context() -> Dictionary:
 
 func _parse_user_variables() -> void:
 	_user_variables.clear()
-	var global_regex: RegEx = RegEx.new()
-	global_regex.compile(r"@global\s+var\s+(\w+)\s*:")
-	var instance_regex: RegEx = RegEx.new()
-	instance_regex.compile(r"@instance\s+var\s+(\w+)\s*:")
-	var local_regex: RegEx = RegEx.new()
-	local_regex.compile(r"^var\s+(\w+)\s*:")
-	
-	for line: String in editor.text.split("\n"):
-		var stripped: String = line.strip_edges()
-		var gm: RegExMatch = global_regex.search(stripped)
+	_variable_lines.clear()
+	var source: String = gdss_editor.get_full_source() if gdss_editor != null else editor.text
+	var lines: PackedStringArray = source.split("\n")
+	for line_number: int in lines.size():
+		var stripped: String = lines[line_number].strip_edges()
+		var gm: RegExMatch = _re_global.search(stripped)
 		if gm:
-			_user_variables.append("$" + gm.get_string(1))
+			_record_variable(gm.get_string(1), line_number)
 			continue
-		var im: RegExMatch = instance_regex.search(stripped)
+		var im: RegExMatch = _re_instance.search(stripped)
 		if im:
-			_user_variables.append("$" + im.get_string(1))
+			_record_variable(im.get_string(1), line_number)
 			continue
-		var lm: RegExMatch = local_regex.search(stripped)
+		var lm: RegExMatch = _re_local.search(stripped)
 		if lm:
-			_user_variables.append("$" + lm.get_string(1))
+			_record_variable(lm.get_string(1), line_number)
+
+
+func _record_variable(var_name: String, line_number: int) -> void:
+	_user_variables.append("$" + var_name)
+	_variable_lines[var_name] = line_number
+
+
+func _on_symbol_validate(symbol: String) -> void:
+	_parse_user_variables()
+	editor.set_symbol_lookup_word_as_valid(_variable_lines.has(symbol.trim_prefix("$")))
+
+
+func _on_symbol_lookup(symbol: String, _line: int, _column: int) -> void:
+	var var_name: String = symbol.trim_prefix("$")
+	if not _variable_lines.has(var_name):
+		return
+	var target: int = _variable_lines[var_name]
+	if gdss_editor != null:
+		gdss_editor.goto_full_source_line(target)
+		return
+	editor.set_caret_line(target)
+	editor.set_caret_column(editor.get_line(target).length())
+	editor.center_viewport_to_caret()
+
+
+func _on_editor_gui_input(event: InputEvent) -> void:
+	if not event is InputEventMouseMotion:
+		return
+	var at: Vector2i = editor.get_line_column_at_pos((event as InputEventMouseMotion).position)
+	var word: String = _word_at(at.y, at.x)
+	if word == _last_hover_word:
+		return
+	_last_hover_word = word
+	editor.tooltip_text = _hover_doc(word)
+
+
+func _word_at(line: int, column: int) -> String:
+	if line < 0 or line >= editor.get_line_count():
+		return ""
+	var text: String = editor.get_line(line)
+	if column < 0 or column > text.length():
+		return ""
+	var start: int = column
+	while start > 0 and _is_identifier_char(text[start - 1]):
+		start -= 1
+	var end: int = column
+	while end < text.length() and _is_identifier_char(text[end]):
+		end += 1
+	return text.substr(start, end - start)
+
+
+func _hover_doc(word: String) -> String:
+	if word.is_empty():
+		return ""
+	var method: GdssMethod = GDSS._get_gdss_methods().get(word)
+	if method != null:
+		return method.get_code_hint()
+	for style_name: String in _property_meta:
+		var meta: Dictionary = _property_meta[style_name]
+		if meta.has(word):
+			var prop: GdssProp = meta[word]
+			return "%s: %s" % [word, GDSS.Type.keys()[prop.type].to_lower()]
+	return ""
+
+
+func _is_identifier_char(c: String) -> bool:
+	return (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or (c >= "0" and c <= "9") or c == "_"
 
 
 func _get_current_word() -> String:

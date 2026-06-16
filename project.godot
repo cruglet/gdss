@@ -32,6 +32,7 @@ enabled=PackedStringArray("res://addons/gdss/plugin.cfg")
 
 internal/initialized=true
 editor/use_minimap=false
+editor/show_outline=true
 
 [physics]
 

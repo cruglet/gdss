@@ -12,10 +12,14 @@ static var _instance_defaults: Dictionary = {}
 static var _local_vars: Dictionary = {}
 var _last_modified: int = 0
 var _saving: bool = false
-var col_error_bg: Color = Color.RED
 var _cached_states: PackedStringArray = []
 var _composite_map_cache: Dictionary = {}
 static var _inst: GdssInterpreter
+
+static var _re_global: RegEx = RegEx.create_from_string(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
+static var _re_instance: RegEx = RegEx.create_from_string(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
+static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*:\s*(.+)")
+static var _re_bad_annotation: RegEx = RegEx.create_from_string(r"^@(\w+)")
 
 @export var editor: GdssEditor
 
@@ -53,7 +57,6 @@ func _ready() -> void:
 	_inst = self
 	_build_defaults()
 	_load_from_file()
-	col_error_bg = EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/mark_color")
 	_error_timer = Timer.new()
 	_error_timer.wait_time = 0.5
 	_error_timer.one_shot = true
@@ -65,7 +68,7 @@ func _ready() -> void:
 		if OS.is_debug_build():
 			EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_editor_file_saved)
 	await get_tree().process_frame
-	check_errors(editor.get_code_edit().text)
+	editor.display_errors(check_errors(editor.get_full_source()))
 
 
 func _notification(what: int) -> void:
@@ -112,9 +115,7 @@ func _on_text_changed() -> void:
 
 
 func _on_error_check_timeout() -> void:
-	var code_edit: CodeEdit = editor.get_code_edit()
-	var errors: Array[Array] = check_errors(code_edit.text)
-	_apply_error_highlights(code_edit, errors)
+	editor.display_errors(check_errors(editor.get_full_source()))
 
 
 func _strip_line_comment(s: String) -> String:
@@ -133,6 +134,14 @@ func _strip_line_comment(s: String) -> String:
 			return s.substr(0, i).strip_edges()
 		i += 1
 	return s
+
+
+func _method_name_of(call_text: String) -> String:
+	return call_text.substr(0, call_text.find("(")).strip_edges()
+
+
+func _is_undefined_var(var_name: String, declared_vars: Dictionary) -> bool:
+	return not declared_vars.has(var_name) and not _global_defaults.has(var_name) and not _instance_defaults.has(var_name)
 
 
 const BUILTIN_COLORS: PackedStringArray = [
@@ -164,7 +173,7 @@ func _get_enum_keys_for_type(t: GDSS.Type) -> PackedStringArray:
 
 
 func _check_method_arg_type(arg: String, param: GdssMethod.Param, method_name: String, errors: Array[Array], line: int) -> void:
-	if arg.begins_with("$"):
+	if arg.begins_with("$") or arg == "pass":
 		return
 	match param.type:
 		GdssMethod.ParamType.INT:
@@ -225,7 +234,7 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
 	if value_str.contains("("):
-		var method_name: String = value_str.substr(0, value_str.find("(")).strip_edges()
+		var method_name: String = _method_name_of(value_str)
 		_check_method_call(value_str, method_name, prop, known_methods, errors, line)
 		return
 	
@@ -241,7 +250,7 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		for part: String in parts:
 			if part.begins_with("$"):
 				var var_name: String = part.substr(1)
-				if not declared_vars.has(var_name) and not GdssInterpreter._global_defaults.has(var_name) and not GdssInterpreter._instance_defaults.has(var_name):
+				if _is_undefined_var(var_name, declared_vars):
 					errors.append(["Undefined variable '$%s'" % var_name, line])
 			elif not part.is_valid_int():
 				errors.append(["Property '%s' expects all integer components, got '%s'" % [prop_name, part], line])
@@ -249,7 +258,7 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 	
 	if value_str.begins_with("$"):
 		var var_name: String = value_str.substr(1)
-		if not declared_vars.has(var_name) and not GdssInterpreter._global_defaults.has(var_name) and not GdssInterpreter._instance_defaults.has(var_name):
+		if _is_undefined_var(var_name, declared_vars):
 			errors.append(["Undefined variable '$%s'" % var_name, line])
 		return
 	
@@ -281,15 +290,6 @@ func check_errors(source: String) -> Array[Array]:
 	var selector_stack: Array[String] = []
 	var declared_vars: Dictionary = {}
 
-	var global_regex: RegEx = RegEx.new()
-	global_regex.compile(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
-	var instance_regex: RegEx = RegEx.new()
-	instance_regex.compile(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
-	var local_regex: RegEx = RegEx.new()
-	local_regex.compile(r"^var\s+(\w+)\s*:\s*(.+)")
-	var bad_annotation_regex: RegEx = RegEx.new()
-	bad_annotation_regex.compile(r"^@(\w+)")
-
 	for i: int in lines.size():
 		var stripped: String = _strip_line_comment(lines[i].strip_edges())
 
@@ -298,7 +298,7 @@ func check_errors(source: String) -> Array[Array]:
 
 		if stripped.begins_with("@global") or stripped.begins_with("@instance"):
 			var is_global: bool = stripped.begins_with("@global")
-			var rx: RegEx = global_regex if is_global else instance_regex
+			var rx: RegEx = _re_global if is_global else _re_instance
 			var m: RegExMatch = rx.search(stripped)
 			if not m:
 				var label: String = "@global" if is_global else "@instance"
@@ -310,12 +310,12 @@ func check_errors(source: String) -> Array[Array]:
 				else:
 					declared_vars[m.get_string(1)] = true
 					if val_str.contains("("):
-						var method_name: String = val_str.substr(0, val_str.find("(")).strip_edges()
+						var method_name: String = _method_name_of(val_str)
 						_check_method_call(val_str, method_name, null, known_methods, errors, i)
 			continue
 
 		if stripped.begins_with("var "):
-			var m: RegExMatch = local_regex.search(stripped)
+			var m: RegExMatch = _re_local.search(stripped)
 			if not m:
 				errors.append(["Invalid var declaration. Expected: var name: value", i])
 			else:
@@ -325,12 +325,12 @@ func check_errors(source: String) -> Array[Array]:
 				else:
 					declared_vars[m.get_string(1)] = true
 					if val_str.contains("("):
-						var method_name: String = val_str.substr(0, val_str.find("(")).strip_edges()
+						var method_name: String = _method_name_of(val_str)
 						_check_method_call(val_str, method_name, null, known_methods, errors, i)
 			continue
 
 		if stripped.begins_with("@"):
-			var am: RegExMatch = bad_annotation_regex.search(stripped)
+			var am: RegExMatch = _re_bad_annotation.search(stripped)
 			var annotation_name: String = am.get_string(1) if am else stripped
 			errors.append(["Unknown annotation '@%s'" % annotation_name, i])
 			continue
@@ -370,8 +370,10 @@ func check_errors(source: String) -> Array[Array]:
 						errors.append(["Unknown selector '%s'" % s, i])
 				selector_stack.append(s)
 
-			if not state_part.is_empty() and not known_states.has(state_part):
-				errors.append(["Unknown state ':%s'" % state_part, i])
+			for raw_state: String in state_part.split(",", false):
+				var state_name: String = raw_state.strip_edges().trim_prefix(":").strip_edges()
+				if not state_name.is_empty() and not known_states.has(state_name):
+					errors.append(["Unknown state ':%s'" % state_name, i])
 			continue
 
 		if stripped == "}":
@@ -412,10 +414,10 @@ func check_errors(source: String) -> Array[Array]:
 			else:
 				if value_str.begins_with("$"):
 					var var_name: String = value_str.substr(1)
-					if not declared_vars.has(var_name) and not GdssInterpreter._global_defaults.has(var_name) and not GdssInterpreter._instance_defaults.has(var_name):
+					if _is_undefined_var(var_name, declared_vars):
 						errors.append(["Undefined variable '$%s'" % var_name, i])
 				elif value_str.contains("("):
-					var method_name: String = value_str.substr(0, value_str.find("(")).strip_edges()
+					var method_name: String = _method_name_of(value_str)
 					_check_method_call(value_str, method_name, null, known_methods, errors, i)
 		else:
 			errors.append(["Stray token '%s': expected a property or block" % stripped, i])
@@ -423,30 +425,17 @@ func check_errors(source: String) -> Array[Array]:
 	for line: int in brace_open_lines:
 		errors.append(["Unclosed brace '{'", line])
 
-	var error: Array = errors[0] if not errors.is_empty() else []
-	if not error.is_empty():
-		editor.show_error(error[0], error[1])
-	else:
-		editor.show_error("", -1)
-
 	return errors
-
-
-func _apply_error_highlights(code_edit: CodeEdit, errors: Array[Array]) -> void:
-	for i: int in code_edit.get_line_count():
-		code_edit.set_line_background_color(i, Color.TRANSPARENT)
-	for error: Array in errors:
-		var line: int = error[1]
-		if line >= 0 and line < code_edit.get_line_count():
-			code_edit.set_line_background_color(line, col_error_bg)
 
 
 func save_current() -> void:
 	if editor == null:
 		return
-	parsed = interpret(editor.get_code_edit().text)
 	_saving = true
-	GdssStorage.save(editor.get_code_edit().text, parsed, GdssInterpreter._global_defaults, GdssInterpreter._instance_defaults, GdssInterpreter._local_vars)
+	var source: String = editor.get_full_source()
+	GdssStorage.write_source(GdssStorage.get_save_path(), source)
+	parsed = interpret(source)
+	GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	editor._user_saved()
 	parsed_changed.emit()
@@ -468,20 +457,14 @@ func _load_from_file() -> void:
 	_cached_states.clear()
 	_composite_map_cache.clear()
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
-	var data: Dictionary = GdssStorage.load_data()
-	if data.is_empty():
-		return
-	if data.has("source"):
-		var source: String = data["source"]
-		if Engine.is_editor_hint() and is_instance_valid(editor):
-			if editor.get_code_edit().text != source:
-				if editor.get_code_edit().text_changed.is_connected(_on_text_changed):
-					editor.get_code_edit().text_changed.disconnect(_on_text_changed)
-				if editor.is_running_as_plugin():
-					editor.get_code_edit().text = source
-				editor.get_code_edit().text_changed.connect(_on_text_changed)
-		parsed = interpret(source)
-		parsed_changed.emit()
+	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
+	if Engine.is_editor_hint() and is_instance_valid(editor) and editor.is_running_as_plugin():
+		if editor.get_code_edit().text_changed.is_connected(_on_text_changed):
+			editor.get_code_edit().text_changed.disconnect(_on_text_changed)
+		editor.set_full_source(source)
+		editor.get_code_edit().text_changed.connect(_on_text_changed)
+	parsed = interpret(source)
+	parsed_changed.emit()
 
 
 func _build_defaults() -> void:
@@ -517,8 +500,20 @@ func _build_composite_map(selector: String) -> Dictionary:
 
 
 func interpret(source: String) -> Dictionary[String, Dictionary]:
-	var globals: Dictionary = _extract_globals(source)
+	return interpret_all(PackedStringArray([source]))
+
+
+func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]:
+	globals.clear()
+	_global_defaults.clear()
+	_instance_defaults.clear()
+	_local_vars.clear()
 	var known_states: PackedStringArray = _get_known_states()
+	var local_vars: Dictionary = {}
+	for source: String in sources:
+		var file_locals: Dictionary = _accumulate_globals(source)
+		for key: String in file_locals:
+			local_vars[key] = file_locals[key]
 	var result: Dictionary[String, Dictionary] = {}
 	for selector: String in _defaults:
 		result[selector] = {}
@@ -527,29 +522,21 @@ func interpret(source: String) -> Dictionary[String, Dictionary]:
 				result[selector][state] = _defaults[selector][state].duplicate()
 			else:
 				result[selector][state] = _defaults[selector][state]
-	var tokens: Array[String] = _tokenize(source)
-	tokens = _substitute_globals(tokens, globals)
-	_parse_block(tokens, 0, result, "", known_states)
+	for source: String in sources:
+		var tokens: Array[String] = _tokenize(source)
+		tokens = _substitute_globals(tokens, local_vars)
+		_parse_block(tokens, 0, result, "", known_states)
 	return result
 
 
-func _extract_globals(source: String) -> Dictionary:
+func _accumulate_globals(source: String) -> Dictionary:
 	var local_vars: Dictionary = {}
-	globals.clear()
-	_global_defaults.clear()
-	_instance_defaults.clear()
-	var global_regex: RegEx = RegEx.new()
-	global_regex.compile(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
-	var instance_regex: RegEx = RegEx.new()
-	instance_regex.compile(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
-	var local_regex: RegEx = RegEx.new()
-	local_regex.compile(r"^var\s+(\w+)\s*:\s*(.+)")
 	var known_states: PackedStringArray = _get_known_states()
 	for line: String in source.split("\n"):
 		var stripped: String = _strip_line_comment(line.strip_edges())
 		if stripped.is_empty():
 			continue
-		var gm: RegExMatch = global_regex.search(stripped)
+		var gm: RegExMatch = _re_global.search(stripped)
 		if gm:
 			var name: String = gm.get_string(1)
 			var raw: String = gm.get_string(2).strip_edges()
@@ -559,7 +546,7 @@ func _extract_globals(source: String) -> Dictionary:
 			globals[name] = val
 			_global_defaults[name] = val
 			continue
-		var im: RegExMatch = instance_regex.search(stripped)
+		var im: RegExMatch = _re_instance.search(stripped)
 		if im:
 			var name: String = im.get_string(1)
 			var raw: String = im.get_string(2).strip_edges()
@@ -567,7 +554,7 @@ func _extract_globals(source: String) -> Dictionary:
 			var consumed: Array = _consume_value(tokens, 0, known_states)
 			_instance_defaults[name] = consumed[0]
 			continue
-		var lm: RegExMatch = local_regex.search(stripped)
+		var lm: RegExMatch = _re_local.search(stripped)
 		if lm:
 			var raw: String = lm.get_string(2).strip_edges()
 			var tokens: Array[String] = _tokenize_value(raw)
@@ -903,12 +890,16 @@ func _parse_value(parts: Array[String]) -> Variant:
 		return ""
 	if parts.size() == 4:
 		var all_numeric: bool = true
+		var all_int_resolvable: bool = true
 		for p: String in parts:
 			if not p.is_valid_int() and not p.is_valid_float():
 				all_numeric = false
-				break
+			if not p.is_valid_int() and not p.begins_with("__gdss_global__") and not p.begins_with("__gdss_local__") and not p.begins_with("__gdss_instance__"):
+				all_int_resolvable = false
 		if all_numeric:
 			return Vector4i(int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]))
+		if all_int_resolvable:
+			return {"__gdss_composite4__": [parts[0], parts[1], parts[2], parts[3]]}
 	if parts.size() == 1:
 		var token: String = parts[0].trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 		if token.to_lower() == "true":

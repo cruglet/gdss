@@ -5,6 +5,12 @@ extends Node
 @export var editor: CodeEdit
 @export var interpreter: GdssInterpreter
 
+var gdss_editor: GdssEditor
+
+static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*:")
+static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*:")
+static var _re_local: RegEx = RegEx.create_from_string(r"(?:^|\s)var\s+(\w+)\s*:")
+
 var _highlighter: GdssCodeHighlighter
 var _nodes: Array[String] = []
 var _properties: Array[String] = []
@@ -22,6 +28,7 @@ var _enum_values: Array[String] = []
 
 
 func _ready() -> void:
+	gdss_editor = get_parent() as GdssEditor
 	_build_from_objects()
 	_setup_highlighter()
 	_parse_user_variables.call_deferred()
@@ -147,11 +154,6 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 
 	func invalidate_cache() -> void:
 		_cache_dirty = true
-	
-	
-	func update_cache() -> void:
-		_rebuild_brace_cache()
-		_cache_dirty = false
 
 
 	func _is_word_char(c: String) -> bool:
@@ -169,7 +171,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	func _get_line_syntax_highlighting(p_line: int) -> Dictionary:
 		var result: Dictionary = {}
 		var text: String = get_text_edit().get_line(p_line)
-		var len: int = text.length()
+		var line_length: int = text.length()
 
 		var total_lines: int = get_text_edit().get_line_count()
 
@@ -177,13 +179,13 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 			_rebuild_brace_cache()
 			_cache_dirty = false
 
-		var open_count: int = _brace_depth_cache[p_line] if p_line < _brace_depth_cache.size() else 0
+		var brace_depth: int = _brace_depth_cache[p_line] if p_line < _brace_depth_cache.size() else 0
 
-		if len == 0:
+		if line_length == 0:
 			return result
 
 		var i: int = 0
-		while i < len:
+		while i < line_length:
 			var c: String = text[i]
 
 			if c == "#":
@@ -193,7 +195,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 			if c == "\"":
 				result[i] = {"color": col_string}
 				var j: int = i + 1
-				while j < len and text[j] != "\"":
+				while j < line_length and text[j] != "\"":
 					j += 1
 				result[j] = {"color": col_string}
 				i = j + 1
@@ -202,7 +204,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 			if c == "$":
 				var start: int = i
 				i += 1
-				while i < len and _is_word_char(text[i]):
+				while i < line_length and _is_word_char(text[i]):
 					i += 1
 				var var_name: String = text.substr(start + 1, i - start - 1)
 				if global_variables.has(var_name):
@@ -216,26 +218,26 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				continue
 			
 			if c == "@":
-						var start: int = i
-						i += 1
-						while i < len:
-							var nc: String = text[i]
-							var is_word_char: bool = (nc >= "a" and nc <= "z") or (nc >= "A" and nc <= "Z") or nc == "_"
-							if not is_word_char:
-								break
-							i += 1
-						result[start] = {"color": col_annotation}
-						continue
+				var start: int = i
+				i += 1
+				while i < line_length:
+					var next_char: String = text[i]
+					var is_word_char: bool = (next_char >= "a" and next_char <= "z") or (next_char >= "A" and next_char <= "Z") or next_char == "_"
+					if not is_word_char:
+						break
+					i += 1
+				result[start] = {"color": col_annotation}
+				continue
 
 			if c == "{":
-				result[i] = {"color": col_symbol if open_count >= 0 else col_brace_mismatch}
-				open_count += 1
+				result[i] = {"color": col_symbol if brace_depth >= 0 else col_brace_mismatch}
+				brace_depth += 1
 				i += 1
 				continue
 
 			if c == "}":
-				open_count -= 1
-				result[i] = {"color": col_symbol if open_count >= 0 else col_brace_mismatch}
+				brace_depth -= 1
+				result[i] = {"color": col_symbol if brace_depth >= 0 else col_brace_mismatch}
 				i += 1
 				continue
 
@@ -249,10 +251,10 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				i += 1
 				continue
 
-			if c.is_valid_int() or (c == "-" and i + 1 < len and text[i + 1].is_valid_int()):
+			if c.is_valid_int() or (c == "-" and i + 1 < line_length and text[i + 1].is_valid_int()):
 				var start: int = i
 				i += 1
-				while i < len and (text[i].is_valid_int() or text[i] == "."):
+				while i < line_length and (text[i].is_valid_int() or text[i] == "."):
 					i += 1
 				result[start] = {"color": col_number}
 				continue
@@ -261,9 +263,9 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 			if is_letter:
 				var start: int = i
 				i += 1
-				while i < len:
-					var nc: String = text[i]
-					var is_word_char: bool = (nc >= "a" and nc <= "z") or (nc >= "A" and nc <= "Z") or nc == "_" or (nc >= "0" and nc <= "9")
+				while i < line_length:
+					var next_char: String = text[i]
+					var is_word_char: bool = (next_char >= "a" and next_char <= "z") or (next_char >= "A" and next_char <= "Z") or next_char == "_" or (next_char >= "0" and next_char <= "9")
 					if not is_word_char:
 						break
 					i += 1
@@ -272,8 +274,6 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					continue
 				var word: String = text.substr(start, i - start)
 				var before: String = text.substr(0, start)
-				var before_stripped: String = before.strip_edges()
-
 				var trimmed_before: String = before.rstrip(" \t")
 				var is_after_colon: bool = trimmed_before.ends_with(":") and before.length() == trimmed_before.length()
 				var after: String = text.substr(i).strip_edges()
@@ -285,7 +285,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				if is_after_colon and states.has(word):
 					var before_colon: String = trimmed_before.substr(0, trimmed_before.length() - 1).strip_edges()
 					var valid: bool = false
-					if open_count > 0:
+					if brace_depth > 0:
 						for style_name: String in _node_states:
 							if _node_has_state(style_name, word):
 								valid = true
@@ -307,17 +307,6 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					elif enum_values.has(word):
 						result[start] = {"color": col_const}
 					else:
-						var is_cursor: bool = false
-						var colon_prop: int = trimmed_before.rfind(":")
-						if colon_prop != -1:
-							var prop: String = trimmed_before.substr(0, colon_prop).strip_edges()
-							for style_name: String in property_meta:
-								var meta: Dictionary = property_meta[style_name]
-								if meta.has(prop):
-									var pd: GdssProp = meta[prop]
-									if pd.type == GDSS.Type.CURSOR:
-										is_cursor = true
-										break
 						result[start] = {"color": col_default}
 				elif word == "var":
 					result[start] = {"color": col_keyword}
@@ -325,8 +314,6 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					result[start] = {"color": col_keyword}
 				elif properties.has(word):
 					result[start] = {"color": col_member}
-				elif is_after_colon and states.has(word):
-					result[start] = {"color": col_control_flow}
 				else:
 					result[start] = {"color": col_default}
 				continue
@@ -351,17 +338,6 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					depth -= 1
 
 
-	func _is_enum_property(prop: String) -> bool:
-		for style_name: String in property_meta:
-			var meta: Dictionary = property_meta[style_name]
-			if not meta.has(prop):
-				continue
-			var pd: GdssProp = meta[prop]
-			if pd.type == GDSS.Type.CURSOR or pd.type == GDSS.Type.COLOR:
-				return true
-		return false
-
-
 func _on_text_changed() -> void:
 	_parse_user_variables()
 	_highlighter.global_variables = _global_variables
@@ -369,29 +345,23 @@ func _on_text_changed() -> void:
 	_highlighter.instance_variables = _instance_variables
 	_highlighter.clear_highlighting_cache()
 	_highlighter.invalidate_cache()
-	_highlighter.update_cache()
 
 
 func _parse_user_variables() -> void:
 	_global_variables.clear()
 	_local_variables.clear()
 	_instance_variables.clear()
-	var global_regex: RegEx = RegEx.new()
-	global_regex.compile(r"@global\s+var\s+(\w+)\s*:")
-	var instance_regex: RegEx = RegEx.new()
-	instance_regex.compile(r"@instance\s+var\s+(\w+)\s*:")
-	var local_regex: RegEx = RegEx.new()
-	local_regex.compile(r"(?:^|\s)var\s+(\w+)\s*:")
-	for line: String in editor.text.split("\n"):
+	var source: String = gdss_editor.get_full_source() if gdss_editor != null else editor.text
+	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
-		var gm: RegExMatch = global_regex.search(stripped)
+		var gm: RegExMatch = _re_global.search(stripped)
 		if gm:
 			_global_variables.append(gm.get_string(1))
 			continue
-		var im: RegExMatch = instance_regex.search(stripped)
+		var im: RegExMatch = _re_instance.search(stripped)
 		if im:
 			_instance_variables.append(im.get_string(1))
 			continue
-		var lm: RegExMatch = local_regex.search(stripped)
+		var lm: RegExMatch = _re_local.search(stripped)
 		if lm:
 			_local_variables.append(lm.get_string(1))
