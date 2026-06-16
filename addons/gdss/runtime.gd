@@ -5,7 +5,7 @@ var _last_modified: int = 0
 
 func _ready() -> void:
 	_ensure_parsed()
-	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
+	_last_modified = GdssStorage.get_latest_modified()
 	get_tree().node_added.connect(_on_node_added)
 	_bind_tree.bind(get_tree().root).call_deferred()
 
@@ -15,7 +15,7 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_IN and not Engine.is_editor_hint() and OS.is_debug_build():
-		var modified: int = FileAccess.get_modified_time(GdssStorage.get_save_path())
+		var modified: int = GdssStorage.get_latest_modified()
 		if modified == _last_modified:
 			return
 		_last_modified = modified
@@ -23,7 +23,7 @@ func _notification(what: int) -> void:
 
 
 func _on_editor_saved() -> void:
-	var modified: int = FileAccess.get_modified_time(GdssStorage.get_save_path())
+	var modified: int = GdssStorage.get_latest_modified()
 	if modified == _last_modified:
 		return
 	_last_modified = modified
@@ -37,11 +37,13 @@ func _reload_parsed() -> void:
 	var raw: Variant = data["parsed"]
 	if not raw is Dictionary:
 		return
+	GdssInterpreter.parsed.clear()
 	for key: String in (raw as Dictionary):
 		var val: Variant = (raw as Dictionary)[key]
 		if val is Dictionary:
 			GdssInterpreter.parsed[key] = val
 	if data.has("local_vars") and data["local_vars"] is Dictionary:
+		GdssInterpreter._local_vars.clear()
 		for key: String in (data["local_vars"] as Dictionary):
 			GdssInterpreter._local_vars[key] = (data["local_vars"] as Dictionary)[key]
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
@@ -51,21 +53,12 @@ func _reload_parsed() -> void:
 
 
 func _refresh_all_handlers() -> void:
-	_refresh_tree(get_tree().root)
-
-
-func _refresh_tree(node: Node) -> void:
-	if node is CanvasItem:
-		var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(node as CanvasItem)
-		for box: GdssPropHandler in handlers:
-			box._tweened_values.clear()
-			box._invalidate_entry_cache()
-			box._apply_overrides()
-			box.emit_changed()
-		if not handlers.is_empty():
-			(node as CanvasItem).queue_redraw()
-	for child: Node in node.get_children():
-		_refresh_tree(child)
+	for handler: GdssPropHandler in GdssNodeHandler.get_all_handlers():
+		var item: CanvasItem = handler.ref
+		if item == null:
+			continue
+		handler.reapply()
+		item.queue_redraw()
 
 
 func _ensure_parsed() -> void:
@@ -108,12 +101,13 @@ func _on_node_added(node: Node) -> void:
 
 
 func _try_bind(canvas_item: CanvasItem) -> void:
+	var in_group: bool = canvas_item.is_in_group(GdssNodeHandler.GROUP)
+	if not in_group and not canvas_item.get_meta("gdss_enabled", false):
+		return
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if not gdss_node:
 		return
-	if not canvas_item.is_in_group(GdssNodeHandler.GROUP):
-		if not canvas_item.get_meta("gdss_enabled", false):
-			return
+	if not in_group:
 		canvas_item.add_to_group(GdssNodeHandler.GROUP)
 	GdssNodeHandler.bind(canvas_item)
 	gdss_node.update_state(canvas_item)

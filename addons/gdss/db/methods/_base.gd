@@ -76,3 +76,7 @@ func interpolate_args(from_args: Array[Variant], to_args: Array[Variant], t: flo
 
 func clear_live_textures() -> void:
 	pass
+
+
+func purge_node(node_id: int) -> void:
+	pass

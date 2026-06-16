@@ -37,18 +37,19 @@ func clear_lists() -> void:
 
 
 func repopulate(new: bool = false) -> void:
-	_set_properties(new)
+	_set_properties()
 	_set_nodes(new)
-	_set_methods(new)
+	_set_methods()
 	for node: GdssNode in node_list.values():
 		node.invalidate_props_cache()
 	ResourceSaver.save(self)
 
 
-func _set_properties(new: bool = false) -> void:
+func _set_properties() -> void:
 	var properties: Dictionary[String, GdssProp]
 	var dir: DirAccess = DirAccess.open(props_dir)
-	
+	if dir == null:
+		return
 	for file_name: String in dir.get_files():
 		if not file_name.get_extension() == "tres":
 			continue
@@ -64,7 +65,8 @@ func _set_nodes(new: bool = false) -> void:
 	var components: Array[GdssNodeComponent]
 	
 	var dir: DirAccess = DirAccess.open(nodes_dir)
-	
+	if dir == null:
+		return
 	for file_name: String in dir.get_files():
 		if not file_name.get_extension() == "tres":
 			continue
@@ -96,10 +98,11 @@ func _set_nodes(new: bool = false) -> void:
 	node_list = nodes
 
 
-func _set_methods(new: bool = false) -> void:
+func _set_methods() -> void:
 	var methods: Dictionary[String, GdssMethod]
 	var dir: DirAccess = DirAccess.open(methods_dir)
-	
+	if dir == null:
+		return
 	for file_name: String in dir.get_files():
 		if not file_name.get_extension() == "tres":
 			continue

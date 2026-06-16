@@ -63,6 +63,12 @@ var _theme_dirty: bool = true
 var _props_cache: Array[GdssProp] = []
 var _props_dirty: bool = true
 
+var _style_props_cache: Array[GdssProp] = []
+var _style_props_dirty: bool = true
+
+var _props_by_name_cache: Dictionary[String, GdssProp] = {}
+var _props_by_name_dirty: bool = true
+
 
 @abstract func get_events() -> PackedStringArray
 @abstract func get_active_state(canvas_item: CanvasItem) -> String
@@ -100,6 +106,20 @@ func invalidate_theme_cache() -> void:
 func invalidate_props_cache() -> void:
 	_props_dirty = true
 	_props_cache.clear()
+	_style_props_dirty = true
+	_style_props_cache.clear()
+	_props_by_name_dirty = true
+	_props_by_name_cache.clear()
+
+
+func get_props_by_name() -> Dictionary[String, GdssProp]:
+	if not _props_by_name_dirty:
+		return _props_by_name_cache
+	_props_by_name_cache.clear()
+	for prop: GdssProp in get_enabled_props():
+		_props_by_name_cache[prop.name] = prop
+	_props_by_name_dirty = false
+	return _props_by_name_cache
 
 
 func get_default_events() -> PackedStringArray:
@@ -171,6 +191,17 @@ func get_enabled_props() -> Array[GdssProp]:
 	return _props_cache
 
 
+func get_style_props() -> Array[GdssProp]:
+	if not _style_props_dirty:
+		return _style_props_cache
+	_style_props_cache.clear()
+	for prop: GdssProp in get_enabled_props():
+		if prop.category == GdssProp.Category.STYLE:
+			_style_props_cache.append(prop)
+	_style_props_dirty = false
+	return _style_props_cache
+
+
 func _update_state(...a: Array) -> void:
 	update_state(a.get(a.size() - 1))
 
@@ -178,13 +209,15 @@ func _update_state(...a: Array) -> void:
 func update_state(canvas_item: CanvasItem) -> void:
 	if not canvas_item:
 		return
-	var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(canvas_item)
-	if handlers.is_empty():
-		return
 	if is_static:
-		for box: GdssPropHandler in handlers:
-			box._apply_overrides()
-			box.emit_changed()
+		var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(canvas_item)
+		if handlers.is_empty():
+			return
+		for handler: GdssPropHandler in handlers:
+			handler._apply_overrides(false)
+			handler.emit_changed()
 		canvas_item.queue_redraw()
 		return
-	handlers[0].current_state = get_active_state(canvas_item)
+	var handler: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item)
+	if handler != null:
+		handler.current_state = get_active_state(canvas_item)

@@ -55,6 +55,8 @@ enum TransitionFunc {
 
 static var _inst: EditorPlugin
 static var _db: GdssDB
+static var _global_flush_scheduled: bool = false
+static var _gpu_panels: int = -1
 
 var debug_container: Container
 var debug_label: Label
@@ -87,7 +89,13 @@ static func get_global_var(name: String, fallback: Variant = null) -> Variant:
 ## [/codeblock]
 static func set_global_var(name: String, value: Variant) -> void:
 	GdssInterpreter.globals[name] = value
-	_refresh_affected(name)
+	if _global_flush_scheduled:
+		return
+	if Engine.get_main_loop() == null:
+		_flush_global_refresh()
+		return
+	_global_flush_scheduled = true
+	_flush_global_refresh.call_deferred()
 
 
 ## Assigns an [b]instance-specific override[/b] for a GDSS variable on a Node.
@@ -127,23 +135,26 @@ static func clear_instance_vars(node: Node) -> void:
 	GdssInterpreter._instance_vars.erase(node.get_instance_id())
 
 
-static func _refresh_affected(_global_name: String) -> void:
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	if tree == null:
-		return
-	_refresh_affected_tree(tree.root)
+static func gpu_panels_enabled() -> bool:
+	if _gpu_panels == -1:
+		if not ProjectSettings.has_setting("gdss/rendering/gpu_panels"):
+			ProjectSettings.set_setting("gdss/rendering/gpu_panels", true)
+		_gpu_panels = 1 if ProjectSettings.get_setting("gdss/rendering/gpu_panels", true) else 0
+	return _gpu_panels == 1
 
 
-static func _refresh_affected_tree(node: Node) -> void:
-	if node is CanvasItem:
-		var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(node as CanvasItem)
-		for box: GdssPropHandler in handlers:
-			box._on_global_changed()
-			box.emit_changed()
-		if not handlers.is_empty():
-			(node as CanvasItem).queue_redraw()
-	for child: Node in node.get_children():
-		_refresh_affected_tree(child)
+static func _flush_global_refresh() -> void:
+	_global_flush_scheduled = false
+	var seen: Dictionary[int, bool] = {}
+	for handler: GdssPropHandler in GdssNodeHandler.get_all_handlers():
+		var item: CanvasItem = handler.ref
+		if item == null:
+			continue
+		var id: int = item.get_instance_id()
+		if seen.has(id):
+			continue
+		seen[id] = true
+		item.queue_redraw()
 
 
 static func _get_gdss_nodes() -> Dictionary[String, GdssNode]:
@@ -155,11 +166,13 @@ static func _get_gdss_methods() -> Dictionary[String, GdssMethod]:
 
 
 static func get_db() -> GdssDB:
-	if not _db:
-		var db: GdssDB = load("uid://wmo287ce38ty")
-		if db == null:
-			db = GdssDB.new()
+	if _db != null and not _db.node_list.is_empty():
+		return _db
+	var db: GdssDB = load("res://addons/gdss/db/db.tres")
+	if db != null:
 		_db = db
+	if _db == null:
+		_db = GdssDB.new()
 	return _db
 
 
@@ -185,13 +198,14 @@ func _exit_tree() -> void:
 	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
 	if editor_settings.settings_changed.is_connected(_on_editor_settings_changed):
 		editor_settings.settings_changed.disconnect(_on_editor_settings_changed)
-	if is_instance_valid(gdss_editor):
-		gdss_editor.queue_free()
-		gdss_editor = null
 	if is_instance_valid(gdss_dock):
 		remove_dock(gdss_dock)
 		gdss_dock.queue_free()
 		gdss_dock = null
+		gdss_editor = null
+	elif is_instance_valid(gdss_editor):
+		gdss_editor.queue_free()
+		gdss_editor = null
 	if inspector_plugin:
 		remove_inspector_plugin(inspector_plugin)
 		inspector_plugin = null
@@ -229,12 +243,24 @@ func _setup_settings() -> void:
 			"hint": PROPERTY_HINT_PLACEHOLDER_TEXT,
 			"hint_string": "user://gdss_cache.gdssc"
 		})
+	if not ProjectSettings.has_setting("gdss/rendering/gpu_panels"):
+		ProjectSettings.set_setting("gdss/rendering/gpu_panels", true)
+	ProjectSettings.set_initial_value("gdss/rendering/gpu_panels", true)
+	ProjectSettings.add_property_info({
+		"name": "gdss/rendering/gpu_panels",
+		"type": TYPE_BOOL,
+		"hint": PROPERTY_HINT_NONE,
+		"hint_string": "Draw panels with a GPU SDF shader (fast). Disable to use the CPU geometry fallback."
+	})
+	ProjectSettings.save()
 
 
 func _setup_editor() -> void:
 	inspector_plugin = GdssInspectorPlugin.new()
 	gdss_editor = GDSS_EDITOR.instantiate()
 	if _has_main_screen():
+		gdss_editor.set(&"size_flags_horizontal", Control.SIZE_EXPAND_FILL)
+		gdss_editor.set(&"size_flags_vertical", Control.SIZE_EXPAND_FILL)
 		EditorInterface.get_editor_main_screen().add_child(gdss_editor)
 		_make_visible(false)
 	else:
@@ -244,7 +270,8 @@ func _setup_editor() -> void:
 	if DEBUG_MODE:
 		_debug_hook()
 	add_inspector_plugin(inspector_plugin)
-	add_autoload_singleton("GdssRuntime", "res://addons/gdss/runtime.gd")
+	if not ProjectSettings.has_setting("autoload/GdssRuntime"):
+		add_autoload_singleton("GdssRuntime", "res://addons/gdss/runtime.gd")
 	if not scene_changed.is_connected(_on_scene_changed):
 		scene_changed.connect(_on_scene_changed)
 	GdssNodeHandler.rebind_tree.bind(EditorInterface.get_edited_scene_root()).call_deferred()
@@ -270,12 +297,7 @@ func _prompt_reload() -> void:
 
 
 func _on_editor_settings_changed() -> void:
-	if EditorInterface.get_editor_settings().get_setting("gdss/editor/location") != (1 if _has_main_screen() else 0):
-		return
-	EditorInterface.get_editor_toaster().push_toast(
-		"GDSS: Reload the project to apply dock mode changes.",
-		EditorToaster.SEVERITY_WARNING
-	)
+	pass
 
 
 func _has_main_screen() -> bool:
@@ -283,15 +305,14 @@ func _has_main_screen() -> bool:
 
 
 func _make_visible(visible: bool) -> void:
-	if not _has_main_screen():
+	if not _has_main_screen() or not is_instance_valid(gdss_editor):
 		return
-	if gdss_editor:
-		gdss_editor.visible = visible
-		if visible:
-			was_in_distraction_free_mode = EditorInterface.distraction_free_mode
-			EditorInterface.distraction_free_mode = true
-		if not was_in_distraction_free_mode and not visible:
-			EditorInterface.distraction_free_mode = false
+	gdss_editor.set(&"visible", visible)
+	if visible:
+		was_in_distraction_free_mode = EditorInterface.distraction_free_mode
+		EditorInterface.distraction_free_mode = true
+	if not was_in_distraction_free_mode and not visible:
+		EditorInterface.distraction_free_mode = false
 
 
 func _get_plugin_name() -> String:

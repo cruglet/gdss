@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GdssMethod_RadialGradient" format=3]
+
+[ext_resource type="Script" path="res://addons/gdss/db/methods/radial_gradient.gd" id="1_rad"]
+
+[resource]
+script = ExtResource("1_rad")
+method_name = "radial_gradient"
+supported_prop_types = Array[int]([3])
+returns_texture = true

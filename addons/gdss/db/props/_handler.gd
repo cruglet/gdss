@@ -3,6 +3,19 @@ class_name GdssPropHandler
 extends StyleBox
 
 static var _texture_cache: Dictionary = {}
+static var _corner_start_angles: Array[float] = [PI, PI * 1.5, 0.0, PI * 0.5]
+
+const _TRANSITION_FUNCS: Dictionary = {
+	"LINEAR": Tween.TRANS_LINEAR, "SINE": Tween.TRANS_SINE, "QUINT": Tween.TRANS_QUINT,
+	"QUART": Tween.TRANS_QUART, "QUAD": Tween.TRANS_QUAD, "EXPO": Tween.TRANS_EXPO,
+	"ELASTIC": Tween.TRANS_ELASTIC, "CUBIC": Tween.TRANS_CUBIC, "CIRC": Tween.TRANS_CIRC,
+	"BOUNCE": Tween.TRANS_BOUNCE, "BACK": Tween.TRANS_BACK, "SPRING": Tween.TRANS_SPRING,
+}
+const _EASE_TYPES: Dictionary = {
+	"EASE_IN": Tween.EASE_IN, "EASE_OUT": Tween.EASE_OUT,
+	"EASE_IN_OUT": Tween.EASE_IN_OUT, "EASE_OUT_IN": Tween.EASE_OUT_IN,
+}
+
 var _slot_state: String = ""
 
 var _ref_path: NodePath = NodePath()
@@ -16,6 +29,28 @@ var _entry_cache_classes: PackedStringArray = []
 
 var _animatable_cache: Dictionary = {}
 var _animatable_dirty: bool = true
+
+var _method_args_cache: Dictionary = {}
+
+var _gdss_node: GdssNode = null
+
+static var _shader: Shader = null
+static var _rr_cache: Dictionary = {}
+static var _tri_cache: Dictionary = {}
+
+var _gpu_material: ShaderMaterial = null
+var _gpu_ci: RID = RID()
+var _gpu_parent: RID = RID()
+var _gpu_last: Dictionary = {}
+var _gpu_quad: Rect2 = Rect2()
+var _gpu_xform: Transform2D = Transform2D.IDENTITY
+var _gpu_emitted: bool = false
+
+var _style_vals_cache: Dictionary = {}
+var _style_dynamic: Array[GdssProp] = []
+var _style_vals_state: String = "￿"
+var _nonstyle_dynamic: Array[GdssProp] = []
+var _nonstyle_state: String = "￿"
 
 var ref: CanvasItem:
 	get:
@@ -35,6 +70,7 @@ var ref: CanvasItem:
 		else:
 			return _ref_node_rt if is_instance_valid(_ref_node_rt) else null
 	set(v):
+		_gdss_node = null
 		if v == null:
 			_ref_node = null
 			_ref_node_rt = null
@@ -42,36 +78,23 @@ var ref: CanvasItem:
 			return
 		if Engine.is_editor_hint():
 			_ref_node = v
-			if v.is_inside_tree():
-				_ref_path = v.get_path()
-			if not v.is_connected("renamed", _on_ref_renamed):
-				v.connect("renamed", _on_ref_renamed)
-			if not v.is_connected("tree_entered", _on_ref_tree_entered):
-				v.connect("tree_entered", _on_ref_tree_entered)
-			if not v.is_connected("tree_exiting", _on_ref_tree_exiting):
-				v.connect("tree_exiting", _on_ref_tree_exiting)
-			var interp: GdssInterpreter = GdssInterpreter.get_instance()
-			if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
-				interp.parsed_changed.connect(_on_parsed_changed)
 		else:
 			_ref_node_rt = v
-			if v.is_inside_tree():
-				_ref_path = v.get_path()
-			if not v.is_connected("tree_entered", _on_ref_tree_entered_rt):
-				v.connect("tree_entered", _on_ref_tree_entered_rt)
-			if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
-				v.connect("tree_exiting", _on_ref_tree_exiting_rt)
+		if v.is_inside_tree():
+			_ref_path = v.get_path()
+		_connect_ref_signals(v)
 
 
 var current_state: String = "":
 	set(s):
 		if s == current_state:
 			return
+		var previous: String = current_state
 		_start_transition(current_state, s)
 		current_state = s
-		_apply_overrides()
+		_apply_overrides(not previous.is_empty())
 		if ref != null:
-			ref.queue_redraw()
+			_safe_redraw()
 
 
 var _tweened_values: Dictionary[String, Variant] = {}
@@ -79,7 +102,12 @@ var _tween: Tween = null
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE and Engine.is_editor_hint():
+	if what == NOTIFICATION_PREDELETE:
+		if _gpu_ci.is_valid():
+			RenderingServer.free_rid(_gpu_ci)
+			_gpu_ci = RID()
+		if not Engine.is_editor_hint():
+			return
 		var interp: GdssInterpreter = GdssInterpreter.get_instance()
 		if not is_instance_valid(interp):
 			return
@@ -96,8 +124,7 @@ func _connect_ref_signals(v: CanvasItem) -> void:
 			v.connect("tree_entered", _on_ref_tree_entered)
 		if not v.is_connected("tree_exiting", _on_ref_tree_exiting):
 			v.connect("tree_exiting", _on_ref_tree_exiting)
-		
-		var interp = GdssInterpreter.get_instance()
+		var interp: GdssInterpreter = GdssInterpreter.get_instance()
 		if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
 			interp.parsed_changed.connect(_on_parsed_changed)
 	else:
@@ -107,61 +134,40 @@ func _connect_ref_signals(v: CanvasItem) -> void:
 			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 
 
-func _on_global_changed() -> void:
-	if ref == null or _applying:
+func _apply_dynamic_nonstyle(gdss_node: GdssNode, entry: Dictionary, state: String) -> void:
+	if entry.is_empty() or _applying:
 		return
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
-	if gdss_node == null:
+	if _nonstyle_state != state:
+		_classify_nonstyle(gdss_node, entry, state)
+	if _nonstyle_dynamic.is_empty():
 		return
 	_applying = true
 	var control: Control = ref as Control
-	for prop: GdssProp in gdss_node.get_enabled_props():
-		if prop.category == GdssProp.Category.STYLE:
-			continue
-		var val: Variant = _get_val(prop.name, prop.get_default_value())
+	for prop: GdssProp in _nonstyle_dynamic:
+		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		if val == null:
 			val = prop.get_default_value()
-		match prop.category:
-			GdssProp.Category.COLOR:
-				if val is Color:
-					if prop.category_subproperties.is_empty():
-						var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-						if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
-							control.add_theme_color_override(prop.name, val)
-					else:
-						if gdss_node.colors.has(prop.name):
-							var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-							if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
-								control.add_theme_color_override(prop.name, val)
-						for subprop: String in prop.category_subproperties:
-							if gdss_node.colors.has(subprop):
-								var theme_def: Variant = gdss_node.theme_defaults.get(subprop, null)
-								if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
-									control.add_theme_color_override(subprop, val)
-			GdssProp.Category.CONST:
-				if val is int or val is float:
-					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-					if not (theme_def is int and int(val) == int(theme_def)):
-						control.add_theme_constant_override(prop.name, int(val))
-			GdssProp.Category.FONT_SIZE:
-				if val is int or val is float:
-					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-					if not (theme_def is int and int(val) == int(theme_def)):
-						control.add_theme_font_size_override(prop.name, int(val))
-			GdssProp.Category.FONT:
-				if val is Font:
-					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-					if not (theme_def is Font and val == theme_def):
-						control.add_theme_font_override(prop.name, val as Font)
-			GdssProp.Category.ICON:
-				if val is Texture2D:
-					control.add_theme_icon_override(prop.name, val)
-			GdssProp.Category.NODE_PROPERTY:
-				if prop.type == GDSS.Type.CURSOR:
-					control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
-				else:
-					control.set(prop.name, val)
+		_apply_theme_prop(prop, control, gdss_node, val)
 	_applying = false
+
+
+func _classify_nonstyle(gdss_node: GdssNode, entry: Dictionary, state: String) -> void:
+	_nonstyle_state = state
+	_nonstyle_dynamic.clear()
+	var prop_map: Dictionary[String, GdssProp] = gdss_node.get_props_by_name()
+	var seen: Dictionary[String, bool] = {}
+	for source_state: String in [state, "all"]:
+		if not entry.has(source_state):
+			continue
+		for prop_name: String in entry[source_state]:
+			if seen.has(prop_name):
+				continue
+			seen[prop_name] = true
+			var prop: GdssProp = prop_map.get(prop_name)
+			if prop == null or prop.category == GdssProp.Category.STYLE:
+				continue
+			if _is_dynamic_raw(_raw_entry_val(entry, state, prop_name)):
+				_nonstyle_dynamic.append(prop)
 
 
 func _on_ref_renamed() -> void:
@@ -175,6 +181,7 @@ func _on_ref_tree_entered() -> void:
 
 
 func _on_ref_tree_exiting() -> void:
+	_free_gpu_ci()
 	if is_instance_valid(_ref_node) and _ref_node.is_inside_tree():
 		_ref_path = _ref_node.get_path()
 
@@ -185,8 +192,14 @@ func _on_ref_tree_entered_rt() -> void:
 
 
 func _on_ref_tree_exiting_rt() -> void:
-	if is_instance_valid(_ref_node_rt) and _ref_node_rt.is_inside_tree():
-		_ref_path = _ref_node_rt.get_path()
+	_free_gpu_ci()
+	if is_instance_valid(_ref_node_rt):
+		if _ref_node_rt.is_inside_tree():
+			_ref_path = _ref_node_rt.get_path()
+		var id: int = _ref_node_rt.get_instance_id()
+		for method: GdssMethod in GDSS._get_gdss_methods().values():
+			if method.returns_texture:
+				method.purge_node(id)
 	_ref_node_rt = null
 
 
@@ -194,6 +207,23 @@ func _invalidate_entry_cache() -> void:
 	_entry_cache_dirty = true
 	_entry_cache = {}
 	_animatable_dirty = true
+	_method_args_cache.clear()
+	_gdss_node = null
+	_style_vals_state = "￿"
+	_style_vals_cache.clear()
+	_style_dynamic.clear()
+	_nonstyle_state = "￿"
+	_nonstyle_dynamic.clear()
+
+
+func _resolve_gdss_node() -> GdssNode:
+	if _gdss_node != null:
+		return _gdss_node
+	var node: CanvasItem = ref
+	if node == null:
+		return null
+	_gdss_node = GDSS._get_gdss_nodes().get(node.get_class())
+	return _gdss_node
 
 
 func _on_parsed_changed() -> void:
@@ -215,12 +245,13 @@ func _on_parsed_changed() -> void:
 
 
 func _clear_overrides() -> void:
-	if ref == null:
+	var node: CanvasItem = ref
+	if node == null:
 		return
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
-	var control: Control = ref as Control
+	var control: Control = node as Control
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		match prop.category:
 			GdssProp.Category.COLOR:
@@ -241,70 +272,110 @@ func _clear_overrides() -> void:
 
 
 func _apply_overrides(clear: bool = true) -> void:
-	if ref == null or _applying:
+	var node: CanvasItem = ref
+	if node == null or _applying:
 		return
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
-	if not ref.is_in_group(GdssNodeHandler.GROUP):
+	if not node.is_in_group(GdssNodeHandler.GROUP):
 		return
 	_applying = true
 	if clear:
 		_clear_overrides()
-	var control: Control = ref as Control
-	var enabled_props: Array[GdssProp] = gdss_node.get_enabled_props()
-	for prop: GdssProp in enabled_props:
-		var val: Variant = _get_val(prop.name, prop.get_default_value())
+	var control: Control = node as Control
+	var entry: Dictionary = _resolve_entry()
+	var state: String = _get_state()
+	for prop: GdssProp in gdss_node.get_enabled_props():
+		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		if val == null:
 			val = prop.get_default_value()
-		match prop.category:
-			GdssProp.Category.STYLE:
-				if prop.name == "padding":
-					var padding: Vector4 = Vector4(val)
-					set_content_margin(SIDE_LEFT, padding.x)
-					set_content_margin(SIDE_RIGHT, padding.y)
-					set_content_margin(SIDE_TOP, padding.z)
-					set_content_margin(SIDE_BOTTOM, padding.w)
-			GdssProp.Category.COLOR:
-				if val is Color:
-					if prop.category_subproperties.is_empty():
-						var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-						if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
-							control.add_theme_color_override(prop.name, val)
-					else:
-						if gdss_node.colors.has(prop.name):
-							var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-							if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
-								control.add_theme_color_override(prop.name, val)
-						for subprop: String in prop.category_subproperties:
-							if gdss_node.colors.has(subprop):
-								var theme_def: Variant = gdss_node.theme_defaults.get(subprop, null)
-								if not (theme_def is Color and (val as Color).is_equal_approx(theme_def as Color)):
-									control.add_theme_color_override(subprop, val)
-			GdssProp.Category.CONST:
-				if val is int or val is float:
-					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-					if not (theme_def is int and int(val) == int(theme_def)):
-						control.add_theme_constant_override(prop.name, int(val))
-			GdssProp.Category.FONT_SIZE:
-				if val is int or val is float:
-					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-					if not (theme_def is int and int(val) == int(theme_def)):
-						control.add_theme_font_size_override(prop.name, int(val))
-			GdssProp.Category.FONT:
-				if val is Font:
-					var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
-					if not (theme_def is Font and val == theme_def):
-						control.add_theme_font_override(prop.name, val as Font)
-			GdssProp.Category.ICON:
-				if val is Texture2D:
-					control.add_theme_icon_override(prop.name, val)
-			GdssProp.Category.NODE_PROPERTY:
-				if prop.type == GDSS.Type.CURSOR:
-					control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
-				else:
-					control.set(prop.name, val)
+		if prop.category == GdssProp.Category.STYLE:
+			if prop.name == "padding":
+				var padding: Vector4 = Vector4(val)
+				set_content_margin(SIDE_LEFT, padding.x)
+				set_content_margin(SIDE_RIGHT, padding.y)
+				set_content_margin(SIDE_TOP, padding.z)
+				set_content_margin(SIDE_BOTTOM, padding.w)
+			continue
+		_apply_theme_prop(prop, control, gdss_node, val)
 	_applying = false
+
+
+func _apply_theme_prop(prop: GdssProp, control: Control, gdss_node: GdssNode, val: Variant) -> void:
+	match prop.category:
+		GdssProp.Category.COLOR:
+			if val is Color:
+				if prop.category_subproperties.is_empty():
+					_override_color_if_custom(control, gdss_node, prop.name, val)
+				else:
+					if gdss_node.colors.has(prop.name):
+						_override_color_if_custom(control, gdss_node, prop.name, val)
+					for subprop: String in prop.category_subproperties:
+						if gdss_node.colors.has(subprop):
+							_override_color_if_custom(control, gdss_node, subprop, val)
+		GdssProp.Category.CONST:
+			if val is int or val is float:
+				var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+				if theme_def is int and int(val) == int(theme_def):
+					return
+				if control.has_theme_constant_override(prop.name) and control.get_theme_constant(prop.name) == int(val):
+					return
+				control.add_theme_constant_override(prop.name, int(val))
+		GdssProp.Category.FONT_SIZE:
+			if val is int or val is float:
+				var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+				if theme_def is int and int(val) == int(theme_def):
+					return
+				if control.has_theme_font_size_override(prop.name) and control.get_theme_font_size(prop.name) == int(val):
+					return
+				control.add_theme_font_size_override(prop.name, int(val))
+		GdssProp.Category.FONT:
+			if val is Font:
+				var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
+				if theme_def is Font and val == theme_def:
+					return
+				if control.has_theme_font_override(prop.name) and control.get_theme_font(prop.name) == val:
+					return
+				control.add_theme_font_override(prop.name, val as Font)
+		GdssProp.Category.ICON:
+			if val is Texture2D:
+				if control.has_theme_icon_override(prop.name) and control.get_theme_icon(prop.name) == val:
+					return
+				control.add_theme_icon_override(prop.name, val)
+		GdssProp.Category.NODE_PROPERTY:
+			if prop.type == GDSS.Type.CURSOR:
+				control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
+			else:
+				control.set(prop.name, val)
+
+
+func _override_color_if_custom(control: Control, gdss_node: GdssNode, key: String, val: Color) -> void:
+	var theme_def: Variant = gdss_node.theme_defaults.get(key, null)
+	if theme_def is Color and val.is_equal_approx(theme_def as Color):
+		return
+	if control.has_theme_color_override(key) and control.get_theme_color(key).is_equal_approx(val):
+		return
+	control.add_theme_color_override(key, val)
+
+
+func _apply_single_override(prop: GdssProp, val: Variant) -> void:
+	var node: CanvasItem = ref
+	if node == null:
+		return
+	var gdss_node: GdssNode = _resolve_gdss_node()
+	if gdss_node == null:
+		return
+	if val == null:
+		val = prop.get_default_value()
+	_apply_theme_prop(prop, node as Control, gdss_node, val)
+
+
+func reapply() -> void:
+	_tweened_values.clear()
+	_invalidate_entry_cache()
+	_apply_overrides()
+	emit_changed()
 
 
 func _get_cursor_shape(type: String) -> Control.CursorShape:
@@ -322,7 +393,7 @@ func _get_animatable_props() -> Dictionary:
 	_animatable_cache.clear()
 	if ref == null:
 		return _animatable_cache
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return _animatable_cache
 	for prop: GdssProp in gdss_node.get_enabled_props():
@@ -333,40 +404,24 @@ func _get_animatable_props() -> Dictionary:
 	return _animatable_cache
 
 
+func _safe_redraw() -> void:
+	var node: CanvasItem = ref
+	if node != null:
+		node.queue_redraw()
+
+
 func _start_transition(from_state: String, to_state: String) -> void:
 	var transition_time: float = _get_parsed_val("transition_time", to_state, 0.0)
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
 		_tweened_values.clear()
 		return
 
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = _resolve_gdss_node()
 	var default_state: String = gdss_node.states[0] if gdss_node and not gdss_node.states.is_empty() else "all"
 	var resolved_from: String = from_state if not from_state.is_empty() else default_state
 
-	var trans: Tween.TransitionType
-	var ease: Tween.EaseType
-
-	match _get_parsed_val("transition_func", to_state, "LINEAR"):
-		"LINEAR": trans = Tween.TRANS_LINEAR
-		"SINE": trans = Tween.TRANS_SINE
-		"QUINT": trans = Tween.TRANS_QUINT
-		"QUART": trans = Tween.TRANS_QUART
-		"QUAD": trans = Tween.TRANS_QUAD
-		"EXPO": trans = Tween.TRANS_EXPO
-		"ELASTIC": trans = Tween.TRANS_ELASTIC
-		"CUBIC": trans = Tween.TRANS_CUBIC
-		"CIRC": trans = Tween.TRANS_CIRC
-		"BOUNCE": trans = Tween.TRANS_BOUNCE
-		"BACK": trans = Tween.TRANS_BACK
-		"SPRING": trans = Tween.TRANS_SPRING
-		_: trans = Tween.TRANS_LINEAR
-
-	match _get_parsed_val("transition_type", to_state, "EASE_IN_OUT"):
-		"EASE_IN": ease = Tween.EASE_IN
-		"EASE_OUT": ease = Tween.EASE_OUT
-		"EASE_IN_OUT": ease = Tween.EASE_IN_OUT
-		"EASE_OUT_IN": ease = Tween.EASE_OUT_IN
-		_: ease = Tween.EASE_IN_OUT
+	var trans: Tween.TransitionType = _TRANSITION_FUNCS.get(_get_parsed_val("transition_func", to_state, "LINEAR"), Tween.TRANS_LINEAR)
+	var ease: Tween.EaseType = _EASE_TYPES.get(_get_parsed_val("transition_type", to_state, "EASE_IN_OUT"), Tween.EASE_IN_OUT)
 
 	var tweener_count: int = 0
 	var pending_tween: Tween = (Engine.get_main_loop() as SceneTree).create_tween()
@@ -399,7 +454,7 @@ func _start_transition(from_state: String, to_state: String) -> void:
 					var result: Variant = captured_method.call_method(interp_args, node_id, "tween:" + captured_prop)
 					if result != null:
 						_tweened_values[captured_prop] = result
-					ref.queue_redraw()
+					_safe_redraw()
 				, 0.0, 1.0, transition_time)
 				tweener_count += 1
 				continue
@@ -416,13 +471,14 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				if from == to:
 					continue
 				var captured: String = prop_name
+				var captured_prop: GdssProp = prop
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: Color) -> void:
 					_tweened_values[captured] = v
 					if is_style:
-						ref.queue_redraw()
+						_safe_redraw()
 					else:
-						_apply_overrides()
+						_apply_single_override(captured_prop, v)
 				, from, to, transition_time)
 				tweener_count += 1
 			
@@ -434,13 +490,14 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				if from == to:
 					continue
 				var captured: String = prop_name
+				var captured_prop: GdssProp = prop
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: Vector4) -> void:
 					_tweened_values[captured] = v
 					if is_style:
-						ref.queue_redraw()
+						_safe_redraw()
 					else:
-						_apply_overrides()
+						_apply_single_override(captured_prop, v)
 				, from, to, transition_time)
 				tweener_count += 1
 
@@ -451,13 +508,14 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				if from == to:
 					continue
 				var captured: String = prop_name
+				var captured_prop: GdssProp = prop
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: float) -> void:
 					_tweened_values[captured] = v
 					if is_style:
-						ref.queue_redraw()
+						_safe_redraw()
 					else:
-						_apply_overrides()
+						_apply_single_override(captured_prop, v)
 				, from, to, transition_time)
 				tweener_count += 1
 
@@ -468,13 +526,14 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				if from == to:
 					continue
 				var captured: String = prop_name
+				var captured_prop: GdssProp = prop
 				_tweened_values[captured] = from
 				pending_tween.tween_method(func(v: float) -> void:
 					_tweened_values[captured] = int(v)
 					if is_style:
-						ref.queue_redraw()
+						_safe_redraw()
 					else:
-						_apply_overrides()
+						_apply_single_override(captured_prop, int(v))
 				, float(from), float(to), transition_time)
 				tweener_count += 1
 
@@ -489,13 +548,10 @@ func _start_transition(from_state: String, to_state: String) -> void:
 	_tween.finished.connect(func() -> void:
 		_tweened_values.clear()
 		_apply_overrides()
-		ref.queue_redraw()
+		_safe_redraw()
 	)
 
 
-# Builds a merged entry dict by starting from parsed[ref.get_class()] and then
-# layering each gdss_class in order (lowest to highest priority).
-# Each name is looked up in the current entry's "_classes", allowing nesting.
 # Recursively searches a _classes tree for a given name, returning the entry or {}.
 func _find_class_in_tree(classes: Dictionary, name: String) -> Dictionary:
 	if classes.has(name):
@@ -532,6 +588,9 @@ func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
 	return merged
 
 
+# Builds a merged entry dict by starting from parsed[ref.get_class()] and then
+# layering each gdss_class in order (lowest to highest priority).
+# Each name is looked up in the current entry's "_classes", allowing nesting.
 func _resolve_entry() -> Dictionary:
 	if ref == null:
 		return {}
@@ -559,6 +618,9 @@ func _resolve_entry() -> Dictionary:
 
 
 func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> Variant:
+	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4__"):
+		var parts: Array = (raw as Dictionary)["__gdss_composite4__"]
+		return Vector4i(_resolve_composite_part(parts[0]), _resolve_composite_part(parts[1]), _resolve_composite_part(parts[2]), _resolve_composite_part(parts[3]))
 	raw = _resolve_sentinel(raw, fallback)
 	if raw is Dictionary:
 		var d: Dictionary = raw as Dictionary
@@ -575,14 +637,38 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 	return raw
 
 
+func _resolve_composite_part(part: String) -> int:
+	if part.is_valid_int():
+		return int(part)
+	var resolved: Variant = _resolve_sentinel(part, 0)
+	if resolved is int or resolved is float:
+		return int(resolved)
+	if resolved is String and (resolved as String).is_valid_int():
+		return int(resolved)
+	return 0
+
+
 func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
 	var method_name: String = descriptor["__gdss_method__"]
 	var raw_args: Array = descriptor.get("args", [])
+	var has_live_ref: bool = false
+	for raw: String in raw_args:
+		var s: String = (raw as String).strip_edges()
+		if s.begins_with("$") or s.begins_with("__gdss_global__") or s.begins_with("__gdss_instance__"):
+			has_live_ref = true
+			break
+	var cache_key: String = ""
+	if not has_live_ref:
+		cache_key = method_name + "\n" + "\n".join(PackedStringArray(raw_args))
+		if _method_args_cache.has(cache_key):
+			return _method_args_cache[cache_key]
 	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
 	var resolved: Array[Variant] = []
-	for raw: String in raw_args:
-		var stripped: String = (raw as String).strip_edges()
-		if stripped.begins_with("__gdss_global__"):
+	for arg_index: int in raw_args.size():
+		var stripped: String = (raw_args[arg_index] as String).strip_edges()
+		if stripped == "pass":
+			resolved.append(method.parameters[arg_index].default_value if method != null and arg_index < method.parameters.size() else null)
+		elif stripped.begins_with("__gdss_global__"):
 			var key: String = stripped.substr("__gdss_global__".length())
 			resolved.append(GdssInterpreter.globals.get(key, null))
 		elif stripped.begins_with("__gdss_instance__"):
@@ -602,6 +688,8 @@ func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
 		else:
 			var unquoted: String = stripped.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 			resolved.append(method._resolve_arg(unquoted) if method != null else unquoted)
+	if not has_live_ref:
+		_method_args_cache[cache_key] = resolved
 	return resolved
 
 
@@ -639,7 +727,7 @@ func _get_state() -> String:
 		return "all"
 	if not current_state.is_empty():
 		return current_state
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node and not gdss_node.states.is_empty():
 		return gdss_node.states[0]
 	return "all"
@@ -683,10 +771,14 @@ func _get_val(key: String, fallback: Variant = null) -> Variant:
 		return fallback
 	if _tweened_values.has(key):
 		return _tweened_values[key]
-	var entry: Dictionary = _resolve_entry()
+	return _get_val_cached(key, _resolve_entry(), _get_state(), fallback)
+
+
+func _get_val_cached(key: String, entry: Dictionary, state: String, fallback: Variant) -> Variant:
+	if _tweened_values.has(key):
+		return _tweened_values[key]
 	if entry.is_empty():
 		return fallback
-	var state: String = _get_state()
 	var raw: Variant = null
 	if entry.has(state) and (entry[state] as Dictionary).has(key):
 		raw = entry[state][key]
@@ -715,23 +807,81 @@ func _get_raw_parsed_val(key: String, state: String) -> Variant:
 	return raw
 
 
+func _build_style_vals(gdss_node: GdssNode, entry: Dictionary, state: String) -> Dictionary:
+	if not _tweened_values.is_empty():
+		var fresh: Dictionary = {}
+		for prop: GdssProp in gdss_node.get_style_props():
+			var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+			fresh[prop.name] = fv if fv != null else prop.get_default_value()
+		return fresh
+	if _style_vals_state != state:
+		_style_vals_cache.clear()
+		_style_dynamic.clear()
+		_style_vals_state = state
+		for prop: GdssProp in gdss_node.get_style_props():
+			var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+			_style_vals_cache[prop.name] = rv if rv != null else prop.get_default_value()
+			if _is_dynamic_raw(_raw_entry_val(entry, state, prop.name)):
+				_style_dynamic.append(prop)
+		return _style_vals_cache
+	for prop: GdssProp in _style_dynamic:
+		var dv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+		_style_vals_cache[prop.name] = dv if dv != null else prop.get_default_value()
+	return _style_vals_cache
+
+
+func _raw_entry_val(entry: Dictionary, state: String, key: String) -> Variant:
+	if entry.has(state) and (entry[state] as Dictionary).has(key):
+		return entry[state][key]
+	if entry.has("all") and (entry["all"] as Dictionary).has(key):
+		return entry["all"][key]
+	return null
+
+
+func _is_dynamic_raw(raw: Variant) -> bool:
+	if raw is String:
+		var s: String = raw as String
+		return s.begins_with("__gdss_global__") or s.begins_with("__gdss_instance__")
+	if raw is Dictionary:
+		var d: Dictionary = raw as Dictionary
+		if d.has("__gdss_composite4__"):
+			for part: Variant in d["__gdss_composite4__"]:
+				if part is String and ((part as String).begins_with("__gdss_global__") or (part as String).begins_with("__gdss_instance__")):
+					return true
+			return false
+		if not d.has("__gdss_method__"):
+			return false
+		for arg: Variant in d.get("args", []):
+			if not arg is String:
+				continue
+			var a: String = (arg as String).strip_edges()
+			if a.begins_with("__gdss_global__") or a.begins_with("__gdss_instance__") or a.begins_with("$"):
+				return true
+	return false
+
+
 func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	if ref == null:
 		return
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(ref.get_class())
+	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
-	var vals: Dictionary = {}
-	var props: Array[GdssProp] = gdss_node.get_enabled_props()
-	for prop: GdssProp in props:
-		if prop.category != GdssProp.Category.STYLE:
-			continue
-		var v: Variant = _get_val(prop.name, prop.get_default_value())
-		vals[prop.name] = v if v != null else prop.get_default_value()
+	var entry: Dictionary = _resolve_entry()
+	var state: String = _get_state()
+	_apply_dynamic_nonstyle(gdss_node, entry, state)
+	var vals: Dictionary = _build_style_vals(gdss_node, entry, state)
 	var expand: Vector4 = Vector4(vals.get("expand", Vector4i.ZERO))
 	rect = rect.grow_individual(expand.x, expand.z, expand.y, expand.w)
 	if not rect.has_area():
 		return
+	if GDSS.gpu_panels_enabled():
+		_draw_gpu(to_canvas_item, rect, vals)
+		return
+	_free_gpu_ci()
+	_draw_cpu(to_canvas_item, rect, vals)
+
+
+func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	var corner_radius: Vector4 = Vector4(vals.get("corner_radius", Vector4i.ZERO))
 	var anti_aliasing: bool = vals.get("anti_aliasing", true)
 	var aa_size: float = 1.0 if anti_aliasing else 0.0
@@ -744,15 +894,19 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	if shadow_size > 1.0:
 		var shadow_outer: Rect2 = rect.grow(shadow_size)
 		var fitted: Vector4 = _fit_corners(corner_radius, rect)
-		if shadow_src is GradientTexture2D:
-			_draw_linear_gradient_ring(to_canvas_item, shadow_src as GradientTexture2D, rect, shadow_outer, fitted, detail, skew_x, skew_y, true)
+		if shadow_src is GdssGradient:
+			_draw_linear_gradient_ring(to_canvas_item, shadow_src as GdssGradient, rect, shadow_outer, fitted, detail, skew_x, skew_y, true)
 		elif shadow_src is Texture2D:
 			_draw_textured_ring(to_canvas_item, rect, shadow_outer, fitted, shadow_src as Texture2D, detail, skew_x, skew_y, true)
 		elif shadow_src is Color:
 			_draw_ring_raw(to_canvas_item, rect, shadow_outer, fitted, _fit_corners(corner_radius, shadow_outer), shadow_src as Color, true, detail, skew_x, skew_y)
 	var bg: Variant = vals.get("bg_color", Color.TRANSPARENT)
-	if bg is GradientTexture2D:
-		_draw_linear_gradient_rect(to_canvas_item, bg as GradientTexture2D, rect, corner_radius, detail, skew_x, skew_y)
+	if bg is GdssGradient:
+		var bgrad: GdssGradient = bg as GdssGradient
+		if bgrad.mode == 2:
+			_draw_radial_gradient_rect(to_canvas_item, bgrad, rect, corner_radius, detail, skew_x, skew_y)
+		else:
+			_draw_linear_gradient_rect(to_canvas_item, bgrad, rect, corner_radius, detail, skew_x, skew_y)
 	elif bg is Texture2D:
 		_draw_texture_in_rect(to_canvas_item, bg as Texture2D, rect, corner_radius, detail, skew_x, skew_y)
 	elif bg is Color and (bg as Color).a > 0.0:
@@ -763,10 +917,122 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	if has_border:
 		var inner_rect: Rect2 = rect.grow_individual(-border.x, -border.z, -border.y, -border.w)
 		if inner_rect.has_area():
-			if border_src is GradientTexture2D:
-				_draw_linear_gradient_ring(to_canvas_item, border_src as GradientTexture2D, inner_rect, rect, corner_radius, detail, skew_x, skew_y)
+			if border_src is GdssGradient:
+				_draw_linear_gradient_ring(to_canvas_item, border_src as GdssGradient, inner_rect, rect, corner_radius, detail, skew_x, skew_y)
 			elif border_src is Color and (border_src as Color).a > 0.0:
 				_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_src as Color, aa_size, detail, skew_x, skew_y)
+
+
+static func _get_shared_shader() -> Shader:
+	if _shader == null:
+		_shader = load("res://addons/gdss/db/props/gdss_panel.gdshader") as Shader
+	return _shader
+
+
+func _ensure_gpu_ci(to_canvas_item: RID) -> void:
+	if not _gpu_ci.is_valid():
+		_gpu_ci = RenderingServer.canvas_item_create()
+		_gpu_material = ShaderMaterial.new()
+		_gpu_material.shader = _get_shared_shader()
+		RenderingServer.canvas_item_set_material(_gpu_ci, _gpu_material.get_rid())
+		RenderingServer.canvas_item_set_draw_behind_parent(_gpu_ci, true)
+		_gpu_parent = RID()
+	if _gpu_parent != to_canvas_item:
+		RenderingServer.canvas_item_set_parent(_gpu_ci, to_canvas_item)
+		_gpu_parent = to_canvas_item
+
+
+func _free_gpu_ci() -> void:
+	if _gpu_ci.is_valid():
+		RenderingServer.free_rid(_gpu_ci)
+		_gpu_ci = RID()
+		_gpu_parent = RID()
+	_gpu_material = null
+	_gpu_last.clear()
+	_gpu_emitted = false
+
+
+func _set_param(key: StringName, value: Variant) -> void:
+	if _gpu_last.get(key) == value and _gpu_last.has(key):
+		return
+	_gpu_last[key] = value
+	_gpu_material.set_shader_parameter(key, value)
+
+
+func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
+	_ensure_gpu_ci(to_canvas_item)
+	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
+	var shadow_size: float = (shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
+	var pad: float = shadow_size + 2.0 if shadow_size > 0.5 else 0.0
+	var quad: Rect2 = rect.grow(pad)
+	var pad_frac: Vector2 = Vector2(pad / quad.size.x, pad / quad.size.y) if pad > 0.0 else Vector2.ZERO
+	var anti_aliasing: bool = vals.get("anti_aliasing", true)
+	_set_param(&"u_size", quad.size)
+	_set_param(&"u_pad", Vector2(pad, pad))
+	_set_param(&"u_corner_radius", Vector4(vals.get("corner_radius", Vector4i.ZERO)))
+	_set_param(&"u_border_widths", Vector4(vals.get("border", Vector4i.ZERO)))
+	_set_param(&"u_shadow", shadow)
+	_set_param(&"u_aa", 1.0 if anti_aliasing else 0.0)
+	var shadow_src: Variant = vals.get("shadow_color", Color(0, 0, 0, 0.4))
+	_set_param(&"u_shadow_color", shadow_src if shadow_src is Color else Color(0, 0, 0, 0.4))
+	_push_fill(vals.get("bg_color", Color.TRANSPARENT), pad_frac)
+	_push_border(vals.get("border_color", Color.TRANSPARENT), pad_frac)
+	var xform: Transform2D = _skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
+	if not _gpu_emitted or quad != _gpu_quad or xform != _gpu_xform:
+		_gpu_quad = quad
+		_gpu_xform = xform
+		_gpu_emitted = true
+		RenderingServer.canvas_item_clear(_gpu_ci)
+		RenderingServer.canvas_item_set_transform(_gpu_ci, xform)
+		RenderingServer.canvas_item_add_rect(_gpu_ci, quad, Color.WHITE)
+
+
+func _push_fill(bg: Variant, pad_frac: Vector2) -> void:
+	if bg is GdssGradient:
+		var grad: GdssGradient = bg as GdssGradient
+		_set_param(&"u_fill_a", grad.color_a)
+		_set_param(&"u_fill_b", grad.color_b)
+		_set_param(&"u_grad_offsets", grad.offsets)
+		_set_param(&"u_grad_p0", _remap_uv(grad.p0, pad_frac))
+		_set_param(&"u_grad_p1", _remap_uv(grad.p1, pad_frac))
+		_set_param(&"u_fill_mode", grad.mode)
+	elif bg is Texture2D:
+		_set_param(&"u_fill_mode", 3)
+		_set_param(&"u_tex", bg as Texture2D)
+	elif bg is Color:
+		_set_param(&"u_fill_mode", 0)
+		_set_param(&"u_fill_a", bg as Color)
+	else:
+		_set_param(&"u_fill_mode", 0)
+		_set_param(&"u_fill_a", Color.TRANSPARENT)
+
+
+func _push_border(border_src: Variant, pad_frac: Vector2) -> void:
+	if border_src is GdssGradient:
+		var grad: GdssGradient = border_src as GdssGradient
+		_set_param(&"u_border_mode", 1)
+		_set_param(&"u_border_a", grad.color_a)
+		_set_param(&"u_border_b", grad.color_b)
+		_set_param(&"u_border_p0", _remap_uv(grad.p0, pad_frac))
+		_set_param(&"u_border_p1", _remap_uv(grad.p1, pad_frac))
+	elif border_src is Color:
+		_set_param(&"u_border_mode", 0)
+		_set_param(&"u_border_a", border_src as Color)
+	else:
+		_set_param(&"u_border_mode", 0)
+		_set_param(&"u_border_a", Color.TRANSPARENT)
+
+
+func _remap_uv(uv: Vector2, pad_frac: Vector2) -> Vector2:
+	return pad_frac + uv * (Vector2.ONE - pad_frac * 2.0)
+
+
+func _skew_transform(rect: Rect2, skew_x: float, skew_y: float) -> Transform2D:
+	if skew_x == 0.0 and skew_y == 0.0:
+		return Transform2D.IDENTITY
+	var center: Vector2 = rect.position + rect.size * 0.5
+	var shear: Transform2D = Transform2D(Vector2(1.0, skew_y), Vector2(skew_x, 1.0), Vector2.ZERO)
+	return Transform2D.IDENTITY.translated(center) * shear * Transform2D.IDENTITY.translated(-center)
 
 
 func _draw_texture_in_rect(to_canvas_item: RID, tex: Texture2D, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
@@ -814,9 +1080,15 @@ func _draw_textured_ring(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rec
 		RenderingServer.canvas_item_add_polygon(to_canvas_item, quad, colors, uvs, tex.get_rid())
 
 
-func _draw_linear_gradient_rect(to_canvas_item: RID, tex: GradientTexture2D, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
-	var grad: Gradient = tex.gradient
-	var angle: float = tex.fill_from.angle_to_point(tex.fill_to)
+func _sample_grad(c1: Color, c2: Color, offsets: Vector2, t: float) -> Color:
+	var span: float = maxf(offsets.y - offsets.x, 0.0001)
+	return c1.lerp(c2, clampf((t - offsets.x) / span, 0.0, 1.0))
+
+
+func _draw_linear_gradient_rect(to_canvas_item: RID, grad: GdssGradient, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
+	var c1: Color = grad.color_a
+	var c2: Color = grad.color_b
+	var angle: float = grad.p0.angle_to_point(grad.p1)
 	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, _fit_corners(corner_radii, rect), detail), rect, skew_x, skew_y)
 	var dir: Vector2 = Vector2(cos(angle), sin(angle))
 	var colors: PackedColorArray
@@ -824,15 +1096,37 @@ func _draw_linear_gradient_rect(to_canvas_item: RID, tex: GradientTexture2D, rec
 	for i: int in points.size():
 		var p: Vector2 = points[i]
 		var t: float = ((p - rect.position) / rect.size).dot(dir) * 0.5 + 0.5
-		colors[i] = grad.sample(clampf(t, 0.0, 1.0))
+		colors[i] = _sample_grad(c1, c2, grad.offsets, t)
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, colors)
 
 
-func _draw_linear_gradient_ring(to_canvas_item: RID, tex: GradientTexture2D, inner_rect: Rect2, outer_rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float, fade: bool = false) -> void:
-	var grad: Gradient = tex.gradient
-	var c1: Color = grad.get_color(0)
-	var c2: Color = grad.get_color(1)
-	var angle: float = tex.fill_from.angle_to_point(tex.fill_to)
+func _draw_radial_gradient_rect(to_canvas_item: RID, grad: GdssGradient, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:
+	var perimeter: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, _fit_corners(corner_radii, rect), detail), rect, skew_x, skew_y)
+	var n: int = perimeter.size()
+	if n < 3:
+		return
+	var radius: float = maxf((grad.p1 - grad.p0).length(), 0.0001)
+	var center: Vector2 = rect.position + grad.p0 * rect.size
+	var verts: PackedVector2Array
+	var cols: PackedColorArray
+	var indices: PackedInt32Array
+	verts.resize(n + 1)
+	cols.resize(n + 1)
+	verts[0] = center
+	cols[0] = _sample_grad(grad.color_a, grad.color_b, grad.offsets, 0.0)
+	for i: int in n:
+		verts[i + 1] = perimeter[i]
+		var uv: Vector2 = (perimeter[i] - rect.position) / rect.size
+		cols[i + 1] = _sample_grad(grad.color_a, grad.color_b, grad.offsets, (uv - grad.p0).length() / radius)
+	for i: int in n:
+		indices.append_array([0, i + 1, (i + 1) % n + 1])
+	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, verts, cols)
+
+
+func _draw_linear_gradient_ring(to_canvas_item: RID, grad: GdssGradient, inner_rect: Rect2, outer_rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float, fade: bool = false) -> void:
+	var c1: Color = grad.color_a
+	var c2: Color = grad.color_b
+	var angle: float = grad.p0.angle_to_point(grad.p1)
 	var outer_fitted: Vector4 = _fit_corners(corner_radii, outer_rect)
 	var inner_fitted: Vector4 = _fit_corners(corner_radii, inner_rect)
 	var inner_points: PackedVector2Array = _apply_skew(_get_rounded_rect(inner_rect, inner_fitted, detail), inner_rect, skew_x, skew_y)
@@ -854,7 +1148,7 @@ func _draw_linear_gradient_ring(to_canvas_item: RID, tex: GradientTexture2D, inn
 		for j: int in 4:
 			var p: Vector2 = quad[j]
 			var t: float = ((p - outer_rect.position) / outer_rect.size).dot(dir) * 0.5 + 0.5
-			var col: Color = c1.lerp(c2, clampf(t, 0.0, 1.0))
+			var col: Color = _sample_grad(c1, c2, grad.offsets, t)
 			var is_outer: bool = j == 1 or j == 2
 			if fade and is_outer:
 				col.a = 0.0
@@ -907,6 +1201,9 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 
 
 func _triangulate_ring(inner_size: int, outer_size: int) -> PackedInt32Array:
+	var key: int = inner_size * 100003 + outer_size
+	if _tri_cache.has(key):
+		return _tri_cache[key]
 	var indices: PackedInt32Array
 	var total: int = max(inner_size, outer_size)
 	for i: int in total:
@@ -915,17 +1212,20 @@ func _triangulate_ring(inner_size: int, outer_size: int) -> PackedInt32Array:
 		var o0: int = i % outer_size + inner_size
 		var o1: int = (i + 1) % outer_size + inner_size
 		indices.append_array([i0, o0, o1, i0, o1, i1])
+	_tri_cache[key] = indices
 	return indices
 
 
 func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 8) -> PackedVector2Array:
+	var key: String = "%.2f,%.2f,%.2f,%.2f|%.2f,%.2f,%.2f,%.2f|%d" % [rect.position.x, rect.position.y, rect.size.x, rect.size.y, corner_radii.x, corner_radii.y, corner_radii.z, corner_radii.w, detail]
+	if _rr_cache.has(key):
+		return _rr_cache[key]
 	var corner_centers: Array[Vector2] = [
 		rect.position + Vector2(corner_radii[0], corner_radii[0]),
 		Vector2(rect.end.x, rect.position.y) + Vector2(-corner_radii[1], corner_radii[1]),
 		rect.end + Vector2(-corner_radii[2], -corner_radii[2]),
 		Vector2(rect.position.x, rect.end.y) + Vector2(corner_radii[3], -corner_radii[3]),
 	]
-	var start_angles: Array[float] = [PI, PI * 1.5, 0.0, PI * 0.5]
 
 	var points: PackedVector2Array
 	for corner_idx: int in 4:
@@ -938,8 +1238,11 @@ func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 8) -> P
 				3: points.append(Vector2(rect.position.x, rect.end.y))
 		else:
 			for i: int in range(detail + 1):
-				var theta: float = start_angles[corner_idx] + (PI * 0.5) * i / detail
+				var theta: float = _corner_start_angles[corner_idx] + (PI * 0.5) * i / detail
 				points.append(corner_centers[corner_idx] + Vector2(cos(theta), sin(theta)) * radius)
+	if _rr_cache.size() > 2048:
+		_rr_cache.clear()
+	_rr_cache[key] = points
 	return points
 
 
