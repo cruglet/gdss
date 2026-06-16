@@ -1,20 +1,27 @@
-# GDSS Demo theme!
+# @chunk main
+# GDSS demo + stress-test theme.
+# Split into named "chunks" (the tabs in the GDSS editor).
 
+# @chunk Palette
 @global var accent: "#8e00ff"
 @global var accent_dark: "#5a00cc"
-@instance var card_color: "#101027"
+@global var bg: "#0d0d14"
+@global var surface: "#16161f"
+@global var surface_2: "#1f1f3a"
+@global var text: "#ffffff"
+@global var text_dim: "#9097ad"
+@global var border: "#ffffff22"
+@instance var card_color: "#16161f"
 
 var radius: 10
-var subtle_border: "#ffffff22"
-var text_bright: "#fff"
-var text_dim: "#aaa"
 
+# @chunk Buttons
 Button {
 	bg_color: linear_gradient($accent, $accent_dark, -45)
-	border_color: $subtle_border
+	border_color: $border
 	border: 1 1 1 1
 	corner_radius: $radius $radius $radius $radius
-	font_color: $text_bright
+	font_color: $text
 	font_size: 15
 	padding: 12 12 6 6
 	cursor: POINTING
@@ -34,7 +41,7 @@ Button {
 	}
 
 	:disabled {
-		bg_color: "#333333"
+		bg_color: $surface_2
 		font_color: $text_dim
 	}
 
@@ -44,10 +51,10 @@ Button {
 		border_color: $accent
 		border: 2 2 2 2
 		font_color: $accent
-		
+
 		:hover {
-			bg_color: rgba(0.55, 0.0, 1.0, 0.15)
-			font_color: $text_bright
+			bg_color: alpha($accent, 0.15)
+			font_color: $text
 		}
 	}
 
@@ -58,41 +65,46 @@ Button {
 	}
 }
 
+# @chunk Panels
 Panel, PanelContainer {
-	bg_color: $card_color
-	border_color: $subtle_border
+	bg_color: $surface
+	border_color: $border
 	border: 1 1 1 1
 	corner_radius: $radius $radius $radius $radius
 
+	transition_time: 0.3
+	transition_func: SINE
+
 	# Elevated card with a gradient
 	CardPanel {
-		bg_color: linear_gradient("#1f1f3a", "#0d0d1a", 160)
-		border_color: $accent
-		border: 1 1 1 1
+		bg_color: linear_gradient($surface_2, $bg, 160)
+		border_color: $border
 	}
 }
 
+# @chunk Labels
 Label {
-	font_color: $text_bright 
+	font_color: $text
 	font_size: 12
 	
 	TitleLabel {
 		font_size: 28
 		font_color: $accent
 	}
-	
+
 	SubtitleLabel {
 		font_size: 16
-		font_color: $text_dim 
+		font_color: $text_dim
 	}
 }
 
+# @chunk Inputs
 LineEdit {
-	bg_color: "#111111"
-	border_color: $subtle_border
+	bg_color: $bg
+	border_color: $border
 	border: 1 1 1 1
 	corner_radius: $radius $radius $radius $radius
-	font_color: $text_bright
+	font_color: $text
 	font_size: 14
 	padding: 8 8 8 8
 	cursor: IBEAM

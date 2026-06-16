@@ -3313,7 +3313,7 @@ metadata/gdss_classes = PackedStringArray("TitleLabel")
 
 [node name="Label2" type="Label" parent="CenterContainer/PanelContainer/MarginContainer/VBoxContainer" unique_id=1199484660 groups=["gdss"]]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.6666667, 0.6666667, 0.6666667, 1)
+theme_override_colors/font_color = Color(0.5647059, 0.5921569, 0.6784314, 1)
 theme_override_fonts/font = SubResource("FontFile_j5lb4")
 theme_override_styles/normal = SubResource("StyleBox_u10mr")
 theme_override_styles/focus = SubResource("StyleBox_onu7k")
