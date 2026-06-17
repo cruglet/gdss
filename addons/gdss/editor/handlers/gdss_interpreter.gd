@@ -9,7 +9,11 @@ static var globals: Dictionary = {}
 static var _global_defaults: Dictionary = {}
 static var _instance_vars: Dictionary = {}
 static var _instance_defaults: Dictionary = {}
+static var _instance_scheme_base: Dictionary = {}
 static var _local_vars: Dictionary = {}
+static var schemes: Dictionary[String, Dictionary] = {}
+static var meta: Dictionary = {}
+static var current_scheme: String = ""
 var _last_modified: int = 0
 var _saving: bool = false
 var _cached_states: PackedStringArray = []
@@ -20,6 +24,8 @@ static var _re_global: RegEx = RegEx.create_from_string(r"^@global\s+var\s+(\w+)
 static var _re_instance: RegEx = RegEx.create_from_string(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
 static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*:\s*(.+)")
 static var _re_bad_annotation: RegEx = RegEx.create_from_string(r"^@(\w+)")
+static var _re_scheme: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
+static var _re_meta: RegEx = RegEx.create_from_string(r"^@meta\b")
 
 @export var editor: GdssEditor
 
@@ -305,7 +311,9 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 
 func check_errors(source: String) -> Array[Array]:
 	var errors: Array[Array] = []
-	var lines: PackedStringArray = source.split("\n")
+	_check_separator_mix(_strip_annotation_blocks(source)["cleaned"], errors)
+	var pre: Dictionary = _strip_annotation_blocks(_normalize_separators(source))
+	var lines: PackedStringArray = (pre["cleaned"] as String).split("\n")
 	var known_selectors: Array = GDSS._get_gdss_nodes().keys()
 	var known_states: PackedStringArray = _get_known_states()
 	var known_methods: Dictionary = GDSS._get_gdss_methods()
@@ -313,6 +321,8 @@ func check_errors(source: String) -> Array[Array]:
 	var brace_open_lines: Array[int] = []
 	var selector_stack: Array[String] = []
 	var declared_vars: Dictionary = {}
+	var declared_globals: Dictionary = {}
+	var declared_instances: Dictionary = {}
 
 	var statements: Array[Array] = []
 	for line_idx: int in lines.size():
@@ -340,6 +350,8 @@ func check_errors(source: String) -> Array[Array]:
 					errors.append(["Variable '%s' has no value" % m.get_string(1), i])
 				else:
 					declared_vars[m.get_string(1)] = true
+					if is_global:
+						declared_globals[m.get_string(1)] = true
 					if val_str.contains("("):
 						var method_name: String = _method_name_of(val_str)
 						_check_method_call(val_str, method_name, null, known_methods, errors, i)
@@ -456,7 +468,43 @@ func check_errors(source: String) -> Array[Array]:
 	for line: int in brace_open_lines:
 		errors.append(["Unclosed brace '{'", line])
 
+	_check_annotation_blocks(pre["blocks"], declared_globals, declared_instances, errors)
+
 	return errors
+
+
+func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, declared_instances: Dictionary, errors: Array[Array]) -> void:
+	var scheme_names: Dictionary = {}
+	var default_scheme: String = ""
+	var default_line: int = -1
+	for block: Dictionary in blocks:
+		var label: String = "@scheme" if block["kind"] == "scheme" else "@meta"
+		if block["malformed"]:
+			errors.append(["Expected '{' on the same line as %s" % label, block["header_line"]])
+			continue
+		if block.get("unterminated", false):
+			errors.append(["Unclosed brace '{' on %s block" % label, block["header_line"]])
+			continue
+		if block["kind"] == "scheme":
+			scheme_names[block["name"]] = true
+			for entry: Dictionary in block["entries"]:
+				var value_str: String = entry["value_str"]
+				if value_str.is_empty():
+					errors.append(["Scheme variable '%s' has no value" % entry["key"], entry["line"]])
+					continue
+				if not declared_globals.has(entry["key"]) and not declared_instances.has(entry["key"]) and not _global_defaults.has(entry["key"]) and not _instance_defaults.has(entry["key"]):
+					errors.append(["Scheme '%s' overrides '%s', which is not an @global or @instance var." % [block["name"], entry["key"]], entry["line"]])
+				if value_str.begins_with("$"):
+					errors.append(["Scheme value for '%s' must be a literal; variable references aren't supported inside schemes." % entry["key"], entry["line"]])
+		else:
+			for entry: Dictionary in block["entries"]:
+				if (entry["value_str"] as String).is_empty():
+					errors.append(["Metadata key '%s' has no value" % entry["key"], entry["line"]])
+				elif entry["key"] == "default_scheme":
+					default_scheme = _parse_meta_value(entry["value_str"])
+					default_line = entry["line"]
+	if not default_scheme.is_empty() and not scheme_names.has(default_scheme):
+		errors.append(["@meta default_scheme '%s' is not a defined @scheme" % default_scheme, default_line])
 
 
 func save_current() -> void:
@@ -466,8 +514,9 @@ func save_current() -> void:
 	var source: String = editor.get_full_source()
 	GdssStorage.write_source(GdssStorage.get_save_path(), source)
 	parsed = interpret(source)
-	GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars)
+	GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
+	GdssStorage.write_compiled(source, _build_bundle(), _last_modified)
 	editor._user_saved()
 	parsed_changed.emit()
 	if Engine.is_editor_hint():
@@ -484,6 +533,12 @@ func _force_viewport_redraw() -> void:
 	viewport_container.size = original_size
 
 
+func reload_active_file() -> void:
+	_load_from_file()
+	if Engine.is_editor_hint():
+		_force_viewport_redraw()
+
+
 func _load_from_file() -> void:
 	_cached_states.clear()
 	_composite_map_cache.clear()
@@ -495,7 +550,115 @@ func _load_from_file() -> void:
 		editor.set_full_source(source)
 		editor.get_code_edit().text_changed.connect(_on_text_changed)
 	parsed = interpret(source)
+	_ensure_compiled_fresh(source)
 	parsed_changed.emit()
+
+
+func _build_bundle() -> Dictionary:
+	return {
+		"parsed": parsed,
+		"global_defaults": _global_defaults,
+		"instance_defaults": _instance_defaults,
+		"local_vars": _local_vars,
+		"schemes": schemes,
+		"meta": meta,
+	}
+
+
+func _ensure_compiled_fresh(source: String) -> void:
+	if not Engine.is_editor_hint():
+		return
+	var compiled: Dictionary = GdssStorage.load_compiled()
+	if not compiled.is_empty() and compiled.get("source_modified", -1) == _last_modified:
+		return
+	GdssStorage.write_compiled(source, _build_bundle(), _last_modified)
+
+
+func replace_meta_block(source: String, new_block: String) -> Dictionary:
+	var lines: PackedStringArray = source.split("\n")
+	var out: PackedStringArray = []
+	var found: bool = false
+	var i: int = 0
+	while i < lines.size():
+		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+		if not found and _re_meta.search(stripped) != null and stripped.contains("{"):
+			out.append_array(new_block.split("\n"))
+			found = true
+			var depth: int = _brace_delta(stripped)
+			i += 1
+			while i < lines.size() and depth > 0:
+				depth += _brace_delta(_strip_line_comment(lines[i].strip_edges()))
+				i += 1
+			continue
+		out.append(lines[i])
+		i += 1
+	return {"found": found, "source": "\n".join(out)}
+
+
+func strip_meta_blocks(source: String) -> String:
+	var lines: PackedStringArray = source.split("\n")
+	var out: PackedStringArray = []
+	var i: int = 0
+	while i < lines.size():
+		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+		if _re_meta.search(stripped) == null:
+			out.append(lines[i])
+			i += 1
+			continue
+		if not stripped.contains("{"):
+			i += 1
+			continue
+		var depth: int = _brace_delta(stripped)
+		i += 1
+		while i < lines.size() and depth > 0:
+			depth += _brace_delta(_strip_line_comment(lines[i].strip_edges()))
+			i += 1
+	return "\n".join(out)
+
+
+static func compile_for_export() -> void:
+	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
+	if source.is_empty():
+		return
+	var snapshot: Dictionary = {
+		"globals": globals.duplicate(true),
+		"global_defaults": _global_defaults.duplicate(true),
+		"instance_defaults": _instance_defaults.duplicate(true),
+		"local_vars": _local_vars.duplicate(true),
+		"schemes": schemes.duplicate(true),
+		"meta": meta.duplicate(true),
+		"parsed": parsed.duplicate(true),
+		"current_scheme": current_scheme,
+	}
+	var worker: GdssInterpreter = GdssInterpreter.new()
+	worker._build_defaults()
+	var compiled_parsed: Dictionary = worker.interpret(source)
+	var bundle: Dictionary = {
+		"parsed": compiled_parsed,
+		"global_defaults": _global_defaults.duplicate(true),
+		"instance_defaults": _instance_defaults.duplicate(true),
+		"local_vars": _local_vars.duplicate(true),
+		"schemes": schemes.duplicate(true),
+		"meta": meta.duplicate(true),
+	}
+	GdssStorage.write_compiled(source, bundle, FileAccess.get_modified_time(GdssStorage.get_save_path()))
+	worker.free()
+	_restore_statics(snapshot)
+
+
+static func _restore_statics(snapshot: Dictionary) -> void:
+	globals = snapshot["globals"]
+	_global_defaults = snapshot["global_defaults"]
+	_instance_defaults = snapshot["instance_defaults"]
+	_local_vars = snapshot["local_vars"]
+	meta = snapshot["meta"]
+	current_scheme = snapshot["current_scheme"]
+	parsed.clear()
+	for key: String in (snapshot["parsed"] as Dictionary):
+		parsed[key] = snapshot["parsed"][key]
+	schemes.clear()
+	for key: String in (snapshot["schemes"] as Dictionary):
+		schemes[key] = snapshot["schemes"][key]
 
 
 func _build_defaults() -> void:
@@ -534,17 +697,101 @@ func interpret(source: String) -> Dictionary[String, Dictionary]:
 	return interpret_all(PackedStringArray([source]))
 
 
+func _replace_eq_separators(line: String) -> String:
+	var result: String = ""
+	var in_quote: bool = false
+	var quote_char: String = ""
+	var depth: int = 0
+	for i: int in line.length():
+		var c: String = line[i]
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+			result += c
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+			result += c
+		elif c == "#":
+			result += line.substr(i)
+			return result
+		elif c == "(":
+			depth += 1
+			result += c
+		elif c == ")":
+			depth -= 1
+			result += c
+		elif c == "=" and depth == 0:
+			result += ":"
+		else:
+			result += c
+	return result
+
+
+func _normalize_separators(source: String) -> String:
+	var out: PackedStringArray = []
+	for line: String in source.split("\n"):
+		out.append(_replace_eq_separators(line))
+	return "\n".join(out)
+
+
+func _line_separator(stripped: String) -> String:
+	if stripped.is_empty() or stripped.ends_with("{") or stripped == "}":
+		return ""
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for i: int in stripped.length():
+		var c: String = stripped[i]
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+		elif c == ":" or c == "=":
+			if stripped.substr(0, i).strip_edges().is_empty():
+				return ""
+			return c
+	return ""
+
+
+func _check_separator_mix(source: String, errors: Array[Array]) -> void:
+	var uses_colon: bool = false
+	var uses_equals: bool = false
+	var mix_line: int = -1
+	var lines: PackedStringArray = source.split("\n")
+	for i: int in lines.size():
+		for stmt: String in _split_statements(_strip_line_comment(lines[i].strip_edges())):
+			var sep: String = _line_separator(stmt.strip_edges())
+			if sep == ":":
+				uses_colon = true
+			elif sep == "=":
+				uses_equals = true
+		if uses_colon and uses_equals and mix_line == -1:
+			mix_line = i
+	if uses_colon and uses_equals:
+		errors.append(["This file mixes ':' and '=' separators. Use one or the other.", maxi(mix_line, 0)])
+
+
 func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]:
 	globals.clear()
 	_global_defaults.clear()
 	_instance_defaults.clear()
 	_local_vars.clear()
+	schemes.clear()
+	meta.clear()
 	var known_states: PackedStringArray = _get_known_states()
-	var local_vars: Dictionary = {}
+	var cleaned_sources: PackedStringArray = []
 	for source: String in sources:
+		var pre: Dictionary = _strip_annotation_blocks(_normalize_separators(source))
+		cleaned_sources.append(pre["cleaned"])
+		_accumulate_blocks(pre["blocks"], known_states)
+	var local_vars: Dictionary = {}
+	for source: String in cleaned_sources:
 		var file_locals: Dictionary = _accumulate_globals(source)
 		for key: String in file_locals:
 			local_vars[key] = file_locals[key]
+	_instance_scheme_base = _instance_defaults.duplicate(true)
 	var result: Dictionary[String, Dictionary] = {}
 	for selector: String in _defaults:
 		result[selector] = {}
@@ -553,7 +800,7 @@ func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]
 				result[selector][state] = _defaults[selector][state].duplicate()
 			else:
 				result[selector][state] = _defaults[selector][state]
-	for source: String in sources:
+	for source: String in cleaned_sources:
 		var tokens: Array[String] = _tokenize(source)
 		tokens = _substitute_globals(tokens, local_vars)
 		_parse_block(tokens, 0, result, "", known_states)
@@ -593,6 +840,127 @@ func _accumulate_globals(source: String) -> Dictionary:
 			local_vars[lm.get_string(1)] = consumed[0]
 			_local_vars[lm.get_string(1)] = consumed[0]
 	return local_vars
+
+
+static func resolve_scheme(name: String) -> Dictionary:
+	var result: Dictionary = _global_defaults.duplicate(true)
+	for key: String in _instance_scheme_base:
+		result[key] = _instance_scheme_base[key]
+	if schemes.has(name):
+		var deltas: Dictionary = schemes[name]
+		for key: String in deltas:
+			result[key] = deltas[key]
+	return result
+
+
+static func scheme_keys() -> PackedStringArray:
+	var keys: Dictionary = {}
+	for scheme_name: String in schemes:
+		for key: String in (schemes[scheme_name] as Dictionary):
+			keys[key] = true
+	return PackedStringArray(keys.keys())
+
+
+func _strip_annotation_blocks(source: String) -> Dictionary:
+	var lines: PackedStringArray = source.split("\n")
+	var out_lines: PackedStringArray = []
+	var blocks: Array[Dictionary] = []
+	var i: int = 0
+	while i < lines.size():
+		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+		var scheme_match: RegExMatch = _re_scheme.search(stripped)
+		var is_meta: bool = _re_meta.search(stripped) != null
+		if scheme_match == null and not is_meta:
+			out_lines.append(lines[i])
+			i += 1
+			continue
+		var kind: String = "scheme" if scheme_match != null else "meta"
+		var block_name: String = scheme_match.get_string(1) if scheme_match != null else ""
+		var header_line: int = i
+		var entries: Array[Dictionary] = []
+		out_lines.append("")
+		if not stripped.contains("{"):
+			i += 1
+			while i < lines.size():
+				var look: String = _strip_line_comment(lines[i].strip_edges())
+				if look.is_empty() or look.begins_with("@"):
+					break
+				out_lines.append("")
+				if look == "}":
+					i += 1
+					break
+				i += 1
+			blocks.append({"kind": kind, "name": block_name, "header_line": header_line, "entries": [], "malformed": true, "unterminated": false})
+			continue
+		var depth: int = _brace_delta(stripped)
+		var head_entry: Dictionary = _extract_block_entry(stripped.substr(stripped.find("{") + 1), header_line)
+		if not head_entry.is_empty():
+			entries.append(head_entry)
+		i += 1
+		while i < lines.size() and depth > 0:
+			var body: String = _strip_line_comment(lines[i].strip_edges())
+			depth += _brace_delta(body)
+			var entry: Dictionary = _extract_block_entry(body, i)
+			if not entry.is_empty():
+				entries.append(entry)
+			out_lines.append("")
+			i += 1
+		blocks.append({"kind": kind, "name": block_name, "header_line": header_line, "entries": entries, "malformed": false, "unterminated": depth > 0})
+	return {"cleaned": "\n".join(out_lines), "blocks": blocks}
+
+
+func _extract_block_entry(content: String, line: int) -> Dictionary:
+	var clean: String = content.trim_prefix("{").trim_suffix("}").strip_edges()
+	var colon: int = clean.find(":")
+	if colon <= 0:
+		return {}
+	return {
+		"key": clean.substr(0, colon).strip_edges(),
+		"value_str": clean.substr(colon + 1).strip_edges(),
+		"line": line,
+	}
+
+
+func _brace_delta(s: String) -> int:
+	var depth: int = 0
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for c: String in s:
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+		elif c == "{":
+			depth += 1
+		elif c == "}":
+			depth -= 1
+	return depth
+
+
+func _accumulate_blocks(blocks: Array, known_states: PackedStringArray) -> void:
+	for block: Dictionary in blocks:
+		if block["malformed"]:
+			continue
+		if block["kind"] == "scheme":
+			var name: String = block["name"]
+			if not schemes.has(name):
+				schemes[name] = {}
+			for entry: Dictionary in block["entries"]:
+				var value_str: String = entry["value_str"]
+				if value_str.is_empty():
+					continue
+				var tokens: Array[String] = _tokenize_value(value_str)
+				var consumed: Array = _consume_value(tokens, 0, known_states)
+				schemes[name][entry["key"]] = consumed[0]
+		else:
+			for entry: Dictionary in block["entries"]:
+				meta[entry["key"]] = _parse_meta_value(entry["value_str"])
+
+
+func _parse_meta_value(value_str: String) -> String:
+	return value_str.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 
 
 func _tokenize_value(raw: String) -> Array[String]:
