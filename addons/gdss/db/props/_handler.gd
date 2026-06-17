@@ -16,6 +16,15 @@ const _EASE_TYPES: Dictionary = {
 	"EASE_IN_OUT": Tween.EASE_IN_OUT, "EASE_OUT_IN": Tween.EASE_OUT_IN,
 }
 
+
+static func tween_trans(func_enum: GDSS.TransitionFunc) -> Tween.TransitionType:
+	return _TRANSITION_FUNCS.get(GDSS.TransitionFunc.keys()[func_enum], Tween.TRANS_LINEAR)
+
+
+static func tween_ease(type_enum: GDSS.TransitionType) -> Tween.EaseType:
+	return _EASE_TYPES.get(GDSS.TransitionType.keys()[type_enum], Tween.EASE_IN_OUT)
+
+
 var _slot_state: String = ""
 
 var _ref_path: NodePath = NodePath()
@@ -178,6 +187,7 @@ func _on_ref_renamed() -> void:
 func _on_ref_tree_entered() -> void:
 	if is_instance_valid(_ref_node):
 		_ref_path = _ref_node.get_path()
+		GdssNodeHandler.apply_mode_tree.call_deferred(_ref_node)
 
 
 func _on_ref_tree_exiting() -> void:
@@ -278,7 +288,7 @@ func _apply_overrides(clear: bool = true) -> void:
 	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
-	if not node.is_in_group(GdssNodeHandler.GROUP):
+	if not GDSS.resolve_mode(node):
 		return
 	_applying = true
 	if clear:
@@ -383,7 +393,20 @@ func _get_cursor_shape(type: String) -> Control.CursorShape:
 		"ARROW": return Control.CursorShape.CURSOR_ARROW
 		"IBEAM": return Control.CursorShape.CURSOR_IBEAM
 		"POINTING": return Control.CursorShape.CURSOR_POINTING_HAND
-		"DISABLED": return Control.CursorShape.CURSOR_FORBIDDEN
+		"CROSS": return Control.CursorShape.CURSOR_CROSS
+		"WAIT": return Control.CursorShape.CURSOR_WAIT
+		"BUSY": return Control.CursorShape.CURSOR_BUSY
+		"DRAG": return Control.CursorShape.CURSOR_DRAG
+		"CAN_DROP": return Control.CursorShape.CURSOR_CAN_DROP
+		"FORBIDDEN", "DISABLED": return Control.CursorShape.CURSOR_FORBIDDEN
+		"VSIZE": return Control.CursorShape.CURSOR_VSIZE
+		"HSIZE": return Control.CursorShape.CURSOR_HSIZE
+		"BDIAGSIZE": return Control.CursorShape.CURSOR_BDIAGSIZE
+		"FDIAGSIZE": return Control.CursorShape.CURSOR_FDIAGSIZE
+		"MOVE": return Control.CursorShape.CURSOR_MOVE
+		"VSPLIT": return Control.CursorShape.CURSOR_VSPLIT
+		"HSPLIT": return Control.CursorShape.CURSOR_HSPLIT
+		"HELP": return Control.CursorShape.CURSOR_HELP
 	return Control.CursorShape.CURSOR_ARROW
 
 

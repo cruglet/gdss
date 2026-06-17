@@ -40,7 +40,11 @@ static func get_handlers(canvas_item: CanvasItem) -> Array[GdssPropHandler]:
 
 
 static func is_enabled(canvas_item: CanvasItem) -> bool:
-	return canvas_item.is_in_group(GROUP)
+	return GDSS.resolve_mode(canvas_item)
+
+
+static func is_bound(canvas_item: CanvasItem) -> bool:
+	return _registry.has(canvas_item.get_instance_id())
 
 
 static func refresh(canvas_item: CanvasItem) -> void:
@@ -57,10 +61,42 @@ static func rebind_tree(node: Node) -> void:
 	if node is CanvasItem:
 		var canvas_item: CanvasItem = node as CanvasItem
 		_migrate_legacy(canvas_item)
-		if canvas_item.is_in_group(GROUP) and GDSS._get_gdss_nodes().has(canvas_item.get_class()):
-			bind(canvas_item, false)
+		apply_mode(canvas_item)
 	for child: Node in node.get_children():
 		rebind_tree(child)
+
+
+static func apply_mode_tree(node: Node) -> void:
+	if node == null:
+		return
+	if node is CanvasItem:
+		apply_mode(node as CanvasItem)
+	for child: Node in node.get_children():
+		apply_mode_tree(child)
+
+
+static func apply_mode(canvas_item: CanvasItem) -> void:
+	if not GDSS._get_gdss_nodes().has(canvas_item.get_class()):
+		return
+	if GDSS.resolve_mode(canvas_item):
+		bind(canvas_item)
+	elif _registry.has(canvas_item.get_instance_id()):
+		unbind(canvas_item)
+
+
+static func set_mode_state(node: Node, mode: GDSS.GdssMode, in_legacy_group: bool) -> void:
+	if mode == GDSS.GdssMode.INHERIT:
+		if node.has_meta(GDSS.MODE_META):
+			node.remove_meta(GDSS.MODE_META)
+	else:
+		node.set_meta(GDSS.MODE_META, mode)
+	if in_legacy_group and not node.is_in_group(GROUP):
+		node.add_to_group(GROUP, true)
+	elif not in_legacy_group and node.is_in_group(GROUP):
+		node.remove_from_group(GROUP)
+	apply_mode_tree(node)
+	if Engine.is_editor_hint():
+		node.notify_property_list_changed()
 
 
 static func _migrate_legacy(canvas_item: CanvasItem) -> void:
@@ -79,7 +115,7 @@ static func _migrate_legacy(canvas_item: CanvasItem) -> void:
 			if canvas_item.has_meta(meta_key):
 				canvas_item.remove_meta(meta_key)
 	if was_enabled:
-		canvas_item.add_to_group(GROUP, true)
+		canvas_item.set_meta(GDSS.MODE_META, GDSS.GdssMode.ENABLE)
 
 
 static func bind(canvas_item: CanvasItem, apply: bool = true) -> void:
