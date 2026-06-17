@@ -181,3 +181,47 @@ static func _clear_overrides_for(control: Control, gdss_node: GdssNode) -> void:
 				control.remove_theme_font_override(prop.name)
 			GdssProp.Category.ICON:
 				control.remove_theme_icon_override(prop.name)
+
+
+# Removes every GDSS-applied theme override from all bound nodes without tearing
+# down the binding, so a scene can be packed without baking runtime styling into
+# it. Pair with reapply_overrides() to restore the live preview afterwards.
+static func strip_overrides() -> void:
+	for id: int in _registry.keys():
+		var canvas_item: CanvasItem = instance_from_id(id) as CanvasItem
+		if not is_instance_valid(canvas_item):
+			continue
+		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
+		if gdss_node == null:
+			continue
+		var control: Control = canvas_item as Control
+		if control == null:
+			continue
+		_clear_overrides_for(control, gdss_node)
+		for state: String in gdss_node.states:
+			control.remove_theme_stylebox_override(state)
+
+
+# Re-applies the GDSS style overrides to every bound node, reusing the handlers
+# that are already in the registry.
+static func reapply_overrides() -> void:
+	for id: int in _registry.keys():
+		var canvas_item: CanvasItem = instance_from_id(id) as CanvasItem
+		if not is_instance_valid(canvas_item):
+			continue
+		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
+		if gdss_node == null:
+			continue
+		var control: Control = canvas_item as Control
+		if control == null:
+			continue
+		for handler: GdssPropHandler in _registry.get(id, {}).values():
+			if handler == null:
+				continue
+			if gdss_node.is_static:
+				if not handler._slot_state.is_empty():
+					control.add_theme_stylebox_override(handler._slot_state, handler)
+			else:
+				for state: String in gdss_node.states:
+					control.add_theme_stylebox_override(state, handler)
+			handler._apply_overrides(false)

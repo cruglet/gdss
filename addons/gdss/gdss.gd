@@ -383,6 +383,18 @@ func _on_scene_changed(scene_root: Node) -> void:
 	GdssNodeHandler.rebind_tree(scene_root)
 
 
+# Called by the editor right before a scene is packed for saving. Strip the
+# live GDSS overrides so they are never baked into the .tscn, then restore them
+# on the next idle frame so the editor preview is uninterrupted.
+func _apply_changes() -> void:
+	GdssNodeHandler.strip_overrides()
+	_reapply_overrides_deferred.call_deferred()
+
+
+func _reapply_overrides_deferred() -> void:
+	GdssNodeHandler.reapply_overrides()
+
+
 func _prompt_reload() -> void:
 	var dialog: ConfirmationDialog = ConfirmationDialog.new()
 	dialog.title = "GDSS Reload Recommended"
