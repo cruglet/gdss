@@ -1,64 +1,88 @@
 # @chunk main
-# GDSS demo + stress-test theme.
+# GDSS demo + simple example theme.
 # Split into named "chunks" (the tabs in the GDSS editor).
 
+# This is just one example of how you can structure a GDSS file. You have the
+# freedom to organize it however you like, so treat this layout example
+# as a starting point rather than a rule.
+#
+# A few naming conventions go a long way once a theme grows. Prefixing color
+# variables with "col" (col_accent, col_bg) and prefixing or suffixing sizes
+# and numbers with "size" or "num" (size_radius, num_columns) makes the type
+# of each variable obvious at a glance. Keeping shared values in @global
+# variables means one edit updates the whole theme, while @instance variables
+# cover anything you want to change per node. Grouping related rules under one
+# selector and using nested classes keeps things tidy instead of repeating
+# properties, and short, topical chunk names keep the tabs easy to scan.
 # @chunk Palette
+# Global variables are like standard variables which can be accessed from 
+# GDScript. Calling GDSS.set_global_var() will automatically update any node
+# that uses this variable.
 @global var accent: "#8e00ff"
 @global var accent_dark: "#5a00cc"
+@global var on_accent: "#ffffff"
 @global var bg: "#0d0d14"
 @global var surface: "#16161f"
 @global var surface_2: "#1f1f3a"
 @global var text: "#ffffff"
 @global var text_dim: "#9097ad"
 @global var border: "#ffffff22"
+
+# Instance variables behave like global variables except on a per-node basis. 
+# Meaning, you also have to pass in the node reference in GDSS.set_instance_var().
 @instance var card_color: "#16161f"
 
+# Standard variables are effectively constants, as they don't change during 
+# runtime and are typically only used to be able to share a value between 
+# different theme properties and propogate those changes quickly when designing
+# in the editor.
 var radius: 10
-
 # @chunk Buttons
 Button {
 	bg_color: linear_gradient($accent, $accent_dark, -45)
 	border_color: $border
 	border: 1 1 1 1
 	corner_radius: $radius $radius $radius $radius
-	font_color: $text
+	font_color: $on_accent
 	font_size: 15
 	padding: 12 12 6 6
 	cursor: POINTING
-
+	
 	transition_time: 0.2
 	transition_type: EASE_OUT
 	transition_func: QUINT
-
+	
 	:hover {
-		bg_color: linear_gradient($accent, $accent_dark, 45)
+		# The "pass" keyword exists in gdss as well, except it can also be used 
+		# as an expression. It can be used semantically to explicitly keep 
+		# optional parameters as their default value.
+		bg_color: linear_gradient($accent, $accent_dark, 45, pass, 0.5)
 		expand: 2 2 2 2
 	}
-
+	
 	:pressed {
 		bg_color: $accent_dark
 		expand: 0 0 0 0
 	}
-
+	
 	:disabled {
 		bg_color: $surface_2
 		font_color: $text_dim
+		cursor: DISABLED
 	}
-
-	# Transparent with a colored border
+	
 	GhostButton {
 		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
-		border_color: $accent
+		border_color: $accent;
 		border: 2 2 2 2
 		font_color: $accent
-
+		
 		:hover {
 			bg_color: alpha($accent, 0.15)
 			font_color: $text
 		}
 	}
-
-	# Pill shaped
+	
 	PillButton {
 		corner_radius: 999 999 999 999
 		padding: 16 16 8 8
@@ -71,10 +95,7 @@ Panel, PanelContainer {
 	border_color: $border
 	border: 1 1 1 1
 	corner_radius: $radius $radius $radius $radius
-
-	transition_time: 0.3
-	transition_func: SINE
-
+	
 	# Elevated card with a gradient
 	CardPanel {
 		bg_color: linear_gradient($surface_2, $bg, 160)
@@ -91,7 +112,7 @@ Label {
 		font_size: 28
 		font_color: $accent
 	}
-
+	
 	SubtitleLabel {
 		font_size: 16
 		font_color: $text_dim
@@ -105,15 +126,16 @@ LineEdit {
 	border: 1 1 1 1
 	corner_radius: $radius $radius $radius $radius
 	font_color: $text
+	caret_color: $text
 	font_size: 14
 	padding: 8 8 8 8
 	cursor: IBEAM
 	selection_color: $accent
-
+	
 	transition_time: 0.15
 	transition_type: EASE_OUT
 	transition_func: SINE
-
+	
 	:focus {
 		border_color: $accent
 		border: 2 2 2 2
