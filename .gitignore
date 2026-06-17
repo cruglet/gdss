@@ -16,3 +16,6 @@ export_presets.cfg
 .mono/
 data_*/
 mono_crash.*.json
+
+# GDSS compiled theme (regenerated; injected into exports by GdssExportPlugin)
+*.gdssc

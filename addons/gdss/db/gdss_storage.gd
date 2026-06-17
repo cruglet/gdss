@@ -7,8 +7,18 @@ static func get_save_path() -> String:
 	return ProjectSettings.get_setting("gdss/storage/save_path", "res://theme.tgdss")
 
 
+static func set_save_path(path: String) -> void:
+	ProjectSettings.set_setting("gdss/storage/save_path", path)
+	ProjectSettings.set_setting("gdss/storage/save_paths", PackedStringArray([path]))
+	ProjectSettings.save()
+
+
 static func get_cache_path() -> String:
 	return ProjectSettings.get_setting("gdss/storage/gdss_cache_path", "user://gdss_cache.gdssc")
+
+
+static func get_compiled_path() -> String:
+	return get_save_path().get_basename() + ".gdssc"
 
 
 static func get_save_paths() -> PackedStringArray:
@@ -59,12 +69,12 @@ static func write_source(path: String, source: String) -> void:
 	file.close()
 
 
-static func write_cache(parsed: Dictionary, global_defaults: Dictionary, instance_defaults: Dictionary, local_vars: Dictionary) -> void:
+static func write_cache(parsed: Dictionary, global_defaults: Dictionary, instance_defaults: Dictionary, local_vars: Dictionary, schemes: Dictionary = {}, meta: Dictionary = {}) -> void:
 	var cache_file: FileAccess = FileAccess.open(get_cache_path(), FileAccess.WRITE)
 	if cache_file == null:
 		printerr("[GDSS] Failed to open cache file for writing: ", get_cache_path())
 		return
-	cache_file.store_var({"parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars})
+	cache_file.store_var({"parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": schemes, "meta": meta})
 	cache_file.close()
 
 
@@ -80,7 +90,7 @@ static func save(source: String, parsed: Dictionary, global_defaults: Dictionary
 	if cache_file == null:
 		printerr("[GDSS] Failed to open cache file for writing: ", get_cache_path())
 		return
-	cache_file.store_var({"parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars})
+	cache_file.store_var({"parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": {}, "meta": {}})
 	cache_file.close()
 
 
@@ -105,3 +115,24 @@ static func load_data(path: String = "") -> Dictionary:
 		for key: String in (cache as Dictionary):
 			result[key] = (cache as Dictionary)[key]
 	return result
+
+
+static func write_compiled(source: String, data: Dictionary, source_modified: int) -> void:
+	var file: FileAccess = FileAccess.open(get_compiled_path(), FileAccess.WRITE)
+	if file == null:
+		printerr("[GDSS] Failed to write compiled theme: ", get_compiled_path())
+		return
+	file.store_var({"source": source, "data": data, "source_modified": source_modified})
+	file.close()
+
+
+static func load_compiled() -> Dictionary:
+	var path: String = get_compiled_path()
+	if not FileAccess.file_exists(path):
+		return {}
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {}
+	var result: Variant = file.get_var()
+	file.close()
+	return result if result is Dictionary else {}
