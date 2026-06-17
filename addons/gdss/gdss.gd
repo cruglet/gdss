@@ -6,6 +6,7 @@ extends EditorPlugin
 
 const DEBUG_MODE: bool = false
 const DEBUG_WAS_VISIBLE: StringName = &"gdss_was_visible"
+const CLASSES_META: StringName = &"gdss_classes"
 
 const GdssInspector = preload("uid://bhvd3stvftya8")
 const GDSS_EDITOR = preload("uid://bh4sv3ta53fmk")
@@ -133,6 +134,75 @@ static func get_instance_var(node: Node, name: String, fallback: Variant = null)
 ## Clears all GDSS instance variables from a specific node.
 static func clear_instance_vars(node: Node) -> void:
 	GdssInterpreter._instance_vars.erase(node.get_instance_id())
+
+
+## Returns the GDSS classes currently applied to [param node], in priority order.
+## [codeblock]
+## var classes: PackedStringArray = GDSS.get_classes(my_button)
+## [/codeblock]
+static func get_classes(node: Node) -> PackedStringArray:
+	return node.get_meta(CLASSES_META, PackedStringArray()) as PackedStringArray
+
+
+## Replaces every GDSS class on [param node] and reapplies its style.
+## [codeblock]
+## GDSS.set_classes(my_button, PackedStringArray(["GhostButton", "PillButton"]))
+## [/codeblock]
+static func set_classes(node: Node, classes: PackedStringArray) -> void:
+	node.set_meta(CLASSES_META, classes)
+	if node is CanvasItem:
+		GdssNodeHandler.refresh(node as CanvasItem)
+
+
+## Returns [code]true[/code] if [param gdss_class] is currently applied to [param node].
+static func has_class(node: Node, gdss_class: String) -> bool:
+	return get_classes(node).has(gdss_class)
+
+
+## Adds [param gdss_class] to [param node] and reapplies its style.
+## [br][br]
+## Does nothing if the class is already present.
+## [codeblock]
+## GDSS.add_class(my_button, "PillButton")
+## [/codeblock]
+static func add_class(node: Node, gdss_class: String) -> void:
+	var classes: PackedStringArray = get_classes(node)
+	if classes.has(gdss_class):
+		return
+	classes.append(gdss_class)
+	set_classes(node, classes)
+
+
+## Removes [param gdss_class] from [param node] and reapplies its style.
+## [br][br]
+## Does nothing if the class is not present.
+static func remove_class(node: Node, gdss_class: String) -> void:
+	var classes: PackedStringArray = get_classes(node)
+	var index: int = classes.find(gdss_class)
+	if index == -1:
+		return
+	classes.remove_at(index)
+	set_classes(node, classes)
+
+
+## Toggles [param gdss_class] on [param node], returning its new state
+## ([code]true[/code] if the class is now applied).
+## [codeblock]
+## var active: bool = GDSS.toggle_class(my_button, "Active")
+## [/codeblock]
+static func toggle_class(node: Node, gdss_class: String) -> bool:
+	if has_class(node, gdss_class):
+		remove_class(node, gdss_class)
+		return false
+	add_class(node, gdss_class)
+	return true
+
+
+## Removes all GDSS classes from [param node] and reapplies its style.
+static func clear_classes(node: Node) -> void:
+	if get_classes(node).is_empty():
+		return
+	set_classes(node, PackedStringArray())
 
 
 static func gpu_panels_enabled() -> bool:

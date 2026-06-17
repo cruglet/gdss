@@ -594,7 +594,7 @@ func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
 func _resolve_entry() -> Dictionary:
 	if ref == null:
 		return {}
-	var current_classes: PackedStringArray = ref.get_meta(&"gdss_classes", PackedStringArray()) as PackedStringArray
+	var current_classes: PackedStringArray = ref.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray
 	if not _entry_cache_dirty and _entry_cache_classes == current_classes:
 		return _entry_cache
 	var parsed: Dictionary[String, Dictionary] = GdssInterpreter.parsed

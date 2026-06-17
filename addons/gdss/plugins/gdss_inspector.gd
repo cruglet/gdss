@@ -115,7 +115,7 @@ class GdssClassesProperty extends EditorProperty:
 		if obj == null:
 			return
 		_node_type = (obj as Node).get_class()
-		_values = (obj.get_meta(&"gdss_classes", PackedStringArray()) as PackedStringArray).duplicate()
+		_values = (obj.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray).duplicate()
 		_page = clampi(_page, 0, _page_count() - 1)
 		_rebuild()
 
@@ -246,13 +246,13 @@ class GdssClassesProperty extends EditorProperty:
 		var obj: Object = get_edited_object()
 		if obj == null:
 			return
-		var old_val: PackedStringArray = obj.get_meta(&"gdss_classes", PackedStringArray())
+		var old_val: PackedStringArray = obj.get_meta(GDSS.CLASSES_META, PackedStringArray())
 		if old_val == _values:
 			return
 		var undo_redo: EditorUndoRedoManager = EditorInterface.get_editor_undo_redo()
 		undo_redo.create_action("Set GDSS Classes")
-		undo_redo.add_do_method(obj, &"set_meta", &"gdss_classes", _values.duplicate())
-		undo_redo.add_undo_method(obj, &"set_meta", &"gdss_classes", old_val)
+		undo_redo.add_do_method(obj, &"set_meta", GDSS.CLASSES_META, _values.duplicate())
+		undo_redo.add_undo_method(obj, &"set_meta", GDSS.CLASSES_META, old_val)
 		undo_redo.add_do_method(GdssNodeHandler, &"refresh", obj)
 		undo_redo.add_undo_method(GdssNodeHandler, &"refresh", obj)
 		undo_redo.commit_action()
