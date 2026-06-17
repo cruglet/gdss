@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://b34dwnq1cakei" path="res://demo/demo.gd" id="1_d6po2"]
 
-[node name="Demo" type="Control" unique_id=861984960]
+[node name="Demo" type="Control" unique_id=1543317550 node_paths=PackedStringArray("toggle_button")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -10,3 +10,463 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_d6po2")
+toggle_button = NodePath("Background/Margin/Column/Header/SwitchButton")
+
+[node name="Background" type="PanelContainer" parent="." unique_id=589487203 groups=["gdss"]]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Margin" type="MarginContainer" parent="Background" unique_id=576206703]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Column" type="VBoxContainer" parent="Background/Margin" unique_id=465745925]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Header" type="HBoxContainer" parent="Background/Margin/Column" unique_id=1452563589]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Background/Margin/Column/Header" unique_id=446977670 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "GDSS Demo"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="RandomizeButton" type="Button" parent="Background/Margin/Column/Header" unique_id=884577793 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Randomize accent"
+
+[node name="SwitchButton" type="Button" parent="Background/Margin/Column/Header" unique_id=1518789615 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Switch to light"
+
+[node name="Scroll" type="ScrollContainer" parent="Background/Margin/Column" unique_id=1483821396]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="Grid" type="GridContainer" parent="Background/Margin/Column/Scroll" unique_id=1977747540]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+columns = 4
+
+[node name="Card1" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=534073914 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card1" unique_id=105385011]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin" unique_id=504337496]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=199065793 groups=["gdss"]]
+layout_mode = 2
+text = "Card 1"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=157443564 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1215793918 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1304247291]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body/Actions" unique_id=1145148443 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body/Actions" unique_id=918289026 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Pill" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1026338500 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Pill action"
+metadata/gdss_classes = PackedStringArray("PillButton")
+
+[node name="Disabled" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1927635725 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+disabled = true
+text = "Disabled"
+
+[node name="Card2" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=961019697 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card2" unique_id=537984051]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin" unique_id=1252841994]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=919823664 groups=["gdss"]]
+layout_mode = 2
+text = "Card 2"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=1625172302 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=1961175547 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=1193225744]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body/Actions" unique_id=1483054342 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body/Actions" unique_id=1763732013 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Card3" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=1504487092 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card3" unique_id=1943556955]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin" unique_id=587711232]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=2137960383 groups=["gdss"]]
+layout_mode = 2
+text = "Card 3"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=1626594511 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=1122361937 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=667266791]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body/Actions" unique_id=1150745099 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body/Actions" unique_id=1541598720 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Card4" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=468885078 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card4" unique_id=666860901]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin" unique_id=857933407]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=507012934 groups=["gdss"]]
+layout_mode = 2
+text = "Card 4"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=523301291 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=982543893 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=1013118721]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body/Actions" unique_id=600146185 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body/Actions" unique_id=1422172618 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Card5" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=960803907 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card5" unique_id=877367426]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin" unique_id=1347378712]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=1893495366 groups=["gdss"]]
+layout_mode = 2
+text = "Card 5"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=807132018 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=73072989 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=843117973]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body/Actions" unique_id=662025307 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body/Actions" unique_id=1933748119 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Pill" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=222049489 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Pill action"
+metadata/gdss_classes = PackedStringArray("PillButton")
+
+[node name="Card6" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=204991413 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card6" unique_id=85352024]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin" unique_id=1852623510]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=205328396 groups=["gdss"]]
+layout_mode = 2
+text = "Card 6"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=701880063 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=462207349 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=152555229]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body/Actions" unique_id=1491592546 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body/Actions" unique_id=353504411 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Disabled" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=1311604284 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+disabled = true
+text = "Disabled"
+
+[node name="Card7" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=685267047 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card7" unique_id=1732146032]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin" unique_id=2014831152]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=374835859 groups=["gdss"]]
+layout_mode = 2
+text = "Card 7"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=11249696 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=1994867184 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=1431866359]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body/Actions" unique_id=1086176222 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body/Actions" unique_id=1958448458 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Card8" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=1692741552 groups=["gdss"]]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card8" unique_id=2108108311]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin" unique_id=1368749089]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=2122112310 groups=["gdss"]]
+layout_mode = 2
+text = "Card 8"
+metadata/gdss_classes = PackedStringArray("TitleLabel")
+
+[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=1827148029 groups=["gdss"]]
+layout_mode = 2
+text = "Buttons, inputs and a card surface, all GDSS-styled."
+autowrap_mode = 3
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=948120370 groups=["gdss"]]
+layout_mode = 2
+placeholder_text = "Type something…"
+
+[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=264387667]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body/Actions" unique_id=1391450093 groups=["gdss"]]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_default_cursor_shape = 2
+text = "Action"
+
+[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body/Actions" unique_id=20332613 groups=["gdss"]]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[connection signal="pressed" from="Background/Margin/Column/Header/RandomizeButton" to="." method="_on_randomize_pressed"]
+[connection signal="pressed" from="Background/Margin/Column/Header/SwitchButton" to="." method="_on_switch_pressed"]

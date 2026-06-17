@@ -205,6 +205,38 @@ static func clear_classes(node: Node) -> void:
 	set_classes(node, PackedStringArray())
 
 
+## Returns [code]true[/code] if GDSS styling is currently enabled on [param node].
+static func is_gdss_enabled(node: Node) -> bool:
+	return node.is_in_group(GdssNodeHandler.GROUP)
+
+
+## Enables GDSS styling on [param node].
+## [br][br]
+## Adds the node to the GDSS group and binds it so its style is applied and kept
+## in sync. Has no visible effect on node types GDSS does not style.
+## [codeblock]
+## GDSS.enable_gdss(my_button)
+## [/codeblock]
+static func enable_gdss(node: Node) -> void:
+	if not node.is_in_group(GdssNodeHandler.GROUP):
+		node.add_to_group(GdssNodeHandler.GROUP, true)
+	if node is CanvasItem:
+		GdssNodeHandler.bind(node as CanvasItem)
+
+
+## Disables GDSS styling on [param node].
+## [br][br]
+## Unbinds the node, removes its GDSS style overrides, and takes it out of the
+## GDSS group.
+## [codeblock]
+## GDSS.disable_gdss(my_button)
+## [/codeblock]
+static func disable_gdss(node: Node) -> void:
+	if node is CanvasItem and _get_gdss_nodes().has(node.get_class()):
+		GdssNodeHandler.unbind(node as CanvasItem)
+	node.remove_from_group(GdssNodeHandler.GROUP)
+
+
 static func gpu_panels_enabled() -> bool:
 	if _gpu_panels == -1:
 		if not ProjectSettings.has_setting("gdss/rendering/gpu_panels"):
