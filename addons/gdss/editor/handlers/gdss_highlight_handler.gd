@@ -129,6 +129,12 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var col_default: Color
 	var col_global: Color
 	var col_instance: Color
+	var col_critical: Color
+	var col_warning: Color
+	var col_notice: Color
+	var _critical_markers: PackedStringArray = []
+	var _warning_markers: PackedStringArray = []
+	var _notice_markers: PackedStringArray = []
 
 
 	func refresh_colors() -> void:
@@ -150,6 +156,56 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		col_variable = s.get_setting("text_editor/theme/highlighting/function_color")
 		col_global = s.get_setting("text_editor/theme/highlighting/string_placeholder_color")
 		col_instance = s.get_setting("text_editor/theme/highlighting/string_placeholder_color")
+		col_critical = _get_marker_color(s, "critical_color")
+		col_warning = _get_marker_color(s, "warning_color")
+		col_notice = _get_marker_color(s, "notice_color")
+		_critical_markers = _get_marker_list(s, "critical_list")
+		_warning_markers = _get_marker_list(s, "warning_list")
+		_notice_markers = _get_marker_list(s, "notice_list")
+
+
+	func _get_marker_color(s: EditorSettings, key: String) -> Color:
+		var path: String = "text_editor/theme/highlighting/comment_markers/" + key
+		return s.get_setting(path) if s.has_setting(path) else col_comment
+
+
+	func _get_marker_list(s: EditorSettings, key: String) -> PackedStringArray:
+		var path: String = "text_editor/theme/highlighting/comment_markers/" + key
+		var result: PackedStringArray = []
+		if not s.has_setting(path):
+			return result
+		for entry: String in str(s.get_setting(path)).split(",", false):
+			var trimmed: String = entry.strip_edges()
+			if not trimmed.is_empty():
+				result.append(trimmed)
+		return result
+
+
+	func _marker_color_for(word: String) -> Variant:
+		if _critical_markers.has(word):
+			return col_critical
+		if _warning_markers.has(word):
+			return col_warning
+		if _notice_markers.has(word):
+			return col_notice
+		return null
+
+
+	func _highlight_comment_markers(text: String, start: int, result: Dictionary) -> void:
+		var n: int = text.length()
+		var i: int = start
+		while i < n:
+			if not _is_word_char(text[i]):
+				i += 1
+				continue
+			var word_start: int = i
+			while i < n and _is_word_char(text[i]):
+				i += 1
+			var marker_color: Variant = _marker_color_for(text.substr(word_start, i - word_start))
+			if marker_color != null:
+				result[word_start] = {"color": marker_color}
+				if i < n:
+					result[i] = {"color": col_comment}
 
 
 	func invalidate_cache() -> void:
@@ -190,6 +246,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 
 			if c == "#":
 				result[i] = {"color": col_comment}
+				_highlight_comment_markers(text, i, result)
 				break
 
 			if c == "\"":
@@ -251,6 +308,11 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				i += 1
 				continue
 
+			if c == ";":
+				result[i] = {"color": col_default}
+				i += 1
+				continue
+
 			if c.is_valid_int() or (c == "-" and i + 1 < line_length and text[i + 1].is_valid_int()):
 				var start: int = i
 				i += 1
@@ -273,7 +335,9 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					i += 1
 					continue
 				var word: String = text.substr(start, i - start)
-				var before: String = text.substr(0, start)
+				var before_full: String = text.substr(0, start)
+				var semi: int = before_full.rfind(";")
+				var before: String = before_full.substr(semi + 1) if semi != -1 else before_full
 				var trimmed_before: String = before.rstrip(" \t")
 				var is_after_colon: bool = trimmed_before.ends_with(":") and before.length() == trimmed_before.length()
 				var after: String = text.substr(i).strip_edges()
@@ -282,7 +346,9 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				var brace_idx: int = trimmed_before.rfind("{")
 				var in_value: bool = colon_idx != -1 and colon_idx > brace_idx and not is_after_colon
 
-				if is_after_colon and states.has(word):
+				if word == "pass":
+					result[start] = {"color": col_control_flow}
+				elif is_after_colon and states.has(word):
 					var before_colon: String = trimmed_before.substr(0, trimmed_before.length() - 1).strip_edges()
 					var valid: bool = false
 					if brace_depth > 0:

@@ -80,8 +80,29 @@ func _build_from_objects() -> void:
 	editor.code_completion_prefixes = prefixes
 
 
+func _caret_in_comment() -> bool:
+	var line: String = editor.get_line(editor.get_caret_line())
+	var col: int = mini(editor.get_caret_column(), line.length())
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for i: int in col:
+		var c: String = line[i]
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+		elif c == "#":
+			return true
+	return false
+
+
 func _on_text_changed() -> void:
 	_parse_user_variables()
+	if _caret_in_comment():
+		editor.cancel_code_completion()
+		return
 	var word: String = _get_current_word()
 	_update_code_hint(word)
 	if word.begins_with("$"):
@@ -101,6 +122,9 @@ func _on_text_changed() -> void:
 
 
 func _on_completion_requested() -> void:
+	if _caret_in_comment():
+		editor.cancel_code_completion()
+		return
 	_parse_user_variables()
 	var word: String = _get_current_word()
 	_update_completions(word)

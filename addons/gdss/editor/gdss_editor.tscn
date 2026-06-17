@@ -7,12 +7,12 @@
 [ext_resource type="Texture2D" uid="uid://ceogrxr1lg3up" path="res://addons/gdss/editor/Map.svg" id="5_50ht1"]
 [ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/ActionCopy.svg" id="5_by7tt"]
 [ext_resource type="Texture2D" uid="uid://c55pmw55mh1ut" path="res://addons/gdss/editor/Doc.svg" id="5_djuub"]
-[ext_resource type="Script" path="res://addons/gdss/editor/gdss_outline.gd" id="9_outln"]
+[ext_resource type="Script" uid="uid://b6selo2ptljhh" path="res://addons/gdss/editor/gdss_outline.gd" id="9_outln"]
 
-[sub_resource type="GDScript" id="GDScript_djuub"]
+[sub_resource type="GDScript" id="GDScript_rjngg"]
 
-[sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_rjngg"]
-script = SubResource("GDScript_djuub")
+[sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_718be"]
+script = SubResource("GDScript_rjngg")
 
 [node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button", "caret_pos_label", "zoom_percentage", "outline")]
 clip_contents = true
@@ -71,11 +71,6 @@ grow_vertical = 2
 custom_minimum_size = Vector2(2, 0)
 layout_mode = 2
 
-[node name="DocButton" type="Button" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=1864495565]
-layout_mode = 2
-theme_type_variation = &"FlatButton"
-icon = ExtResource("5_djuub")
-
 [node name="Control" type="Control" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=822744024]
 layout_mode = 2
 size_flags_horizontal = 3
@@ -85,6 +80,11 @@ layout_mode = 2
 theme_type_variation = &"FlatButton"
 toggle_mode = true
 icon = ExtResource("5_50ht1")
+
+[node name="DocButton" type="Button" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=1864495565]
+layout_mode = 2
+theme_type_variation = &"FlatButton"
+icon = ExtResource("5_djuub")
 
 [node name="Control2" type="Control" parent="VBoxContainer/TitleLabel/HBoxContainer" unique_id=1429785962]
 custom_minimum_size = Vector2(2, 0)
@@ -101,12 +101,13 @@ theme_override_constants/margin_bottom = 8
 [node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/MarginContainer" unique_id=834145104]
 layout_mode = 2
 
-[node name="HSplitContainer" type="HSplitContainer" parent="VBoxContainer/MarginContainer/VBoxContainer"]
+[node name="HSplitContainer" type="HSplitContainer" parent="VBoxContainer/MarginContainer/VBoxContainer" unique_id=225068908]
 layout_mode = 2
 size_flags_vertical = 3
+split_offsets = PackedInt32Array(160)
 split_offset = 160
 
-[node name="GdssOutline" type="VBoxContainer" parent="VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer" node_paths=PackedStringArray("code_edit")]
+[node name="GdssOutline" type="VBoxContainer" parent="VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer" unique_id=2056757957 node_paths=PackedStringArray("code_edit")]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
 script = ExtResource("9_outln")
@@ -119,10 +120,12 @@ size_flags_vertical = 3
 scroll_smooth = true
 minimap_draw = true
 minimap_width = 100
-syntax_highlighter = SubResource("SyntaxHighlighter_rjngg")
+syntax_highlighter = SubResource("SyntaxHighlighter_718be")
 highlight_current_line = true
 draw_tabs = true
+symbol_lookup_on_click = true
 line_folding = true
+line_length_guidelines = Array[int]([80, 100])
 gutters_draw_line_numbers = true
 code_completion_enabled = true
 code_completion_prefixes = Array[String](["@", ":", "	", "$", "B", "s", "a", "b", "c", "e", "f", "p", "t", "o", "h", "i", "C", "u", "r", "l", "w", "m", "F", "v", "G", "z", "g", "H", "d", "I", "L", "M", "O", "P", "R", "n", "S", "T", "V"])
@@ -163,7 +166,7 @@ layout_mode = 2
 layout_mode = 2
 text = "0:0"
 
-[connection signal="pressed" from="VBoxContainer/TitleLabel/HBoxContainer/DocButton" to="." method="_on_doc_button_pressed"]
 [connection signal="toggled" from="VBoxContainer/TitleLabel/HBoxContainer/ToggleMapButton" to="." method="_on_toggle_map_button_toggled"]
+[connection signal="pressed" from="VBoxContainer/TitleLabel/HBoxContainer/DocButton" to="." method="_on_doc_button_pressed"]
 [connection signal="pressed" from="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton" to="." method="_on_copy_button_pressed"]
 [connection signal="pressed" from="VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ZoomPercentage" to="." method="_on_zoom_percentage_pressed"]

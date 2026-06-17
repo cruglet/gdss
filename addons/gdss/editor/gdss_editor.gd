@@ -23,6 +23,8 @@ var font_max: float
 var _has_unsaved_changes: bool = false
 var _suppress_dirty: bool = false
 var _current_file_path: String = ""
+var _saved_label: Label
+var _saved_tween: Tween
 
 var _chunk_tabs: TabBar
 var _chunks: Array[Dictionary] = []
@@ -33,9 +35,25 @@ var _error_target_line: int = 0
 var _error_bg: Color = Color.RED
 var _all_errors: Array = []
 var _highlighted_lines: PackedInt32Array = []
-var _search_bar: HBoxContainer
+var _search_bar: VBoxContainer
 var _search_field: LineEdit
 var _search_label: Label
+var _replace_row: HBoxContainer
+var _replace_field: LineEdit
+var _search_matches: Array[Vector2i] = []
+var _search_index: int = -1
+var _zoom_menu: PopupMenu
+
+enum {
+	MENU_SAVE,
+	MENU_FIND,
+	MENU_REPLACE,
+	MENU_COMMENT,
+	MENU_SPACES_TO_TABS,
+	MENU_MOVE_UP,
+	MENU_MOVE_DOWN,
+	MENU_SELECT_NEXT,
+}
 
 var file_name: String:
 	get():
@@ -45,7 +63,7 @@ var file_name: String:
 func _ready() -> void:
 	initial_font_size = code_edit.get_theme_font_size(&"font_size")
 	font_size = initial_font_size
-	font_min = initial_font_size * 0.5
+	font_min = initial_font_size * 0.25
 	font_max = initial_font_size * 3
 	if not is_running_as_plugin():
 		set_process(false)
@@ -61,6 +79,7 @@ func _ready() -> void:
 			if e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 				_jump_to_error()
 	)
+	_setup_saved_label()
 	
 	copy_button.icon = EditorInterface.get_editor_theme().get_icon(&"ActionCopy", &"EditorIcons")
 	
@@ -74,6 +93,7 @@ func _ready() -> void:
 	code_edit.caret_changed.connect(_on_code_edit_caret_changed)
 	_setup_outline_toggle()
 	_setup_location_toggle()
+	_setup_menu_bar()
 	_setup_chunk_tabs()
 	_setup_search()
 	_update_editor()
@@ -421,36 +441,115 @@ func show_error(message: String, line_num: int, total_errors: int = 1) -> void:
 
 func _on_code_edit_input(event: InputEvent) -> void:
 	if event is InputEventMagnifyGesture:
-		font_size += (event.factor - 1) * 5
-		font_size = clamp(font_size, font_min, font_max)
-	elif event is InputEventKey:
-		var key: InputEventKey = event as InputEventKey
-		if key == null or not key.pressed:
-			return
-		if key.keycode == KEY_EQUAL and key.is_command_or_control_pressed():
-			font_size += 4
-		if key.keycode == KEY_MINUS and key.is_command_or_control_pressed():
-			font_size -= 4
-		if key.keycode == KEY_S and key.is_command_or_control_pressed():
-			EditorInterface.save_scene()
-			GdssInterpreter.get_instance().save_current()
-			code_edit.get_viewport().set_input_as_handled()
-		if key.keycode == KEY_I and key.is_command_or_control_pressed() and key.shift_pressed:
-			_convert_spaces_to_tabs()
-			code_edit.get_viewport().set_input_as_handled()
-		if key.keycode == KEY_SLASH and key.is_command_or_control_pressed():
-			_toggle_comment()
-			code_edit.get_viewport().set_input_as_handled()
-		if key.keycode == KEY_D and key.is_command_or_control_pressed():
-			_select_next_occurrence()
-			code_edit.get_viewport().set_input_as_handled()
-		if key.keycode == KEY_F and key.is_command_or_control_pressed():
-			_open_search()
-			code_edit.get_viewport().set_input_as_handled()
-	else:
+		font_size += ((event as InputEventMagnifyGesture).factor - 1) * 5
+		_apply_font_size()
 		return
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event as InputEventMouseButton
+		if not (mb.pressed and mb.is_command_or_control_pressed()):
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			font_size += 2
+			_apply_font_size()
+			code_edit.get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			font_size -= 2
+			_apply_font_size()
+			code_edit.get_viewport().set_input_as_handled()
+		return
+	if not event is InputEventKey:
+		return
+	var key: InputEventKey = event as InputEventKey
+	if not key.pressed:
+		return
+	if key.keycode == KEY_EQUAL and key.is_command_or_control_pressed():
+		font_size += 4
+		_apply_font_size()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_MINUS and key.is_command_or_control_pressed():
+		font_size -= 4
+		_apply_font_size()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_S and key.is_command_or_control_pressed():
+		GdssInterpreter.get_instance().save_current()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_I and key.is_command_or_control_pressed() and key.shift_pressed:
+		_convert_spaces_to_tabs()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_SLASH and key.is_command_or_control_pressed():
+		_toggle_comment()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_D and key.is_command_or_control_pressed():
+		_select_next_occurrence()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_F and key.is_command_or_control_pressed():
+		_open_search(key.shift_pressed)
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_UP and key.alt_pressed:
+		code_edit.move_lines_up()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_DOWN and key.alt_pressed:
+		code_edit.move_lines_down()
+		code_edit.get_viewport().set_input_as_handled()
+
+
+func _apply_font_size() -> void:
+	font_size = clampf(font_size, font_min, font_max)
 	code_edit.add_theme_font_size_override(&"font_size", int(font_size))
-	zoom_percentage.text = "%s%%" % int((font_size / initial_font_size) * 100)
+	zoom_percentage.text = "%d%%" % int(round(font_size / initial_font_size * 100.0))
+
+
+func _set_zoom_percent(percent: int) -> void:
+	font_size = initial_font_size * percent / 100.0
+	_apply_font_size()
+
+
+func _setup_menu_bar() -> void:
+	var top_bar: Node = title_label.get_node_or_null("HBoxContainer")
+	if top_bar == null:
+		return
+	var menu_bar: MenuBar = MenuBar.new()
+	menu_bar.flat = true
+	var file_menu: PopupMenu = PopupMenu.new()
+	file_menu.name = "File"
+	file_menu.add_item("Save  (Ctrl+S)", MENU_SAVE)
+	file_menu.id_pressed.connect(_on_menu_id_pressed)
+	menu_bar.add_child(file_menu)
+	var edit_menu: PopupMenu = PopupMenu.new()
+	edit_menu.name = "Edit"
+	edit_menu.add_item("Find  (Ctrl+F)", MENU_FIND)
+	edit_menu.add_item("Find & Replace  (Ctrl+Shift+F)", MENU_REPLACE)
+	edit_menu.add_separator()
+	edit_menu.add_item("Toggle Comment  (Ctrl+/)", MENU_COMMENT)
+	edit_menu.add_item("Convert Spaces to Tabs  (Ctrl+Shift+I)", MENU_SPACES_TO_TABS)
+	edit_menu.add_separator()
+	edit_menu.add_item("Move Line Up  (Alt+Up)", MENU_MOVE_UP)
+	edit_menu.add_item("Move Line Down  (Alt+Down)", MENU_MOVE_DOWN)
+	edit_menu.add_item("Select Next Occurrence  (Ctrl+D)", MENU_SELECT_NEXT)
+	edit_menu.id_pressed.connect(_on_menu_id_pressed)
+	menu_bar.add_child(edit_menu)
+	top_bar.add_child(menu_bar)
+	top_bar.move_child(menu_bar, 0)
+
+
+func _on_menu_id_pressed(id: int) -> void:
+	match id:
+		MENU_SAVE:
+			GdssInterpreter.get_instance().save_current()
+		MENU_FIND:
+			_open_search(false)
+		MENU_REPLACE:
+			_open_search(true)
+		MENU_COMMENT:
+			_toggle_comment()
+		MENU_SPACES_TO_TABS:
+			_convert_spaces_to_tabs()
+		MENU_MOVE_UP:
+			code_edit.move_lines_up()
+		MENU_MOVE_DOWN:
+			code_edit.move_lines_down()
+		MENU_SELECT_NEXT:
+			_select_next_occurrence()
 
 
 func _toggle_comment() -> void:
@@ -506,49 +605,75 @@ func _setup_search() -> void:
 	var split: Control = code_edit.get_parent() as Control
 	if split == null:
 		return
-	_search_bar = HBoxContainer.new()
+	var theme: Theme = EditorInterface.get_editor_theme()
+	_search_bar = VBoxContainer.new()
 	_search_bar.visible = false
+	var find_row: HBoxContainer = HBoxContainer.new()
 	_search_field = LineEdit.new()
 	_search_field.placeholder_text = "Find…"
 	_search_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_search_bar.add_child(_search_field)
+	find_row.add_child(_search_field)
 	_search_label = Label.new()
-	_search_bar.add_child(_search_label)
-	var prev_button: Button = Button.new()
-	prev_button.text = "<"
-	prev_button.flat = true
-	_search_bar.add_child(prev_button)
-	var next_button: Button = Button.new()
-	next_button.text = ">"
-	next_button.flat = true
-	_search_bar.add_child(next_button)
-	var close_button: Button = Button.new()
-	close_button.text = "✕"
-	close_button.flat = true
-	_search_bar.add_child(close_button)
+	_search_label.custom_minimum_size = Vector2(52, 0)
+	_search_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	find_row.add_child(_search_label)
+	var prev_button: Button = _make_tool_button(theme, &"MoveUp", "Previous match")
+	prev_button.pressed.connect(_advance_search.bind(-1))
+	find_row.add_child(prev_button)
+	var next_button: Button = _make_tool_button(theme, &"MoveDown", "Next match")
+	next_button.pressed.connect(_advance_search.bind(1))
+	find_row.add_child(next_button)
+	var close_button: Button = _make_tool_button(theme, &"Close", "Close")
+	close_button.pressed.connect(_close_search)
+	find_row.add_child(close_button)
+	_search_bar.add_child(find_row)
+	_replace_row = HBoxContainer.new()
+	_replace_row.visible = false
+	_replace_field = LineEdit.new()
+	_replace_field.placeholder_text = "Replace…"
+	_replace_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_replace_row.add_child(_replace_field)
+	var replace_button: Button = Button.new()
+	replace_button.text = "Replace"
+	replace_button.pressed.connect(_replace_current)
+	_replace_row.add_child(replace_button)
+	var replace_all_button: Button = Button.new()
+	replace_all_button.text = "Replace All"
+	replace_all_button.pressed.connect(_replace_all)
+	_replace_row.add_child(replace_all_button)
+	_search_bar.add_child(_replace_row)
 	var inner_box: Node = split.get_parent()
 	inner_box.add_child(_search_bar)
 	inner_box.move_child(_search_bar, 0)
-	_search_field.text_changed.connect(func(_text: String) -> void: _step_search(0))
-	_search_field.text_submitted.connect(func(_text: String) -> void: _step_search(1))
-	prev_button.pressed.connect(_step_search.bind(-1))
-	next_button.pressed.connect(_step_search.bind(1))
-	close_button.pressed.connect(_close_search)
-	_search_field.gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventKey and event.pressed and (event as InputEventKey).keycode == KEY_ESCAPE:
-			_close_search()
-	)
+	_search_field.text_changed.connect(_on_search_text_changed)
+	_search_field.text_submitted.connect(func(_text: String) -> void: _advance_search(1))
+	_search_field.gui_input.connect(_on_search_field_input)
+	_replace_field.text_submitted.connect(func(_text: String) -> void: _replace_current())
+	_replace_field.gui_input.connect(_on_search_field_input)
 
 
-func _open_search() -> void:
+func _make_tool_button(theme: Theme, icon_name: StringName, tooltip: String) -> Button:
+	var button: Button = Button.new()
+	button.theme_type_variation = &"FlatButton"
+	button.tooltip_text = tooltip
+	if theme.has_icon(icon_name, &"EditorIcons"):
+		button.icon = theme.get_icon(icon_name, &"EditorIcons")
+	else:
+		button.text = tooltip.left(1)
+	return button
+
+
+func _open_search(replace_mode: bool = false) -> void:
 	if _search_bar == null:
 		return
 	_search_bar.visible = true
+	_replace_row.visible = replace_mode
 	if code_edit.has_selection():
 		_search_field.text = code_edit.get_selected_text()
+	_rebuild_matches()
+	_focus_match(_search_index)
 	_search_field.grab_focus()
 	_search_field.select_all()
-	_step_search(0)
 
 
 func _close_search() -> void:
@@ -557,43 +682,127 @@ func _close_search() -> void:
 	code_edit.grab_focus()
 
 
-func _step_search(direction: int) -> void:
+func _on_search_text_changed(_text: String) -> void:
+	_rebuild_matches()
+	_focus_match(_search_index)
+
+
+func _on_search_field_input(event: InputEvent) -> void:
+	if not event is InputEventKey:
+		return
+	var key: InputEventKey = event as InputEventKey
+	if not key.pressed:
+		return
+	if key.keycode == KEY_ESCAPE:
+		_close_search()
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_UP:
+		_advance_search(-1)
+		get_viewport().set_input_as_handled()
+	elif key.keycode == KEY_DOWN:
+		_advance_search(1)
+		get_viewport().set_input_as_handled()
+
+
+func _rebuild_matches() -> void:
+	_search_matches.clear()
 	var needle: String = _search_field.text
 	if needle.is_empty():
-		_search_label.text = ""
+		_search_index = -1
+		_update_search_label()
 		return
-	var flags: int = TextEdit.SEARCH_BACKWARDS if direction < 0 else 0
-	var from_line: int = code_edit.get_caret_line()
-	var from_column: int = code_edit.get_caret_column() + (1 if direction > 0 else 0)
-	var result: Vector2i = code_edit.search(needle, flags, from_line, from_column)
-	if result.x == -1:
-		var wrap_line: int = code_edit.get_line_count() - 1 if direction < 0 else 0
-		var wrap_column: int = code_edit.get_line(wrap_line).length() if direction < 0 else 0
-		result = code_edit.search(needle, flags, wrap_line, wrap_column)
-	if result.x == -1:
-		_search_label.text = "0/0"
-		return
-	code_edit.set_caret_line(result.y)
-	code_edit.set_caret_column(result.x)
-	code_edit.select(result.y, result.x, result.y, result.x + needle.length())
-	code_edit.center_viewport_to_caret()
-	_search_label.text = "%d found" % _count_matches(needle)
-
-
-func _count_matches(needle: String) -> int:
-	var count: int = 0
-	var result: Vector2i = code_edit.search(needle, 0, 0, 0)
-	while result.x != -1 and count < 9999:
-		count += 1
-		var next_column: int = result.x + needle.length()
-		var line: int = result.y
-		if next_column > code_edit.get_line(line).length():
-			line += 1
-			next_column = 0
-			if line >= code_edit.get_line_count():
+	var lower_needle: String = needle.to_lower()
+	var lines: PackedStringArray = code_edit.text.split("\n")
+	for line_idx: int in lines.size():
+		var hay: String = lines[line_idx].to_lower()
+		var from: int = 0
+		while true:
+			var found: int = hay.find(lower_needle, from)
+			if found == -1:
 				break
-		result = code_edit.search(needle, 0, line, next_column)
-	return count
+			_search_matches.append(Vector2i(found, line_idx))
+			from = found + needle.length()
+	_search_index = _nearest_match_index()
+	_update_search_label()
+
+
+func _nearest_match_index() -> int:
+	if _search_matches.is_empty():
+		return -1
+	var line: int = code_edit.get_caret_line()
+	var col: int = code_edit.get_caret_column()
+	if code_edit.has_selection():
+		line = code_edit.get_selection_from_line()
+		col = code_edit.get_selection_from_column()
+	for i: int in _search_matches.size():
+		var m: Vector2i = _search_matches[i]
+		if m.y > line or (m.y == line and m.x >= col):
+			return i
+	return 0
+
+
+func _advance_search(direction: int) -> void:
+	if _search_matches.is_empty():
+		_rebuild_matches()
+	if _search_matches.is_empty():
+		_update_search_label()
+		return
+	if _search_index == -1:
+		_search_index = _nearest_match_index()
+	else:
+		_search_index = (_search_index + direction + _search_matches.size()) % _search_matches.size()
+	_focus_match(_search_index)
+
+
+func _focus_match(index: int) -> void:
+	if index < 0 or index >= _search_matches.size():
+		_update_search_label()
+		return
+	var m: Vector2i = _search_matches[index]
+	var length: int = _search_field.text.length()
+	code_edit.remove_secondary_carets()
+	code_edit.set_caret_line(m.y)
+	code_edit.set_caret_column(m.x + length)
+	code_edit.select(m.y, m.x, m.y, m.x + length)
+	code_edit.center_viewport_to_caret()
+	_update_search_label()
+
+
+func _update_search_label() -> void:
+	if _search_matches.is_empty():
+		_search_label.text = "" if _search_field.text.is_empty() else "0/0"
+		return
+	_search_label.text = "%d/%d" % [_search_index + 1, _search_matches.size()]
+
+
+func _replace_current() -> void:
+	var needle: String = _search_field.text
+	if needle.is_empty() or _search_index < 0 or _search_index >= _search_matches.size():
+		return
+	if code_edit.has_selection() and code_edit.get_selected_text().to_lower() == needle.to_lower():
+		code_edit.begin_complex_operation()
+		code_edit.delete_selection()
+		code_edit.insert_text_at_caret(_replace_field.text)
+		code_edit.end_complex_operation()
+	_rebuild_matches()
+	_focus_match(_search_index)
+
+
+func _replace_all() -> void:
+	var needle: String = _search_field.text
+	if needle.is_empty() or _search_matches.is_empty():
+		return
+	code_edit.remove_secondary_carets()
+	code_edit.begin_complex_operation()
+	for idx: int in range(_search_matches.size() - 1, -1, -1):
+		var m: Vector2i = _search_matches[idx]
+		code_edit.select(m.y, m.x, m.y, m.x + needle.length())
+		code_edit.delete_selection()
+		code_edit.set_caret_line(m.y)
+		code_edit.set_caret_column(m.x)
+		code_edit.insert_text_at_caret(_replace_field.text)
+	code_edit.end_complex_operation()
+	_rebuild_matches()
 
 
 func _on_code_edit_caret_changed() -> void:
@@ -627,7 +836,7 @@ func load_file(path: String) -> void:
 	_current_file_path = path
 	if data.has("source"):
 		code_edit.text = data["source"]
-	_user_saved()
+	_user_saved(false)
 
 
 func _prompt_save() -> void:
@@ -641,9 +850,36 @@ func _clear_suppress_dirty() -> void:
 	_suppress_dirty = false
 
 
-func _user_saved() -> void:
+func _user_saved(flash: bool = true) -> void:
 	_has_unsaved_changes = false
 	title_label.text = file_name
+	if flash:
+		_show_saved()
+
+
+func _show_saved() -> void:
+	if _saved_label == null:
+		return
+	if _saved_tween != null and _saved_tween.is_valid():
+		_saved_tween.kill()
+	_saved_label.text = "Saved!"
+	_saved_label.modulate.a = 1.0
+	_saved_tween = create_tween().set_ease(Tween.EASE_IN)
+	_saved_tween.tween_interval(0.8)
+	_saved_tween.tween_property(_saved_label, "modulate:a", 0.0, 0.7)
+	_saved_tween.tween_callback(func() -> void:
+		_saved_label.text = ""
+	)
+
+
+func _setup_saved_label() -> void:
+	_saved_label = Label.new()
+	_saved_label.add_theme_font_override(&"font", EditorInterface.get_editor_theme().get_font(&"expression", &"EditorFonts"))
+	_saved_label.add_theme_color_override(&"font_color", EditorInterface.get_editor_theme().get_color(&"success_color", &"Editor"))
+	_saved_label.modulate = Color(1, 1, 1, 0)
+	var bar: Node = error_label.get_parent()
+	bar.add_child(_saved_label)
+	bar.move_child(_saved_label, 0)
 
 
 func get_current_file_path() -> String:
@@ -690,7 +926,19 @@ func _on_doc_button_pressed() -> void:
 
 
 func _on_zoom_percentage_pressed() -> void:
-	font_size = initial_font_size
-	code_edit.add_theme_font_size_override("font_size", initial_font_size)
-	zoom_percentage.text = "100%"
+	_ensure_zoom_menu()
+	_zoom_menu.reset_size()
+	var origin: Vector2 = zoom_percentage.get_screen_position()
+	_zoom_menu.position = Vector2i(int(origin.x), int(origin.y - _zoom_menu.size.y))
+	_zoom_menu.popup()
+
+
+func _ensure_zoom_menu() -> void:
+	if _zoom_menu != null:
+		return
+	_zoom_menu = PopupMenu.new()
+	for level: int in [25, 50, 75, 100, 150, 200, 300]:
+		_zoom_menu.add_item("%d%%" % level, level)
+	_zoom_menu.id_pressed.connect(_set_zoom_percent)
+	zoom_percentage.add_child(_zoom_menu)
 	

@@ -136,6 +136,30 @@ func _strip_line_comment(s: String) -> String:
 	return s
 
 
+# Splits a line into statements on unquoted semicolons, treating ";" like a newline.
+func _split_statements(line: String) -> PackedStringArray:
+	var result: PackedStringArray = []
+	var current: String = ""
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for c: String in line:
+		if in_quote:
+			current += c
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+			current += c
+		elif c == ";":
+			result.append(current)
+			current = ""
+		else:
+			current += c
+	result.append(current)
+	return result
+
+
 func _method_name_of(call_text: String) -> String:
 	return call_text.substr(0, call_text.find("(")).strip_edges()
 
@@ -290,8 +314,15 @@ func check_errors(source: String) -> Array[Array]:
 	var selector_stack: Array[String] = []
 	var declared_vars: Dictionary = {}
 
-	for i: int in lines.size():
-		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+	var statements: Array[Array] = []
+	for line_idx: int in lines.size():
+		var line_text: String = _strip_line_comment(lines[line_idx].strip_edges())
+		for raw_stmt: String in _split_statements(line_text):
+			statements.append([raw_stmt.strip_edges(), line_idx])
+
+	for entry: Array in statements:
+		var stripped: String = entry[0]
+		var i: int = entry[1]
 
 		if stripped.is_empty():
 			continue
@@ -585,7 +616,7 @@ func _tokenize_value(raw: String) -> Array[String]:
 				tokens.append(current.strip_edges())
 				current = ""
 			tokens.append(ch)
-		elif ch == " " or ch == "\t":
+		elif ch == " " or ch == "\t" or ch == ";":
 			if not current.strip_edges().is_empty():
 				tokens.append(current.strip_edges())
 				current = ""
@@ -663,7 +694,7 @@ func _tokenize(source: String) -> Array[String]:
 					tokens.append(current.strip_edges())
 					current = ""
 				tokens.append(ch)
-			elif ch == " " or ch == "\t":
+			elif ch == " " or ch == "\t" or ch == ";":
 				if not current.strip_edges().is_empty():
 					tokens.append(current.strip_edges())
 					current = ""
