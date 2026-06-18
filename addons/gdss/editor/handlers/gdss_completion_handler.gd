@@ -18,11 +18,13 @@ var _last_hover_word: String = ""
 
 var _completion_color: Color
 
-static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*:")
-static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*:")
-static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*:")
+static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*[:=]")
+static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*[:=]")
+static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*[:=]")
 static var _re_node_open: RegEx = RegEx.create_from_string(r"^([\w][\w\s,]*)(?::(\w+))?\s*\{")
 static var _re_variant_open: RegEx = RegEx.create_from_string(r"^:([\w][\w\s,:]*)?\s*\{")
+static var _re_scheme_open: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
+static var _re_meta_open: RegEx = RegEx.create_from_string(r"^@meta\b")
 
 const BUILTIN_COLORS: Array[String] = [
 	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
@@ -112,7 +114,7 @@ func _on_text_changed() -> void:
 	if word.is_empty():
 		var context: Dictionary = _get_context()
 		var type: String = context.get("type", "")
-		if type == "property_value" or type == "variant_decl":
+		if type == "property_value" or type == "variant_decl" or type == "scheme_block" or type == "meta_block":
 			editor.request_code_completion(true)
 			return
 		editor.cancel_code_completion()
@@ -185,6 +187,10 @@ func _update_completions(word: String) -> void:
 			_complete_values(word, context.get("style", ""), context.get("property", ""))
 		"variant_block":
 			_complete_properties(word, context.get("style", ""))
+		"scheme_block":
+			_complete_scheme_vars(word)
+		"meta_block":
+			_complete_meta_keys(word)
 	
 	editor.update_code_completion_options(true)
 
@@ -342,6 +348,10 @@ func _complete_at_directives(word: String) -> void:
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@global var", "global var ", _completion_color, _get_icon(&"MemberAnnotation"))
 	if word.is_empty() or "@instance".begins_with(word):
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@instance var", "instance var ", _completion_color, _get_icon(&"MemberAnnotation"))
+	if word.is_empty() or "@scheme".begins_with(word):
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@scheme", "scheme ", _completion_color, _get_icon(&"MemberAnnotation"))
+	if word.is_empty() or "@meta".begins_with(word):
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@meta", "meta {", _completion_color, _get_icon(&"MemberAnnotation"))
 
 
 func _get_prop_icon(prop_def: GdssProp) -> Texture2D:
@@ -369,6 +379,11 @@ func _get_prop_icon(prop_def: GdssProp) -> Texture2D:
 
 
 func _get_context() -> Dictionary:
+	var annotation: String = _annotation_block_context()
+	if annotation == "scheme":
+		return {"type": "scheme_block"}
+	if annotation == "meta":
+		return {"type": "meta_block"}
 	var caret_line: int = editor.get_caret_line()
 	var lines: PackedStringArray = editor.text.split("\n")
 	
@@ -437,7 +452,7 @@ func _get_context() -> Dictionary:
 			"variant": current_variant
 		}
 	
-	var colon_pos: int = stripped.find(":")
+	var colon_pos: int = _first_separator(stripped)
 	if colon_pos != -1:
 		var value_part: String = stripped.substr(colon_pos + 1).strip_edges()
 		if not value_part.is_empty():
@@ -577,3 +592,93 @@ func _get_current_word() -> String:
 
 func _get_icon(icon_name: StringName) -> Texture2D:
 	return EditorInterface.get_editor_theme().get_icon(icon_name, &"EditorIcons")
+
+
+func _first_separator(s: String) -> int:
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for i: int in s.length():
+		var c: String = s[i]
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+		elif c == ":" or c == "=":
+			return i
+	return -1
+
+
+func _annotation_block_context() -> String:
+	var caret: int = editor.get_caret_line()
+	var lines: PackedStringArray = editor.text.split("\n")
+	var depth: int = 0
+	var kind: String = ""
+	for i: int in mini(caret + 1, lines.size()):
+		var stripped: String = _strip_comment(lines[i]).strip_edges()
+		if depth == 0:
+			if _re_scheme_open.search(stripped) != null and stripped.contains("{"):
+				kind = "scheme"
+				depth += _brace_count(stripped)
+			elif _re_meta_open.search(stripped) != null and stripped.contains("{"):
+				kind = "meta"
+				depth += _brace_count(stripped)
+		else:
+			depth += _brace_count(stripped)
+			if depth <= 0:
+				kind = ""
+	return kind if depth > 0 else ""
+
+
+func _brace_count(s: String) -> int:
+	var depth: int = 0
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for c: String in s:
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+		elif c == "{":
+			depth += 1
+		elif c == "}":
+			depth -= 1
+	return depth
+
+
+func _strip_comment(line: String) -> String:
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for i: int in line.length():
+		var c: String = line[i]
+		if in_quote:
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+		elif c == "#":
+			return line.substr(0, i)
+	return line
+
+
+func _complete_scheme_vars(word: String) -> void:
+	var names: Array[String] = []
+	for key: String in GdssInterpreter._global_defaults:
+		if not names.has(key):
+			names.append(key)
+	for key: String in GdssInterpreter._instance_scheme_base:
+		if not names.has(key):
+			names.append(key)
+	for name: String in names:
+		if word.is_empty() or name.begins_with(word):
+			editor.add_code_completion_option(CodeEdit.KIND_VARIABLE, name, name + ": ", _completion_color, _get_icon(&"LocalVariable"))
+
+
+func _complete_meta_keys(word: String) -> void:
+	for key: String in ["name", "description", "author", "version", "default_scheme"]:
+		if word.is_empty() or key.begins_with(word):
+			editor.add_code_completion_option(CodeEdit.KIND_MEMBER, key, key + ": ", _completion_color, _get_icon(&"MemberProperty"))

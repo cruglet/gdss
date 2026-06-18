@@ -7,9 +7,9 @@ extends Node
 
 var gdss_editor: GdssEditor
 
-static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*:")
-static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*:")
-static var _re_local: RegEx = RegEx.create_from_string(r"(?:^|\s)var\s+(\w+)\s*:")
+static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*[:=]")
+static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*[:=]")
+static var _re_local: RegEx = RegEx.create_from_string(r"(?:^|\s)var\s+(\w+)\s*[:=]")
 
 var _highlighter: GdssCodeHighlighter
 var _nodes: Array[String] = []
@@ -342,7 +342,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				var is_after_colon: bool = trimmed_before.ends_with(":") and before.length() == trimmed_before.length()
 				var after: String = text.substr(i).strip_edges()
 				var is_before_brace: bool = after.begins_with("{") or (after.begins_with(":") and after.find("{") != -1)
-				var colon_idx: int = trimmed_before.rfind(":")
+				var colon_idx: int = maxi(trimmed_before.rfind(":"), trimmed_before.rfind("="))
 				var brace_idx: int = trimmed_before.rfind("{")
 				var in_value: bool = colon_idx != -1 and colon_idx > brace_idx and not is_after_colon
 
