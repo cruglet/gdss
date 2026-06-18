@@ -1,14 +1,20 @@
 extends Node
 
+signal scheme_changed(scheme_name: String)
+
 var _last_modified: int = 0
 
 
 func _ready() -> void:
+	GDSS._runtime = self
 	_ensure_parsed()
+	if not Engine.is_editor_hint():
+		var default_scheme: String = GDSS.get_default_scheme()
+		if not default_scheme.is_empty() and GdssInterpreter.schemes.has(default_scheme):
+			GDSS.set_scheme(default_scheme)
 	_last_modified = GdssStorage.get_latest_modified()
 	get_tree().node_added.connect(_on_node_added)
 	_bind_tree.bind(get_tree().root).call_deferred()
-
 	if Engine.is_editor_hint() and OS.is_debug_build():
 		EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_editor_saved)
 
@@ -30,8 +36,29 @@ func _on_editor_saved() -> void:
 	_reload_parsed()
 
 
+func _load_bundle() -> Dictionary:
+	var compiled: Dictionary = GdssStorage.load_compiled()
+	if compiled.has("data") and compiled["data"] is Dictionary and not (compiled["data"] as Dictionary).is_empty():
+		var source_modified: int = GdssStorage.get_latest_modified()
+		var compiled_modified: int = compiled.get("source_modified", 0)
+		if source_modified == 0 or compiled_modified >= source_modified:
+			return compiled["data"]
+	return GdssStorage.load_data()
+
+
+func _apply_scheme_meta(data: Dictionary) -> void:
+	if data.has("schemes") and data["schemes"] is Dictionary:
+		GdssInterpreter.schemes.clear()
+		for key: String in (data["schemes"] as Dictionary):
+			GdssInterpreter.schemes[key] = (data["schemes"] as Dictionary)[key]
+	if data.has("meta") and data["meta"] is Dictionary:
+		GdssInterpreter.meta.clear()
+		for key: String in (data["meta"] as Dictionary):
+			GdssInterpreter.meta[key] = (data["meta"] as Dictionary)[key]
+
+
 func _reload_parsed() -> void:
-	var data: Dictionary = GdssStorage.load_data()
+	var data: Dictionary = _load_bundle()
 	if not data.has("parsed"):
 		return
 	var raw: Variant = data["parsed"]
@@ -46,9 +73,21 @@ func _reload_parsed() -> void:
 		GdssInterpreter._local_vars.clear()
 		for key: String in (data["local_vars"] as Dictionary):
 			GdssInterpreter._local_vars[key] = (data["local_vars"] as Dictionary)[key]
+	_apply_scheme_meta(data)
+	if data.has("global_defaults") and data["global_defaults"] is Dictionary:
+		GdssInterpreter._global_defaults.clear()
+		for key: String in (data["global_defaults"] as Dictionary):
+			GdssInterpreter._global_defaults[key] = (data["global_defaults"] as Dictionary)[key]
+	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
+		GdssInterpreter._instance_defaults.clear()
+		for key: String in (data["instance_defaults"] as Dictionary):
+			GdssInterpreter._instance_defaults[key] = (data["instance_defaults"] as Dictionary)[key]
+		GdssInterpreter._instance_scheme_base = GdssInterpreter._instance_defaults.duplicate(true)
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if method.returns_texture:
 			method.clear_live_textures()
+	if not GdssInterpreter.current_scheme.is_empty() and GdssInterpreter.schemes.has(GdssInterpreter.current_scheme):
+		GDSS.set_scheme(GdssInterpreter.current_scheme)
 	_refresh_all_handlers()
 
 
@@ -64,7 +103,7 @@ func _refresh_all_handlers() -> void:
 func _ensure_parsed() -> void:
 	if not GdssInterpreter.parsed.is_empty():
 		return
-	var data: Dictionary = GdssStorage.load_data()
+	var data: Dictionary = _load_bundle()
 	if not data.has("parsed"):
 		return
 	var raw: Variant = data["parsed"]
@@ -83,9 +122,11 @@ func _ensure_parsed() -> void:
 	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
 		for key: String in (data["instance_defaults"] as Dictionary):
 			GdssInterpreter._instance_defaults[key] = (data["instance_defaults"] as Dictionary)[key]
+		GdssInterpreter._instance_scheme_base = GdssInterpreter._instance_defaults.duplicate(true)
 	if data.has("local_vars") and data["local_vars"] is Dictionary:
 		for key: String in (data["local_vars"] as Dictionary):
 			GdssInterpreter._local_vars[key] = (data["local_vars"] as Dictionary)[key]
+	_apply_scheme_meta(data)
 
 
 func _bind_tree(node: Node) -> void:
@@ -101,13 +142,12 @@ func _on_node_added(node: Node) -> void:
 
 
 func _try_bind(canvas_item: CanvasItem) -> void:
-	var in_group: bool = canvas_item.is_in_group(GdssNodeHandler.GROUP)
-	if not in_group and not canvas_item.get_meta("gdss_enabled", false):
+	if not GDSS.resolve_mode(canvas_item):
+		if GdssNodeHandler.is_bound(canvas_item):
+			GdssNodeHandler.unbind(canvas_item)
 		return
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if not gdss_node:
 		return
-	if not in_group:
-		canvas_item.add_to_group(GdssNodeHandler.GROUP)
 	GdssNodeHandler.bind(canvas_item)
 	gdss_node.update_state(canvas_item)
