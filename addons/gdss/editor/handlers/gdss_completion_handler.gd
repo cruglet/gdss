@@ -197,7 +197,7 @@ func _update_completions(word: String) -> void:
 
 func _complete_nodes(word: String) -> void:
 	for node: String in _nodes:
-		if word.is_empty() or node.to_lower().begins_with(word.to_lower()):
+		if _matches(node, word):
 			editor.add_code_completion_option(CodeEdit.KIND_CLASS, node, node, _completion_color, _get_icon(node))
 
 
@@ -224,7 +224,7 @@ func _complete_properties(word: String, style_name: String) -> void:
 		var prop_def: GdssProp = meta.get(prop, null)
 		var icon: Texture2D = _get_prop_icon(prop_def)
 
-		if word.is_empty() or prop.begins_with(word):
+		if _matches(prop, word):
 			editor.add_code_completion_option(CodeEdit.KIND_MEMBER, prop, prop + ": ", _completion_color, icon)
 
 		if prop_def == null or prop_def.type != GDSS.Type.COMPOSITE4:
@@ -236,7 +236,7 @@ func _complete_properties(word: String, style_name: String) -> void:
 
 		for idx: int in range(prop_def.composite_of.size()):
 			var sub: String = prop_def.composite_of[idx]
-			if word.is_empty() or sub.begins_with(word):
+			if _matches(sub, word):
 				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, _get_icon(&"int"))
 
 
@@ -297,7 +297,7 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 	for method: GdssMethod in _methods:
 		if not method.supported_prop_types.has(effective_type):
 			continue
-		if word.is_empty() or method.method_name.begins_with(word):
+		if _matches(method.method_name, word):
 			var has_params: bool = method.parameters.size() > 0
 			var display: String = method.method_name + ("(…)" if has_params else "()")
 			editor.add_code_completion_option(
@@ -313,20 +313,20 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 
 	match prop_def.type:
 		GDSS.Type.COLOR:
-			for c: String in BUILTIN_COLORS:
-				if word.is_empty() or c.begins_with(word):
+			for c: String in GdssInterpreter.NAMED_COLORS:
+				if _matches(c, word):
 					editor.add_code_completion_option(CodeEdit.KIND_CONSTANT, c, c, _completion_color, _get_icon(&"Color"))
 		GDSS.Type.CURSOR:
 			for cursor_key: String in GDSS.CursorType:
-				if word.is_empty() or cursor_key.begins_with(word):
+				if _matches(cursor_key, word):
 					editor.add_code_completion_option(CodeEdit.KIND_ENUM, cursor_key, cursor_key, _completion_color, _get_icon(&"Mouse"))
 		GDSS.Type.TRANSITION_TYPE:
 			for trans_type: String in GDSS.TransitionType:
-				if word.is_empty() or trans_type.begins_with(word):
+				if _matches(trans_type, word):
 					editor.add_code_completion_option(CodeEdit.KIND_ENUM, trans_type, trans_type, _completion_color, _get_icon(&"Curve"))
 		GDSS.Type.TRANSITION_FUNC:
 			for trans_func: String in GDSS.TransitionFunc:
-				if word.is_empty() or trans_func.begins_with(word):
+				if _matches(trans_func, word):
 					editor.add_code_completion_option(CodeEdit.KIND_ENUM, trans_func, trans_func, _completion_color, _get_icon(&"Curve"))
 		GDSS.Type.COMPOSITE4:
 			var default: Variant = prop_def.default_value
@@ -352,6 +352,8 @@ func _complete_at_directives(word: String) -> void:
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@scheme", "scheme ", _completion_color, _get_icon(&"MemberAnnotation"))
 	if word.is_empty() or "@meta".begins_with(word):
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@meta", "meta {", _completion_color, _get_icon(&"MemberAnnotation"))
+	if word.is_empty() or "@import".begins_with(word):
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@import", "import \"", _completion_color, _get_icon(&"MemberAnnotation"))
 
 
 func _get_prop_icon(prop_def: GdssProp) -> Texture2D:
@@ -588,6 +590,10 @@ func _get_current_word() -> String:
 		word = c + word
 
 	return word
+
+
+func _matches(candidate: String, word: String) -> bool:
+	return word.is_empty() or candidate.to_lower().contains(word.to_lower())
 
 
 func _get_icon(icon_name: StringName) -> Texture2D:
