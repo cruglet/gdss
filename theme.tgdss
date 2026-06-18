@@ -14,6 +14,13 @@
 # cover anything you want to change per node. Grouping related rules under one
 # selector and using nested classes keeps things tidy instead of repeating
 # properties, and short, topical chunk names keep the tabs easy to scan.
+# @meta holds theme-wide info, readable from code via GDSS.get_theme_meta().
+@meta {
+	name: "Aurora"
+	description: "GDSS demo theme with dark and light schemes."
+	default_scheme: dark
+}
+
 # @chunk Palette
 # Global variables are like standard variables which can be accessed from 
 # GDScript. Calling GDSS.set_global_var() will automatically update any node
@@ -28,7 +35,23 @@
 @global var text_dim: "#9097ad"
 @global var border: "#ffffff22"
 
-# Instance variables behave like global variables except on a per-node basis. 
+# A @scheme is a named set of @global overrides. Switch or tween between them
+# from code with GDSS.set_scheme("light", 0.25). Any variable a scheme omits
+# falls back to its base @global value, so the dark scheme (which matches the
+# base) needs nothing at all.
+@scheme dark {
+}
+
+@scheme light {
+	bg: "#eceef5"
+	surface: "#ffffff"
+	surface_2: "#dfe3ee"
+	text: "#1b1e28"
+	text_dim: "#6a7088"
+	border: "#00000018"
+}
+
+# Instance variables behave like global variables except on a per-node basis.
 # Meaning, you also have to pass in the node reference in GDSS.set_instance_var().
 @instance var card_color: "#16161f"
 
