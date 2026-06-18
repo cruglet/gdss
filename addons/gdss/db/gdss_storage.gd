@@ -10,7 +10,37 @@ static func get_save_path() -> String:
 static func set_save_path(path: String) -> void:
 	ProjectSettings.set_setting("gdss/storage/save_path", path)
 	ProjectSettings.set_setting("gdss/storage/save_paths", PackedStringArray([path]))
+	var uid: int = ResourceLoader.get_resource_uid(path)
+	if uid != ResourceUID.INVALID_ID:
+		ProjectSettings.set_setting("gdss/storage/save_uid", ResourceUID.id_to_text(uid))
 	ProjectSettings.save()
+
+
+static func get_save_uid() -> int:
+	var text: String = ProjectSettings.get_setting("gdss/storage/save_uid", "")
+	if text.is_empty():
+		return ResourceUID.INVALID_ID
+	return ResourceUID.text_to_id(text)
+
+
+# Heals the active save path after the .tgdss is moved or renamed in the editor by
+# resolving its tracked UID, and keeps that UID current while the path is valid.
+static func sync_save_path() -> void:
+	var path: String = get_save_path()
+	if FileAccess.file_exists(path):
+		var uid: int = ResourceLoader.get_resource_uid(path)
+		if uid != ResourceUID.INVALID_ID:
+			var text: String = ResourceUID.id_to_text(uid)
+			if str(ProjectSettings.get_setting("gdss/storage/save_uid", "")) != text:
+				ProjectSettings.set_setting("gdss/storage/save_uid", text)
+				ProjectSettings.save()
+		return
+	var saved_uid: int = get_save_uid()
+	if saved_uid == ResourceUID.INVALID_ID or not ResourceUID.has_id(saved_uid):
+		return
+	var resolved: String = ResourceUID.get_id_path(saved_uid)
+	if not resolved.is_empty() and FileAccess.file_exists(resolved):
+		set_save_path(resolved)
 
 
 static func get_cache_path() -> String:

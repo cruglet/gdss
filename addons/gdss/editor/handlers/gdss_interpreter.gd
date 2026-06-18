@@ -540,6 +540,8 @@ func reload_active_file() -> void:
 
 
 func _load_from_file() -> void:
+	if Engine.is_editor_hint():
+		GdssStorage.sync_save_path()
 	_cached_states.clear()
 	_composite_map_cache.clear()
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
