@@ -3,17 +3,28 @@ class_name GdssInspectorPlugin
 extends EditorInspectorPlugin
 
 
-class GdssEnabledProperty extends EditorProperty:
-	var checkbox: CheckBox
+class GdssModeProperty extends EditorProperty:
+	var _option: OptionButton
+	var _readout: Label
 	var _updating: bool = false
 
 	func _init() -> void:
-		checkbox = CheckBox.new()
-		checkbox.text = "Enabled"
-		checkbox.tooltip_text = "Style this node with GDSS (adds it to the \"gdss\" group)."
-		add_child(checkbox)
-		add_focusable(checkbox)
-		checkbox.toggled.connect(_on_toggled)
+		var box: VBoxContainer = VBoxContainer.new()
+		box.size_flags_horizontal = SIZE_EXPAND_FILL
+		add_child(box)
+		set_bottom_editor(box)
+		_option = OptionButton.new()
+		_option.size_flags_horizontal = SIZE_EXPAND_FILL
+		_option.tooltip_text = "Inherit follows the parent, Enable always styles this node, Disable never does."
+		_option.add_item("Inherit", GDSS.GdssMode.INHERIT)
+		_option.add_item("Enable", GDSS.GdssMode.ENABLE)
+		_option.add_item("Disable", GDSS.GdssMode.DISABLE)
+		box.add_child(_option)
+		add_focusable(_option)
+		_readout = Label.new()
+		_readout.modulate = Color(1, 1, 1, 0.6)
+		box.add_child(_readout)
+		_option.item_selected.connect(_on_selected)
 
 	func _ready() -> void:
 		_update_property.call_deferred()
@@ -22,30 +33,47 @@ class GdssEnabledProperty extends EditorProperty:
 		var obj: Object = get_edited_object()
 		if obj == null:
 			return
+		var node: Node = obj as Node
 		_updating = true
-		checkbox.set_pressed_no_signal((obj as Node).is_in_group(GdssNodeHandler.GROUP))
+		var mode: int = GDSS.GdssMode.INHERIT
+		if node.has_meta(GDSS.MODE_META):
+			mode = int(node.get_meta(GDSS.MODE_META))
+		elif node.is_in_group(GdssNodeHandler.GROUP):
+			mode = GDSS.GdssMode.ENABLE
+		_option.select(_option.get_item_index(mode))
+		_readout.text = _effective_text(node)
 		_updating = false
 
-	func _on_toggled(value: bool) -> void:
+	func _effective_text(node: Node) -> String:
+		var enabled: bool = GDSS.resolve_mode(node)
+		return "Effective: %s%s" % ["Enabled" if enabled else "Disabled", _resolve_source(node)]
+
+	func _resolve_source(node: Node) -> String:
+		if node.is_in_group(GdssNodeHandler.GROUP) and GDSS.get_gdss_mode(node) == GDSS.GdssMode.INHERIT:
+			return ""
+		var current: Node = node
+		while current != null:
+			if current.has_meta(GDSS.MODE_META):
+				var mode: int = int(current.get_meta(GDSS.MODE_META))
+				if mode == GDSS.GdssMode.ENABLE or mode == GDSS.GdssMode.DISABLE:
+					return "" if current == node else "  (from %s)" % current.name
+			current = current.get_parent()
+		return "  (project default)"
+
+	func _on_selected(index: int) -> void:
 		if _updating:
 			return
 		var obj: Object = get_edited_object()
 		if obj == null:
 			return
+		var node: Node = obj as Node
+		var new_mode: int = _option.get_item_id(index)
+		var old_mode: int = int(node.get_meta(GDSS.MODE_META)) if node.has_meta(GDSS.MODE_META) else GDSS.GdssMode.INHERIT
+		var was_in_group: bool = node.is_in_group(GdssNodeHandler.GROUP)
 		var undo_redo: EditorUndoRedoManager = EditorInterface.get_editor_undo_redo()
-		undo_redo.create_action("Toggle GDSS")
-		if value:
-			undo_redo.add_do_method(obj, &"add_to_group", GdssNodeHandler.GROUP, true)
-			undo_redo.add_undo_method(obj, &"remove_from_group", GdssNodeHandler.GROUP)
-			undo_redo.add_do_method(GdssNodeHandler, &"bind", obj)
-			undo_redo.add_undo_method(GdssNodeHandler, &"unbind", obj)
-		else:
-			undo_redo.add_do_method(obj, &"remove_from_group", GdssNodeHandler.GROUP)
-			undo_redo.add_undo_method(obj, &"add_to_group", GdssNodeHandler.GROUP, true)
-			undo_redo.add_do_method(GdssNodeHandler, &"unbind", obj)
-			undo_redo.add_undo_method(GdssNodeHandler, &"bind", obj)
-		undo_redo.add_do_method(obj, &"notify_property_list_changed")
-		undo_redo.add_undo_method(obj, &"notify_property_list_changed")
+		undo_redo.create_action("Set GDSS Mode")
+		undo_redo.add_do_method(GdssNodeHandler, &"set_mode_state", node, new_mode, false)
+		undo_redo.add_undo_method(GdssNodeHandler, &"set_mode_state", node, old_mode, was_in_group)
 		undo_redo.commit_action()
 
 
@@ -263,12 +291,12 @@ func _can_handle(object: Object) -> bool:
 
 
 func _parse_property(object: Object, type: Variant.Type, name: String, hint_type: PropertyHint, hint_string: String, usage_flags: int, wide: bool) -> bool:
-	var is_enabled: bool = (object as Node).is_in_group(GdssNodeHandler.GROUP)
+	var is_enabled: bool = GDSS.resolve_mode(object as Node)
 
 	if name == "theme":
-		var enabled_prop: GdssEnabledProperty = GdssEnabledProperty.new()
-		enabled_prop.set_label("Use GDSS")
-		add_custom_control(enabled_prop)
+		var mode_prop: GdssModeProperty = GdssModeProperty.new()
+		mode_prop.set_label("GDSS")
+		add_custom_control(mode_prop)
 		if is_enabled:
 			var classes_prop: GdssClassesProperty = GdssClassesProperty.new()
 			classes_prop.set_label("Classes")
