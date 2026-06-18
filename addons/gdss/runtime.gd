@@ -1,6 +1,8 @@
 extends Node
 
 signal scheme_changed(scheme_name: String)
+signal globals_changed
+signal parsed_reloaded
 
 var _last_modified: int = 0
 
@@ -89,6 +91,7 @@ func _reload_parsed() -> void:
 	if not GdssInterpreter.current_scheme.is_empty() and GdssInterpreter.schemes.has(GdssInterpreter.current_scheme):
 		GDSS.set_scheme(GdssInterpreter.current_scheme)
 	_refresh_all_handlers()
+	parsed_reloaded.emit()
 
 
 func _refresh_all_handlers() -> void:

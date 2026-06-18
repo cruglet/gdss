@@ -129,6 +129,40 @@ static func _schedule_global_refresh() -> void:
 	_flush_global_refresh.call_deferred()
 
 
+## Returns a copy of every currently-set global variable.
+static func get_global_vars() -> Dictionary:
+	return GdssInterpreter.globals.duplicate(true)
+
+
+## Sets several global variables at once with a single refresh.
+## [codeblock]
+## GDSS.set_global_vars({"accent": Color.RED, "bg": Color.BLACK})
+## [/codeblock]
+static func set_global_vars(values: Dictionary) -> void:
+	for key: String in values:
+		GdssInterpreter.globals[key] = values[key]
+	_schedule_global_refresh()
+
+
+## Animates several global variables to new values over [param tween_time] seconds
+## in one tween. Tweenable values interpolate; anything else snaps.
+static func tween_global_vars(values: Dictionary, tween_time: float = 0.0, trans: TransitionFunc = TransitionFunc.SINE, ease: TransitionType = TransitionType.EASE_OUT) -> void:
+	if tween_time <= 0.0 or Engine.get_main_loop() == null:
+		set_global_vars(values)
+		return
+	var from: Dictionary = {}
+	for key: String in values:
+		from[key] = GdssInterpreter.globals.get(key, values[key])
+	var tween: Tween = (Engine.get_main_loop() as SceneTree).create_tween()
+	tween.set_trans(GdssPropHandler.tween_trans(trans))
+	tween.set_ease(GdssPropHandler.tween_ease(ease))
+	tween.tween_method(func(t: float) -> void:
+		for key: String in values:
+			GdssInterpreter.globals[key] = _lerp_value(from[key], values[key], t)
+		_flush_global_refresh()
+	, 0.0, 1.0, tween_time)
+
+
 ## Switches the active [b]scheme[/b], applying every variable it defines.
 ## [br][br]
 ## A scheme is a named set of variable overrides declared in the stylesheet with
@@ -237,6 +271,11 @@ static func _invalidate_texture_cache() -> void:
 static func _emit_scheme_changed(name: String) -> void:
 	if is_instance_valid(_runtime) and _runtime.has_signal(&"scheme_changed"):
 		_runtime.scheme_changed.emit(name)
+
+
+static func _emit_globals_changed() -> void:
+	if is_instance_valid(_runtime) and _runtime.has_signal(&"globals_changed"):
+		_runtime.globals_changed.emit()
 
 
 static func _is_instance_scheme_key(key: String) -> bool:
@@ -447,6 +486,7 @@ static func _flush_global_refresh() -> void:
 			continue
 		seen[id] = true
 		item.queue_redraw()
+	_emit_globals_changed()
 
 
 static func _get_gdss_nodes() -> Dictionary[String, GdssNode]:
