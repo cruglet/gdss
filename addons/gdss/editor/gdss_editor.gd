@@ -43,9 +43,17 @@ var _replace_field: LineEdit
 var _search_matches: Array[Vector2i] = []
 var _search_index: int = -1
 var _zoom_menu: PopupMenu
+var _file_menu: PopupMenu
+var _recent_menu: PopupMenu
 
 enum {
 	MENU_SAVE,
+	MENU_NEW,
+	MENU_OPEN,
+	MENU_SAVE_AS,
+	MENU_RENAME,
+	MENU_REVEAL,
+	MENU_THEME_PROPERTIES,
 	MENU_FIND,
 	MENU_REPLACE,
 	MENU_COMMENT,
@@ -94,6 +102,7 @@ func _ready() -> void:
 	_setup_outline_toggle()
 	_setup_location_toggle()
 	_setup_menu_bar()
+	_push_recent(GdssStorage.get_save_path())
 	_setup_chunk_tabs()
 	_setup_search()
 	_update_editor()
@@ -510,11 +519,25 @@ func _setup_menu_bar() -> void:
 		return
 	var menu_bar: MenuBar = MenuBar.new()
 	menu_bar.flat = true
-	var file_menu: PopupMenu = PopupMenu.new()
-	file_menu.name = "File"
-	file_menu.add_item("Save  (Ctrl+S)", MENU_SAVE)
-	file_menu.id_pressed.connect(_on_menu_id_pressed)
-	menu_bar.add_child(file_menu)
+	_file_menu = PopupMenu.new()
+	_file_menu.name = "File"
+	_file_menu.add_item("New…", MENU_NEW)
+	_file_menu.add_item("Open…", MENU_OPEN)
+	_recent_menu = PopupMenu.new()
+	_recent_menu.name = "RecentMenu"
+	_recent_menu.index_pressed.connect(_on_recent_selected)
+	_file_menu.add_submenu_node_item("Open Recent", _recent_menu)
+	_file_menu.add_separator()
+	_file_menu.add_item("Save  (Ctrl+S)", MENU_SAVE)
+	_file_menu.add_item("Save As…", MENU_SAVE_AS)
+	_file_menu.add_item("Rename…", MENU_RENAME)
+	_file_menu.add_separator()
+	_file_menu.add_item("Reveal in FileSystem", MENU_REVEAL)
+	_file_menu.add_separator()
+	_file_menu.add_item("Theme Properties…", MENU_THEME_PROPERTIES)
+	_file_menu.id_pressed.connect(_on_menu_id_pressed)
+	_file_menu.about_to_popup.connect(_refresh_recent_menu)
+	menu_bar.add_child(_file_menu)
 	var edit_menu: PopupMenu = PopupMenu.new()
 	edit_menu.name = "Edit"
 	edit_menu.add_item("Find  (Ctrl+F)", MENU_FIND)
@@ -536,6 +559,19 @@ func _on_menu_id_pressed(id: int) -> void:
 	match id:
 		MENU_SAVE:
 			GdssInterpreter.get_instance().save_current()
+		MENU_NEW:
+			_new_file()
+		MENU_OPEN:
+			_open_file()
+		MENU_SAVE_AS:
+			_save_as()
+		MENU_RENAME:
+			_rename_file()
+		MENU_REVEAL:
+			if Engine.is_editor_hint():
+				EditorInterface.select_file(GdssStorage.get_save_path())
+		MENU_THEME_PROPERTIES:
+			_open_theme_properties()
 		MENU_FIND:
 			_open_search(false)
 		MENU_REPLACE:
@@ -942,3 +978,235 @@ func _ensure_zoom_menu() -> void:
 	_zoom_menu.id_pressed.connect(_set_zoom_percent)
 	zoom_percentage.add_child(_zoom_menu)
 	
+
+
+func _open_theme_properties() -> void:
+	var dialog: GdssThemePropertiesDialog = GdssThemePropertiesDialog.new()
+	EditorInterface.get_base_control().add_child(dialog)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.open_for(self)
+
+
+func upsert_meta_block(block_text: String) -> void:
+	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
+	if interpreter == null:
+		return
+	_sync_active_chunk()
+	var replaced: bool = false
+	for chunk: Dictionary in _chunks:
+		var outcome: Dictionary = interpreter.replace_meta_block(str(chunk["content"]), block_text)
+		if outcome["found"]:
+			chunk["content"] = outcome["source"]
+			replaced = true
+			break
+	if not replaced:
+		_chunks[0]["content"] = _insert_meta_at_top(str(_chunks[0]["content"]), block_text)
+	_suppress_dirty = true
+	code_edit.text = _chunks[_active_chunk]["content"]
+	_clear_suppress_dirty.call_deferred()
+	interpreter.save_current()
+
+
+func _insert_meta_at_top(content: String, block_text: String) -> String:
+	var lines: PackedStringArray = content.split("\n")
+	var insert_at: int = 0
+	for i: int in lines.size():
+		var stripped: String = lines[i].strip_edges()
+		if stripped.is_empty() or stripped.begins_with("#"):
+			insert_at = i + 1
+		else:
+			break
+	var result: PackedStringArray = lines.slice(0, insert_at)
+	result.append_array(block_text.split("\n"))
+	result.append("")
+	result.append_array(lines.slice(insert_at))
+	return "\n".join(result)
+
+
+const RECENT_KEY: String = "gdss/editor/recent_files"
+const RECENT_MAX: int = 10
+
+
+func _base_control() -> Node:
+	return EditorInterface.get_base_control()
+
+
+func _show_error(message: String) -> void:
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = "GDSS"
+	dialog.dialog_text = message
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	_base_control().add_child(dialog)
+	dialog.popup_centered()
+
+
+func _make_file_dialog(save_mode: bool) -> EditorFileDialog:
+	var dialog: EditorFileDialog = EditorFileDialog.new()
+	dialog.file_mode = EditorFileDialog.FILE_MODE_SAVE_FILE if save_mode else EditorFileDialog.FILE_MODE_OPEN_FILE
+	dialog.access = EditorFileDialog.ACCESS_RESOURCES
+	dialog.add_filter("*.tgdss", "GDSS Theme")
+	dialog.current_dir = GdssStorage.get_save_path().get_base_dir()
+	dialog.canceled.connect(dialog.queue_free)
+	_base_control().add_child(dialog)
+	return dialog
+
+
+func _new_file() -> void:
+	_confirm_unsaved(func() -> void:
+		var dialog: EditorFileDialog = _make_file_dialog(true)
+		dialog.current_file = "theme.tgdss"
+		dialog.file_selected.connect(func(path: String) -> void:
+			GdssStorage.write_source(path, "# @chunk main\n")
+			_switch_to_file(path)
+			dialog.queue_free()
+		)
+		dialog.popup_centered_ratio(0.5)
+	)
+
+
+func _open_file() -> void:
+	_confirm_unsaved(func() -> void:
+		var dialog: EditorFileDialog = _make_file_dialog(false)
+		dialog.file_selected.connect(func(path: String) -> void:
+			_switch_to_file(path)
+			dialog.queue_free()
+		)
+		dialog.popup_centered_ratio(0.5)
+	)
+
+
+func _save_as() -> void:
+	var dialog: EditorFileDialog = _make_file_dialog(true)
+	dialog.current_file = file_name
+	dialog.file_selected.connect(func(path: String) -> void:
+		GdssStorage.write_source(path, get_full_source())
+		_switch_to_file(path)
+		dialog.queue_free()
+	)
+	dialog.popup_centered_ratio(0.5)
+
+
+func _rename_file() -> void:
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = "Rename Stylesheet"
+	var line: LineEdit = LineEdit.new()
+	line.text = file_name
+	line.custom_minimum_size = Vector2(260, 0)
+	dialog.add_child(line)
+	dialog.register_text_enter(line)
+	dialog.confirmed.connect(func() -> void:
+		var new_name: String = line.text.strip_edges().get_file()
+		if new_name.is_empty():
+			return
+		if new_name.get_extension() != "tgdss":
+			new_name = new_name.get_basename() + ".tgdss"
+		var old_path: String = GdssStorage.get_save_path()
+		var new_path: String = old_path.get_base_dir().path_join(new_name)
+		if new_path == old_path:
+			return
+		if FileAccess.file_exists(new_path):
+			_show_error("A file named '%s' already exists." % new_name)
+			return
+		GdssStorage.write_source(old_path, get_full_source())
+		var error: int = DirAccess.rename_absolute(old_path, new_path)
+		if error != OK:
+			_show_error("Could not rename the stylesheet.")
+			return
+		var old_compiled: String = old_path.get_basename() + ".gdssc"
+		if FileAccess.file_exists(old_compiled):
+			DirAccess.remove_absolute(old_compiled)
+		_switch_to_file(new_path)
+		if Engine.is_editor_hint():
+			EditorInterface.get_resource_filesystem().scan()
+	)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	_base_control().add_child(dialog)
+	dialog.popup_centered()
+	line.grab_focus()
+	line.select_all()
+
+
+func _switch_to_file(path: String) -> void:
+	GdssStorage.set_save_path(path)
+	_active_chunk = 0
+	_push_recent(path)
+	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
+	if interpreter != null:
+		interpreter.reload_active_file()
+	if Engine.is_editor_hint():
+		GdssNodeHandler.rebind_tree(EditorInterface.get_edited_scene_root())
+	_user_saved(false)
+
+
+func _confirm_unsaved(on_proceed: Callable) -> void:
+	if not _has_unsaved_changes:
+		on_proceed.call()
+		return
+	var dialog: ConfirmationDialog = ConfirmationDialog.new()
+	dialog.title = "Unsaved Changes"
+	dialog.dialog_text = "Save changes to '%s' before continuing?" % file_name
+	dialog.ok_button_text = "Save & Continue"
+	dialog.add_button("Discard", true, "discard")
+	dialog.confirmed.connect(func() -> void:
+		var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
+		if interpreter != null:
+			interpreter.save_current()
+		on_proceed.call()
+		dialog.queue_free()
+	)
+	dialog.custom_action.connect(func(action: StringName) -> void:
+		if action == "discard":
+			on_proceed.call()
+		dialog.queue_free()
+	)
+	dialog.canceled.connect(dialog.queue_free)
+	_base_control().add_child(dialog)
+	dialog.popup_centered()
+
+
+func _recent_files() -> PackedStringArray:
+	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
+	if editor_settings.has_setting(RECENT_KEY):
+		return editor_settings.get_setting(RECENT_KEY)
+	return PackedStringArray()
+
+
+func _push_recent(path: String) -> void:
+	var recent: PackedStringArray = _recent_files()
+	var existing: int = recent.find(path)
+	if existing != -1:
+		recent.remove_at(existing)
+	recent.insert(0, path)
+	while recent.size() > RECENT_MAX:
+		recent.remove_at(recent.size() - 1)
+	EditorInterface.get_editor_settings().set_setting(RECENT_KEY, recent)
+
+
+func _refresh_recent_menu() -> void:
+	if _recent_menu == null:
+		return
+	_recent_menu.clear()
+	var kept: PackedStringArray = PackedStringArray()
+	for path: String in _recent_files():
+		if not FileAccess.file_exists(path):
+			continue
+		kept.append(path)
+		if path == GdssStorage.get_save_path():
+			continue
+		_recent_menu.add_item(path)
+	EditorInterface.get_editor_settings().set_setting(RECENT_KEY, kept)
+	if _recent_menu.item_count == 0:
+		_recent_menu.add_item("(no recent files)")
+		_recent_menu.set_item_disabled(_recent_menu.item_count - 1, true)
+
+
+func _on_recent_selected(index: int) -> void:
+	var path: String = _recent_menu.get_item_text(index)
+	if not FileAccess.file_exists(path):
+		return
+	_confirm_unsaved(func() -> void:
+		_switch_to_file(path)
+	)
