@@ -2,18 +2,28 @@ class_name GDSSDocumentation
 extends Object
 ## Here is a handy reference sheet for GDSS.
 
-## To enable GDSS, click on a node that is themable, and under the "Theme" property group,
-## you should see a toggle that says "Use GDSS." When this is on, the node will start using your GDSS
-## declarations for styling.
+## To enable GDSS, select a themable node and find the [b]GDSS[/b] mode dropdown under the "Theme"
+## property group. It works like [enum Node.ProcessMode]:[br]
+## • [b]Enable[/b] — always style this node.[br]
+## • [b]Disable[/b] — never style this node.[br]
+## • [b]Inherit[/b] (default) — follow the nearest ancestor that is explicitly Enabled or Disabled.[br][br]
+## Because of Inherit, you can set one container to [b]Enable[/b] and leave its children on Inherit to
+## style an entire subtree at once, and newly instantiated or reparented nodes adopt the GDSS state of
+## wherever they land. A dimmed line under the dropdown shows the resolved "Effective" state and where it
+## comes from. With nothing set anywhere, GDSS stays off (configurable via
+## [code]Project Settings > Gdss > Binding > Root Default[/code]).[br][br]
+## From code you can drive this with [method GDSS.set_gdss_mode], [method GDSS.enable_gdss],
+## [method GDSS.disable_gdss], and query it with [method GDSS.is_gdss_enabled].
 var HowToEnable: GDSSDocumentation
 
-## GDSS is meant to be used as one singular file that holds all theming information across your project.[br][br]
-## There are two format options: [b].tgdss[/b] (Default) and [b].gdss[/b]:[br]
-## • [b]*.tgdss[/b] is stored in plain text. It's the default and is ideal for version control systems and readability.[br]
-## • [b]*.gdss[/b] is stored in binary. It's best for smaller filesize.
-## [br][br]
-## You [i]can[/i] change the type and how this file is stored in [code]Project > Project Settings > Gdss > Storage > Save Path[/code],
-## but you can only have one file loaded at a time.
+## GDSS stylesheets are saved as plain-text [b].tgdss[/b] files, which are ideal for version control and
+## work directly with the built-in editor.[br][br]
+## When you export your project, GDSS automatically compiles the active stylesheet into a compact binary
+## [b].gdssc[/b] artifact that ships in the build and is read at runtime — you don't manage that file
+## yourself (it is regenerated on save and injected into exports).[br][br]
+## Switch the active stylesheet from the editor's [b]File[/b] menu (New, Open, Open Recent, Save As,
+## Rename) or via [code]Project > Project Settings > Gdss > Storage > Save Path[/code]. Only one
+## stylesheet is loaded at a time.
 var FileFormat: GDSSDocumentation
 
 ## The syntax for GDSS is similar to CSS, with some Godot elements mixed in.[br][br]
@@ -112,7 +122,7 @@ var FileFormat: GDSSDocumentation
 ##     }
 ## }
 ## [/codeblock]
-## To set the class of a "node", make sure that "Use GDSS" is on. Then, under [code]Theme > Classes[/code]
+## To set the class of a "node", make sure its GDSS mode resolves to Enabled. Then, under [code]Theme > Classes[/code]
 ## in the inspector, give it the name of a class.[br][br]
 ## You can assign multiple classes as well. Each assigned class is space-separated in the input box, and the
 ## properties from each respective class are applied from left to right.
@@ -124,6 +134,46 @@ var FileFormat: GDSSDocumentation
 ## }
 ## [/codeblock]
 var WritingGDSS: GDSSDocumentation
+
+## A [b]scheme[/b] is a named set of variable overrides, letting one stylesheet carry
+## several interchangeable palettes (light/dark, brand variants, and so on). Declare a
+## scheme with the [code]@scheme[/code] annotation, listing only the variables that
+## should differ from their base values:
+## [codeblock]
+## @global var bg: "#0d0d14"
+## @global var text: "#ffffff"
+##
+## @scheme dark {}
+##
+## @scheme light {
+##     bg: "#eceef5"
+##     text: "#1b1e28"
+## }
+## [/codeblock]
+## Anything a scheme omits falls back to the base [code]@global[/code] value, so the
+## [code]dark[/code] scheme above (which matches the base) needs no entries.[br][br]
+## Switch schemes from GDScript with [method GDSS.set_scheme]. Passing a time animates
+## the change; colors, numbers, and composite values interpolate while everything else
+## snaps:
+## [codeblock]
+## GDSS.set_scheme("light")          # instant
+## GDSS.set_scheme("dark", 0.25)     # tween over 0.25s
+## [/codeblock]
+## Read the active scheme with [method GDSS.get_scheme], list them all with
+## [method GDSS.get_schemes], and react to changes via the [code]scheme_changed[/code]
+## signal on the [code]GdssRuntime[/code] autoload.[br][br]
+## A theme can also carry [b]metadata[/b] in an [code]@meta[/code] block. Use it for a
+## name, description, author, version, or the [code]default_scheme[/code] applied when
+## the game starts:
+## [codeblock]
+## @meta {
+##     name: "Aurora"
+##     description: "Dark and light schemes."
+##     default_scheme: dark
+## }
+## [/codeblock]
+## Read metadata from code with [method GDSS.get_theme_meta] or [method GDSS.get_theme_info].
+var SchemesAndMetadata: GDSSDocumentation
 
 ## These are the nodes that this plugin currently supports in alphabetical order:
 ## [br](nodes in a [code]code[/code] block are "internal" to another node)

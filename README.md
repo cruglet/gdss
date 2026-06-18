@@ -44,7 +44,7 @@ Panel, PanelContainer {
 
 1. Download the GDSS plugin from the asset library or copy `addons/gdss` into your project and enable GDSS in Project Settings > Plugins. Reload the project when prompted.
 2. Open the GDSS editor. It starts as a bottom dock, but you can switch it to a full main-screen tab from the editor toolbar if you want.
-3. Select a themable control node in your scene and tick "Use GDSS" in the Inspector (under the "Theme" group). It will now listen to GDSS.
+3. Select a themable control node and set its **GDSS** mode in the Inspector (under the "Theme" group): **Enable** styles the node, **Inherit** follows its parent, and **Disable** opts out. Enable a container and leave its children on Inherit to style a whole subtree at once. The inspector shows the resolved "Effective" state beneath the dropdown.
 4. Edit the stylesheet (changes apply live in the editor!)
 
 The stylesheet is saved to `res://theme.tgdss` by default. You can change that in `Project Settings > GDSS > Storage`.
@@ -58,6 +58,8 @@ The stylesheet is saved to `res://theme.tgdss` by default. You can change that i
 - Variables come in three kinds: `@global` is shared and settable from code, `@instance` can be overridden per node, and plain `var` is file-local. Reference any of them with `$name`.
 - Methods compute values, such as `linear_gradient`, `radial_gradient`, `darken`, `lighten`, `alpha`, `mix`, `rgba`, `hsv`, `clamp`, and `texture`. Use `pass` for an optional argument to fall back to its default, like `linear_gradient($a, $b, pass, 0.2, 0.8)`.
 - Transitions animate between states with `transition_time`, `transition_func` (LINEAR, QUINT, ELASTIC, and so on), and `transition_type` (EASE_IN, EASE_OUT, EASE_IN_OUT, EASE_OUT_IN).
+- Schemes are named sets of variable overrides, declared with `@scheme name { ... }`. A scheme only lists the variables that differ from the base, so everything it omits falls back to the base `@global` value. Switch or animate between them from code with `GDSS.set_scheme(...)`.
+- Theme metadata lives in an `@meta { ... }` block (`name`, `description`, `default_scheme`, and so on) and is readable from code with `GDSS.get_theme_meta(...)`.
 - Colors accept hex like `"#8e00ff"`, `"#fff"`, or `"#ffffff22"`, and named colors like `RED` and `BLACK`.
 - Lines starting with `#` are comments and get ignored. When you toggle a line off in the editor, it is written without a space, like `#bg_color: RED`.
 
@@ -92,6 +94,37 @@ Override a variable on a single node, or read a global back with a fallback if t
 GDSS.set_instance_var(my_button, "card_color", Color.RED)
 var current: Color = GDSS.get_global_var("accent", Color.WHITE)
 ```
+
+### Schemes
+
+Declare named palettes in the stylesheet, then switch or tween between them with a single call. A scheme only restates the variables that differ from the base:
+
+```gdscript
+@global var bg: "#0d0d14"
+@global var text: "#ffffff"
+
+@meta {
+	default_scheme: dark
+}
+
+@scheme dark {}            # dark matches the base, so it needs nothing
+
+@scheme light {
+	bg: "#eceef5"
+	text: "#1b1e28"
+}
+```
+
+```gdscript
+GDSS.set_scheme("light")          # instant
+GDSS.set_scheme("dark", 0.25)     # tween over 0.25s (colors/numbers interpolate)
+
+var active: String = GDSS.get_scheme()
+for name: String in GDSS.get_schemes():
+	print(name)
+```
+
+The runtime applies the theme's `default_scheme` on start, and a `GdssRuntime.scheme_changed(name)` signal fires whenever the scheme changes. Theme metadata is available too, via `GDSS.get_theme_meta("name")` or `GDSS.get_theme_info()`.
 
 ## TODO
 
