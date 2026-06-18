@@ -5,25 +5,16 @@ extends EditorInspectorPlugin
 
 class GdssModeProperty extends EditorProperty:
 	var _option: OptionButton
-	var _readout: Label
 	var _updating: bool = false
 
 	func _init() -> void:
-		var box: VBoxContainer = VBoxContainer.new()
-		box.size_flags_horizontal = SIZE_EXPAND_FILL
-		add_child(box)
-		set_bottom_editor(box)
 		_option = OptionButton.new()
 		_option.size_flags_horizontal = SIZE_EXPAND_FILL
-		_option.tooltip_text = "Inherit follows the parent, Enable always styles this node, Disable never does."
 		_option.add_item("Inherit", GDSS.GdssMode.INHERIT)
 		_option.add_item("Enable", GDSS.GdssMode.ENABLE)
 		_option.add_item("Disable", GDSS.GdssMode.DISABLE)
-		box.add_child(_option)
+		add_child(_option)
 		add_focusable(_option)
-		_readout = Label.new()
-		_readout.modulate = Color(1, 1, 1, 0.6)
-		box.add_child(_readout)
 		_option.item_selected.connect(_on_selected)
 
 	func _ready() -> void:
@@ -41,7 +32,7 @@ class GdssModeProperty extends EditorProperty:
 		elif node.is_in_group(GdssNodeHandler.GROUP):
 			mode = GDSS.GdssMode.ENABLE
 		_option.select(_option.get_item_index(mode))
-		_readout.text = _effective_text(node)
+		_option.tooltip_text = _effective_text(node)
 		_updating = false
 
 	func _effective_text(node: Node) -> String:
