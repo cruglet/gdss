@@ -29,6 +29,7 @@ var _saved_tween: Tween
 var _chunk_tabs: TabBar
 var _chunks: Array[Dictionary] = []
 var _active_chunk: int = 0
+var _rebuilding_tabs: bool = false
 var _chunk_offsets: PackedInt32Array = []
 var _error_target_chunk: int = 0
 var _error_target_line: int = 0
@@ -255,14 +256,18 @@ func _sync_active_chunk() -> void:
 
 
 func _rebuild_chunk_tabs() -> void:
+	_rebuilding_tabs = true
 	_chunk_tabs.clear_tabs()
 	for chunk: Dictionary in _chunks:
 		_chunk_tabs.add_tab(str(chunk["name"]))
 	if _active_chunk >= 0 and _active_chunk < _chunks.size():
 		_chunk_tabs.current_tab = _active_chunk
+	_rebuilding_tabs = false
 
 
 func _on_chunk_selected(idx: int) -> void:
+	if _rebuilding_tabs:
+		return
 	if idx < 0 or idx >= _chunks.size() or idx == _active_chunk:
 		return
 	_sync_active_chunk()
@@ -276,12 +281,36 @@ func _on_chunk_selected(idx: int) -> void:
 
 
 func _on_chunk_added() -> void:
+	var dialog: AcceptDialog = AcceptDialog.new()
+	dialog.title = "New Chunk"
+	var line: LineEdit = LineEdit.new()
+	line.placeholder_text = "chunk name"
+	line.text = _unique_chunk_name("chunk")
+	line.custom_minimum_size = Vector2(220, 0)
+	dialog.add_child(line)
+	dialog.register_text_enter(line)
+	dialog.confirmed.connect(func() -> void:
+		var entered: String = line.text.strip_edges()
+		if entered.is_empty():
+			entered = "chunk"
+		_create_chunk(_unique_chunk_name(entered))
+	)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.canceled.connect(dialog.queue_free)
+	EditorInterface.get_base_control().add_child(dialog)
+	dialog.popup_centered()
+	line.grab_focus()
+	line.select_all()
+
+
+func _create_chunk(chunk_name: String) -> void:
 	_sync_active_chunk()
-	_chunks.append({"name": _unique_chunk_name("chunk"), "content": ""})
+	_chunks.append({"name": chunk_name, "content": ""})
 	_active_chunk = _chunks.size() - 1
+	_suppress_dirty = true
 	code_edit.text = ""
 	_rebuild_chunk_tabs()
-	code_edit.text_changed.emit()
+	_clear_suppress_dirty.call_deferred()
 	GdssInterpreter.get_instance().save_current()
 
 
