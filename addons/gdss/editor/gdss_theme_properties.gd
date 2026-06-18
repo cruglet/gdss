@@ -37,7 +37,8 @@ func _init() -> void:
 	grid.add_child(_scheme_option)
 	_schemes_label = Label.new()
 	_schemes_label.modulate = Color(1, 1, 1, 0.6)
-	_schemes_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_schemes_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_schemes_label.clip_text = true
 	vbox.add_child(_schemes_label)
 	confirmed.connect(_on_confirmed)
 
