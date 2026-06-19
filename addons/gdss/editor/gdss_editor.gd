@@ -28,6 +28,7 @@ var _current_file_path: String = ""
 var _saved_label: Label
 var _saved_tween: Tween
 
+var _updater: GdssUpdater
 var _chunk_tabs: TabBar
 var _chunks: Array[Dictionary] = []
 var _active_chunk: int = 0
@@ -65,6 +66,7 @@ enum {
 	MENU_MOVE_UP,
 	MENU_MOVE_DOWN,
 	MENU_SELECT_NEXT,
+	MENU_CHECK_UPDATE,
 }
 
 var file_name: String:
@@ -584,6 +586,11 @@ func _setup_menu_bar() -> void:
 	edit_menu.add_item("Select Next Occurrence  (Ctrl+D)", MENU_SELECT_NEXT)
 	edit_menu.id_pressed.connect(_on_menu_id_pressed)
 	menu_bar.add_child(edit_menu)
+	var help_menu: PopupMenu = PopupMenu.new()
+	help_menu.name = "Help"
+	help_menu.add_item("Check for Updates…", MENU_CHECK_UPDATE)
+	help_menu.id_pressed.connect(_on_menu_id_pressed)
+	menu_bar.add_child(help_menu)
 	top_bar.add_child(menu_bar)
 	top_bar.move_child(menu_bar, 0)
 
@@ -619,6 +626,8 @@ func _on_menu_id_pressed(id: int) -> void:
 			code_edit.move_lines_down()
 		MENU_SELECT_NEXT:
 			_select_next_occurrence()
+		MENU_CHECK_UPDATE:
+			_check_for_updates()
 
 
 func _toggle_comment() -> void:
@@ -1066,13 +1075,60 @@ func _base_control() -> Node:
 
 
 func _show_error(message: String) -> void:
+	_show_info("GDSS", message)
+
+
+func _show_info(title: String, message: String) -> void:
 	var dialog: AcceptDialog = AcceptDialog.new()
-	dialog.title = "GDSS"
+	dialog.title = title
 	dialog.dialog_text = message
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)
 	_base_control().add_child(dialog)
 	dialog.popup_centered()
+
+
+func _check_for_updates() -> void:
+	if _updater == null:
+		_updater = GdssUpdater.new()
+		add_child(_updater)
+	_updater.check_completed.connect(_on_update_checked, CONNECT_ONE_SHOT)
+	_updater.check()
+
+
+func _on_update_checked(result: Dictionary) -> void:
+	if not result.get("ok", false):
+		_show_info("Update check failed", str(result.get("message", "Unknown error.")))
+		return
+	if not result.get("update", false):
+		_show_info("GDSS is up to date", "You have the latest version (%s)." % result.get("current"))
+		return
+	var confirm: ConfirmationDialog = ConfirmationDialog.new()
+	confirm.title = "Update available"
+	confirm.dialog_text = "GDSS %s is available — you have %s.\n\nUpdating overwrites the files in res://addons/gdss. Reload the project afterward to apply.\n\nUpdate now?" % [result.get("latest"), result.get("current")]
+	confirm.confirmed.connect(_install_update.bind(str(result.get("latest")), str(result.get("url"))))
+	confirm.confirmed.connect(confirm.queue_free)
+	confirm.canceled.connect(confirm.queue_free)
+	_base_control().add_child(confirm)
+	confirm.popup_centered()
+
+
+func _install_update(version: String, url: String) -> void:
+	_updater.install_completed.connect(_on_update_installed, CONNECT_ONE_SHOT)
+	_updater.install(version, url)
+
+
+func _on_update_installed(success: bool, message: String) -> void:
+	if not success:
+		_show_info("Update failed", message)
+		return
+	var confirm: ConfirmationDialog = ConfirmationDialog.new()
+	confirm.title = "Update installed"
+	confirm.dialog_text = message + "\n\nRestart the editor now?"
+	confirm.confirmed.connect(func() -> void: EditorInterface.restart_editor(true))
+	confirm.canceled.connect(confirm.queue_free)
+	_base_control().add_child(confirm)
+	confirm.popup_centered()
 
 
 func _make_file_dialog(save_mode: bool) -> EditorFileDialog:
