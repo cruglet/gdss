@@ -277,6 +277,81 @@ class GdssClassesProperty extends EditorProperty:
 		undo_redo.commit_action()
 
 
+class GdssCascadeProperty extends EditorProperty:
+	var _label: RichTextLabel
+
+	func _init() -> void:
+		_label = RichTextLabel.new()
+		_label.bbcode_enabled = true
+		_label.fit_content = true
+		_label.scroll_active = false
+		_label.modulate = Color(1, 1, 1, 0.85)
+		_label.size_flags_horizontal = SIZE_EXPAND_FILL
+		add_child(_label)
+		set_bottom_editor(_label)
+
+	func _ready() -> void:
+		_update_property.call_deferred()
+
+	func _update_property() -> void:
+		var obj: Object = get_edited_object()
+		if obj == null:
+			return
+		var node: Node = obj as Node
+		var classes: PackedStringArray = GDSS.get_classes(node)
+		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
+		var states: PackedStringArray = gdss_node.states if gdss_node != null else PackedStringArray()
+		var scheme: String = GDSS.get_scheme()
+		var lines: PackedStringArray = []
+		lines.append("[b]Selector:[/b] %s" % node.get_class())
+		lines.append("[b]Classes:[/b] %s" % (", ".join(classes) if not classes.is_empty() else "(none)"))
+		lines.append("[b]States:[/b] %s" % (", ".join(states) if not states.is_empty() else "(none)"))
+		if not scheme.is_empty():
+			lines.append("[b]Scheme:[/b] %s" % scheme)
+		_label.text = "\n".join(lines)
+
+
+class GdssPreviewProperty extends EditorProperty:
+	var _option: OptionButton
+
+	func _init() -> void:
+		_option = OptionButton.new()
+		_option.size_flags_horizontal = SIZE_EXPAND_FILL
+		_option.tooltip_text = "Force a state to preview it in the editor. Live = follow the real state."
+		add_child(_option)
+		add_focusable(_option)
+		_option.item_selected.connect(_on_selected)
+
+	func _ready() -> void:
+		_update_property.call_deferred()
+
+	func _update_property() -> void:
+		var obj: Object = get_edited_object()
+		if obj == null:
+			return
+		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get((obj as Node).get_class())
+		_option.clear()
+		_option.add_item("Live")
+		if gdss_node != null:
+			for state: String in gdss_node.states:
+				_option.add_item(state)
+		_option.select(0)
+
+	func _on_selected(index: int) -> void:
+		var obj: Object = get_edited_object()
+		if obj == null or not obj is CanvasItem:
+			return
+		var node: CanvasItem = obj as CanvasItem
+		if index == 0:
+			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
+			if gdss_node != null:
+				gdss_node.update_state(node)
+			return
+		var state: String = _option.get_item_text(index)
+		for handler: GdssPropHandler in GdssNodeHandler.get_handlers(node):
+			handler.current_state = state
+
+
 func _can_handle(object: Object) -> bool:
 	return object is Control and GDSS._get_gdss_nodes().has(object.get_class())
 
@@ -292,6 +367,14 @@ func _parse_property(object: Object, type: Variant.Type, name: String, hint_type
 			var classes_prop: GdssClassesProperty = GdssClassesProperty.new()
 			classes_prop.set_label("Classes")
 			add_custom_control(classes_prop)
+			var cascade_prop: GdssCascadeProperty = GdssCascadeProperty.new()
+			cascade_prop.set_label("Applies")
+			add_custom_control(cascade_prop)
+			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get((object as Node).get_class())
+			if gdss_node != null and not gdss_node.is_static and gdss_node.states.size() > 1:
+				var preview_prop: GdssPreviewProperty = GdssPreviewProperty.new()
+				preview_prop.set_label("Preview State")
+				add_custom_control(preview_prop)
 			return true
 
 	if is_enabled:
