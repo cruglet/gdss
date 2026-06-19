@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://c2jjsh6r4vrfs"]
 
-[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_2p8fp"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_di4uc"]
+[ext_resource type="Script" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_2p8fp"]
+[ext_resource type="Script" path="res://addons/gdss/db/props/_base.gd" id="2_di4uc"]
 
 [resource]
 script = ExtResource("1_2p8fp")
@@ -12,10 +12,3 @@ enabled_components = Dictionary[String, bool]({
 base_type = &"MarginContainer"
 style_name = &"MarginContainer"
 is_static = true
-constants = PackedStringArray("margin_left", "margin_top", "margin_right", "margin_bottom")
-theme_defaults = Dictionary[String, Variant]({
-"margin_bottom": 0,
-"margin_left": 0,
-"margin_right": 0,
-"margin_top": 0
-})

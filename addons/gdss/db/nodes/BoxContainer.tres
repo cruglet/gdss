@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_Base" format=3 uid="uid://c01s35qcxoewf"]
 
-[ext_resource type="Script" uid="uid://cauq5fy316yg5" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_yfo7r"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_wr22n"]
+[ext_resource type="Script" path="res://addons/gdss/db/nodes/_n_base.gd" id="1_yfo7r"]
+[ext_resource type="Script" path="res://addons/gdss/db/props/_base.gd" id="2_wr22n"]
 
 [resource]
 script = ExtResource("1_yfo7r")
@@ -12,7 +12,3 @@ enabled_components = Dictionary[String, bool]({
 base_type = &"BoxContainer"
 style_name = &"BoxContainer"
 is_static = true
-constants = PackedStringArray("separation")
-theme_defaults = Dictionary[String, Variant]({
-"separation": 4
-})

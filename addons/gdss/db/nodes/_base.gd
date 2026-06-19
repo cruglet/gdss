@@ -69,6 +69,18 @@ var _style_props_dirty: bool = true
 var _props_by_name_cache: Dictionary[String, GdssProp] = {}
 var _props_by_name_dirty: bool = true
 
+const _NON_STORED: PackedStringArray = [
+	"states", "icons", "font_sizes", "fonts", "constants", "colors", "theme_defaults",
+	"_states", "_icons", "_font_sizes", "_fonts", "_constants", "_colors", "_theme_defaults",
+	"_theme_dirty", "_props_cache", "_props_dirty", "_style_props_cache", "_style_props_dirty",
+	"_props_by_name_cache", "_props_by_name_dirty",
+]
+
+
+func _validate_property(property: Dictionary) -> void:
+	if _NON_STORED.has(property.get("name")):
+		property["usage"] = property.get("usage", 0) & ~PROPERTY_USAGE_STORAGE
+
 
 @abstract func get_events() -> PackedStringArray
 @abstract func get_active_state(canvas_item: CanvasItem) -> String

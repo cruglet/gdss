@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_ItemList" format=3 uid="uid://cp7n82htiyw7k"]
 
-[ext_resource type="Script" uid="uid://dnrsf70r3en1u" path="res://addons/gdss/db/nodes/ItemList.gd" id="1_hc64m"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_fyd1h"]
+[ext_resource type="Script" path="res://addons/gdss/db/nodes/ItemList.gd" id="1_hc64m"]
+[ext_resource type="Script" path="res://addons/gdss/db/props/_base.gd" id="2_fyd1h"]
 
 [sub_resource type="Resource" id="Resource_hc64m"]
 script = ExtResource("2_fyd1h")

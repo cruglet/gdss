@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="GdssNode_Panel" format=3 uid="uid://cmvtwk5nv2ou4"]
 
-[ext_resource type="Script" uid="uid://cyl4d1srrt0i5" path="res://addons/gdss/db/nodes/Panel.gd" id="1_q6tlj"]
-[ext_resource type="Script" uid="uid://b7gagsyfvnai7" path="res://addons/gdss/db/props/_base.gd" id="2_aqdqh"]
+[ext_resource type="Script" path="res://addons/gdss/db/nodes/Panel.gd" id="1_q6tlj"]
+[ext_resource type="Script" path="res://addons/gdss/db/props/_base.gd" id="2_aqdqh"]
 
 [resource]
 script = ExtResource("1_q6tlj")
@@ -11,5 +11,4 @@ enabled_components = Dictionary[String, bool]({
 })
 base_type = &"PanelContainer"
 style_name = &"PanelContainer"
-states = PackedStringArray("panel")
 metadata/_custom_type_script = "uid://cyl4d1srrt0i5"
