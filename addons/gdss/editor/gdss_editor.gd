@@ -40,6 +40,7 @@ var _error_target_line: int = 0
 var _error_bg: Color = Color.RED
 var _all_errors: Array = []
 var _highlighted_lines: PackedInt32Array = []
+var _error_cursor: int = -1
 var _search_bar: VBoxContainer
 var _search_field: LineEdit
 var _search_label: Label
@@ -66,6 +67,10 @@ enum {
 	MENU_MOVE_UP,
 	MENU_MOVE_DOWN,
 	MENU_SELECT_NEXT,
+	MENU_NEXT_ERROR,
+	MENU_PREV_ERROR,
+	MENU_FOLD_ALL,
+	MENU_UNFOLD_ALL,
 	MENU_CHECK_UPDATE,
 }
 
@@ -423,6 +428,7 @@ func _unique_chunk_name(base: String) -> String:
 
 func display_errors(errors: Array) -> void:
 	_all_errors = errors
+	_error_cursor = -1
 	for line_index: int in _highlighted_lines:
 		if line_index < code_edit.get_line_count():
 			code_edit.set_line_background_color(line_index, Color.TRANSPARENT)
@@ -467,7 +473,20 @@ func get_code_edit() -> CodeEdit:
 	return code_edit
 
 
-func show_error(message: String, line_num: int, total_errors: int = 1) -> void:
+func _goto_error(direction: int) -> void:
+	if _all_errors.is_empty():
+		return
+	if _error_cursor == -1:
+		_error_cursor = 0 if direction > 0 else _all_errors.size() - 1
+	else:
+		_error_cursor = wrapi(_error_cursor + direction, 0, _all_errors.size())
+	var err: Array = _all_errors[_error_cursor]
+	goto_full_source_line(int(err[1]))
+	var chunk_start: int = _chunk_offsets[_active_chunk] if _active_chunk < _chunk_offsets.size() else 0
+	show_error(str(err[0]), int(err[1]) - chunk_start, _all_errors.size(), _error_cursor)
+
+
+func show_error(message: String, line_num: int, total_errors: int = 1, current_index: int = -1) -> void:
 	if line_num == -1:
 		error_label.text = ""
 		error_label.tooltip_text = ""
@@ -475,7 +494,11 @@ func show_error(message: String, line_num: int, total_errors: int = 1) -> void:
 		copy_button.disabled = true
 		return
 
-	var more_suffix: String = "  (+%d more)" % (total_errors - 1) if total_errors > 1 else ""
+	var more_suffix: String = ""
+	if current_index >= 0 and total_errors > 1:
+		more_suffix = "  (%d/%d)" % [current_index + 1, total_errors]
+	elif total_errors > 1:
+		more_suffix = "  (+%d more)" % (total_errors - 1)
 	error_label.text = "[%s]: %s%s" % [line_num + 1, message, more_suffix]
 	error_label.tooltip_text = error_label.text
 	err_line_num = line_num
@@ -535,6 +558,9 @@ func _on_code_edit_input(event: InputEvent) -> void:
 	if key.keycode == KEY_DOWN and key.alt_pressed:
 		code_edit.move_lines_down()
 		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_F8:
+		_goto_error(-1 if key.shift_pressed else 1)
+		code_edit.get_viewport().set_input_as_handled()
 
 
 func _apply_font_size() -> void:
@@ -584,6 +610,12 @@ func _setup_menu_bar() -> void:
 	edit_menu.add_item("Move Line Up  (Alt+Up)", MENU_MOVE_UP)
 	edit_menu.add_item("Move Line Down  (Alt+Down)", MENU_MOVE_DOWN)
 	edit_menu.add_item("Select Next Occurrence  (Ctrl+D)", MENU_SELECT_NEXT)
+	edit_menu.add_separator()
+	edit_menu.add_item("Next Error  (F8)", MENU_NEXT_ERROR)
+	edit_menu.add_item("Previous Error  (Shift+F8)", MENU_PREV_ERROR)
+	edit_menu.add_separator()
+	edit_menu.add_item("Fold All", MENU_FOLD_ALL)
+	edit_menu.add_item("Unfold All", MENU_UNFOLD_ALL)
 	edit_menu.id_pressed.connect(_on_menu_id_pressed)
 	menu_bar.add_child(edit_menu)
 	var help_menu: PopupMenu = PopupMenu.new()
@@ -626,6 +658,14 @@ func _on_menu_id_pressed(id: int) -> void:
 			code_edit.move_lines_down()
 		MENU_SELECT_NEXT:
 			_select_next_occurrence()
+		MENU_NEXT_ERROR:
+			_goto_error(1)
+		MENU_PREV_ERROR:
+			_goto_error(-1)
+		MENU_FOLD_ALL:
+			code_edit.fold_all_lines()
+		MENU_UNFOLD_ALL:
+			code_edit.unfold_all_lines()
 		MENU_CHECK_UPDATE:
 			_check_for_updates()
 
@@ -1369,7 +1409,7 @@ func _draw_color_swatches() -> void:
 			var line_height: float = code_edit.get_line_height()
 			var swatch_size: float = maxf(line_height - 4.0, 6.0)
 			var swatch_y: float = after.y - line_height + (line_height - swatch_size) * 0.5
-			var swatch: Rect2 = Rect2(after.x + 4.0, swatch_y, swatch_size, swatch_size)
+			var swatch: Rect2 = Rect2(after.x + 10.0, swatch_y, swatch_size, swatch_size)
 			code_edit.draw_rect(swatch, Color(0, 0, 0, 0.6))
 			code_edit.draw_rect(swatch.grow(-1.0), hit["color"])
 			_swatch_hitboxes.append({"rect": swatch, "line": line, "from": hit["from"], "to": hit["to"]})
