@@ -119,6 +119,19 @@ static func set_global_var(name: String, value: Variant) -> void:
 	_schedule_global_refresh()
 
 
+## Restores a [b]global variable[/b] to the value declared in the stylesheet,
+## discarding any runtime change made with [method set_global_var].
+## [codeblock]
+## GDSS.reset_global_var("theme_accent")
+## [/codeblock]
+static func reset_global_var(name: String) -> void:
+	if GdssInterpreter._global_defaults.has(name):
+		GdssInterpreter.globals[name] = GdssInterpreter._global_defaults.get(name)
+	else:
+		GdssInterpreter.globals.erase(name)
+	_schedule_global_refresh()
+
+
 static func _schedule_global_refresh() -> void:
 	if _global_flush_scheduled:
 		return
@@ -141,6 +154,13 @@ static func get_global_vars() -> Dictionary:
 static func set_global_vars(values: Dictionary) -> void:
 	for key: String in values:
 		GdssInterpreter.globals[key] = values[key]
+	_schedule_global_refresh()
+
+
+## Restores [b]every global variable[/b] to its stylesheet-declared value in a
+## single refresh, discarding all runtime changes.
+static func reset_global_vars() -> void:
+	GdssInterpreter.globals = GdssInterpreter._global_defaults.duplicate(true)
 	_schedule_global_refresh()
 
 
@@ -249,6 +269,28 @@ static func get_default_scheme() -> String:
 	return str(GdssInterpreter.meta.get("default_scheme", ""))
 
 
+## Connects [param callable] to fire whenever the active scheme changes via
+## [method set_scheme]; the callable receives the new scheme name. A convenience
+## over reaching into the runtime autoload's [code]scheme_changed[/code] signal.
+static func on_scheme_changed(callable: Callable) -> void:
+	if is_instance_valid(_runtime) and _runtime.has_signal(&"scheme_changed"):
+		_runtime.scheme_changed.connect(callable)
+
+
+## Connects [param callable] to fire whenever global variables change (via
+## [method set_global_var], a scheme switch, or a tween step).
+static func on_globals_changed(callable: Callable) -> void:
+	if is_instance_valid(_runtime) and _runtime.has_signal(&"globals_changed"):
+		_runtime.globals_changed.connect(callable)
+
+
+## Connects [param callable] to fire whenever the stylesheet is reparsed and
+## reloaded at runtime.
+static func on_parsed_reloaded(callable: Callable) -> void:
+	if is_instance_valid(_runtime) and _runtime.has_signal(&"parsed_reloaded"):
+		_runtime.parsed_reloaded.connect(callable)
+
+
 static func _lerp_value(from_val: Variant, to_val: Variant, t: float) -> Variant:
 	if from_val is Color and to_val is Color:
 		return (from_val as Color).lerp(to_val as Color, t)
@@ -327,9 +369,46 @@ static func get_instance_var(node: Node, name: String, fallback: Variant = null)
 	return GdssInterpreter._instance_defaults.get(name, fallback)
 
 
-## Clears all GDSS instance variables from a specific node.
+## Resolves the [b]effective value[/b] GDSS uses for [param name] on [param node],
+## following the same precedence as styling: a per-node instance override first,
+## then the live global value, then the instance and global defaults, falling back
+## to [param fallback]. Saves the caller from knowing whether [param name] is a
+## global or an instance variable.
+## [codeblock]
+## var accent: Color = GDSS.get_var(my_button, "theme_accent", Color.WHITE)
+## [/codeblock]
+static func get_var(node: Node, name: String, fallback: Variant = null) -> Variant:
+	if node != null:
+		var overrides: Dictionary = GdssInterpreter._instance_vars.get(node.get_instance_id(), {})
+		if overrides.has(name):
+			return overrides.get(name)
+	if GdssInterpreter.globals.has(name):
+		return GdssInterpreter.globals.get(name)
+	if GdssInterpreter._instance_defaults.has(name):
+		return GdssInterpreter._instance_defaults.get(name)
+	if GdssInterpreter._global_defaults.has(name):
+		return GdssInterpreter._global_defaults.get(name)
+	return fallback
+
+
+## Clears a single GDSS instance override from [param node], reverting it to the
+## stylesheet default, and reapplies its style.
+static func clear_instance_var(node: Node, name: String) -> void:
+	var id: int = node.get_instance_id()
+	if GdssInterpreter._instance_vars.has(id):
+		var overrides: Dictionary = GdssInterpreter._instance_vars.get(id)
+		overrides.erase(name)
+		if overrides.is_empty():
+			GdssInterpreter._instance_vars.erase(id)
+	if node is CanvasItem:
+		GdssNodeHandler.refresh(node as CanvasItem)
+
+
+## Clears all GDSS instance variables from a specific node and reapplies its style.
 static func clear_instance_vars(node: Node) -> void:
 	GdssInterpreter._instance_vars.erase(node.get_instance_id())
+	if node is CanvasItem:
+		GdssNodeHandler.refresh(node as CanvasItem)
 
 
 ## Returns the GDSS classes currently applied to [param node], in priority order.

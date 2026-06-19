@@ -160,8 +160,8 @@ var WritingGDSS: GDSSDocumentation
 ## GDSS.set_scheme("dark", 0.25)     # tween over 0.25s
 ## [/codeblock]
 ## Read the active scheme with [method GDSS.get_scheme], list them all with
-## [method GDSS.get_schemes], and react to changes via the [code]scheme_changed[/code]
-## signal on the [code]GdssRuntime[/code] autoload.[br][br]
+## [method GDSS.get_schemes], and react to changes by passing a callable to
+## [method GDSS.on_scheme_changed].[br][br]
 ## A theme can also carry [b]metadata[/b] in an [code]@meta[/code] block. Use it for a
 ## name, description, author, version, or the [code]default_scheme[/code] applied when
 ## the game starts:
