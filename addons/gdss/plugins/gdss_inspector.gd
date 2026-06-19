@@ -85,7 +85,6 @@ class GdssClassesProperty extends EditorProperty:
 		var root: VBoxContainer = VBoxContainer.new()
 		root.size_flags_horizontal = SIZE_EXPAND_FILL
 		add_child(root)
-		set_bottom_editor(root)
 		_empty_label = Label.new()
 		_empty_label.text = "No classes assigned."
 		_empty_label.modulate = Color(1, 1, 1, 0.5)
@@ -277,40 +276,6 @@ class GdssClassesProperty extends EditorProperty:
 		undo_redo.commit_action()
 
 
-class GdssCascadeProperty extends EditorProperty:
-	var _label: RichTextLabel
-
-	func _init() -> void:
-		_label = RichTextLabel.new()
-		_label.bbcode_enabled = true
-		_label.fit_content = true
-		_label.scroll_active = false
-		_label.modulate = Color(1, 1, 1, 0.85)
-		_label.size_flags_horizontal = SIZE_EXPAND_FILL
-		add_child(_label)
-		set_bottom_editor(_label)
-
-	func _ready() -> void:
-		_update_property.call_deferred()
-
-	func _update_property() -> void:
-		var obj: Object = get_edited_object()
-		if obj == null:
-			return
-		var node: Node = obj as Node
-		var classes: PackedStringArray = GDSS.get_classes(node)
-		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(node.get_class())
-		var states: PackedStringArray = gdss_node.states if gdss_node != null else PackedStringArray()
-		var scheme: String = GDSS.get_scheme()
-		var lines: PackedStringArray = []
-		lines.append("[b]Selector:[/b] %s" % node.get_class())
-		lines.append("[b]Classes:[/b] %s" % (", ".join(classes) if not classes.is_empty() else "(none)"))
-		lines.append("[b]States:[/b] %s" % (", ".join(states) if not states.is_empty() else "(none)"))
-		if not scheme.is_empty():
-			lines.append("[b]Scheme:[/b] %s" % scheme)
-		_label.text = "\n".join(lines)
-
-
 class GdssPreviewProperty extends EditorProperty:
 	var _option: OptionButton
 
@@ -367,9 +332,6 @@ func _parse_property(object: Object, type: Variant.Type, name: String, hint_type
 			var classes_prop: GdssClassesProperty = GdssClassesProperty.new()
 			classes_prop.set_label("Classes")
 			add_custom_control(classes_prop)
-			var cascade_prop: GdssCascadeProperty = GdssCascadeProperty.new()
-			cascade_prop.set_label("Applies")
-			add_custom_control(cascade_prop)
 			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get((object as Node).get_class())
 			if gdss_node != null and not gdss_node.is_static and gdss_node.states.size() > 1:
 				var preview_prop: GdssPreviewProperty = GdssPreviewProperty.new()
