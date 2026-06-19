@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GdssMethod_Grayscale" format=3]
+
+[ext_resource type="Script" path="res://addons/gdss/db/methods/grayscale.gd" id="1_gray"]
+
+[resource]
+script = ExtResource("1_gray")
+method_name = "grayscale"
+supported_prop_types = Array[int]([3])
+returns_texture = false

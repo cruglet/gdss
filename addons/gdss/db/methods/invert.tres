@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GdssMethod_Invert" format=3]
+
+[ext_resource type="Script" path="res://addons/gdss/db/methods/invert.gd" id="1_inv"]
+
+[resource]
+script = ExtResource("1_inv")
+method_name = "invert"
+supported_prop_types = Array[int]([3])
+returns_texture = false

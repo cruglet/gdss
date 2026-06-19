@@ -18,6 +18,12 @@
 [ext_resource type="Resource" path="res://addons/gdss/db/methods/radial_gradient.tres" id="12_co76n"]
 [ext_resource type="Resource" path="res://addons/gdss/db/methods/rgba.tres" id="13_xlfko"]
 [ext_resource type="Resource" path="res://addons/gdss/db/methods/texture.tres" id="14_oxlj6"]
+[ext_resource type="Resource" path="res://addons/gdss/db/methods/saturate.tres" id="15_sat"]
+[ext_resource type="Resource" path="res://addons/gdss/db/methods/desaturate.tres" id="16_desat"]
+[ext_resource type="Resource" path="res://addons/gdss/db/methods/grayscale.tres" id="17_gray"]
+[ext_resource type="Resource" path="res://addons/gdss/db/methods/invert.tres" id="18_inv"]
+[ext_resource type="Resource" path="res://addons/gdss/db/methods/complement.tres" id="19_comp"]
+[ext_resource type="Resource" path="res://addons/gdss/db/methods/contrast.tres" id="20_con"]
 [ext_resource type="Resource" path="res://addons/gdss/db/nodes/BoxContainer.tres" id="16_1bxit"]
 [ext_resource type="Resource" path="res://addons/gdss/db/nodes/Button.tres" id="17_kvbea"]
 [ext_resource type="Resource" path="res://addons/gdss/db/nodes/CheckBox.tres" id="18_s6v8s"]
@@ -162,7 +168,13 @@ method_list = Dictionary[String, ExtResource("1_yv5ta")]({
 "mix": ExtResource("11_4ucap"),
 "radial_gradient": ExtResource("12_co76n"),
 "rgba": ExtResource("13_xlfko"),
-"texture": ExtResource("14_oxlj6")
+"texture": ExtResource("14_oxlj6"),
+"saturate": ExtResource("15_sat"),
+"desaturate": ExtResource("16_desat"),
+"grayscale": ExtResource("17_gray"),
+"invert": ExtResource("18_inv"),
+"complement": ExtResource("19_comp"),
+"contrast": ExtResource("20_con")
 })
 component_list = Dictionary[String, ExtResource("1_miyk3")]({
 "Stylebox": ExtResource("2_dl7k7"),
