@@ -4,6 +4,7 @@ extends Node
 
 static var _code_editor_ref: CodeEdit
 static var _re_hex: RegEx = RegEx.create_from_string(r"\"(#[0-9A-Fa-f]{3,8})\"")
+static var _re_word: RegEx = RegEx.create_from_string(r"[A-Za-z_][A-Za-z_0-9]*")
 
 @export_group("refs")
 @export var code_edit: CodeEdit
@@ -31,7 +32,7 @@ var _chunk_tabs: TabBar
 var _chunks: Array[Dictionary] = []
 var _active_chunk: int = 0
 var _rebuilding_tabs: bool = false
-var _color_gutter: int = -1
+var _swatch_hitboxes: Array[Dictionary] = []
 var _chunk_offsets: PackedInt32Array = []
 var _error_target_chunk: int = 0
 var _error_target_line: int = 0
@@ -108,7 +109,7 @@ func _ready() -> void:
 	_push_recent(GdssStorage.get_save_path())
 	_setup_chunk_tabs()
 	_setup_search()
-	_setup_color_gutter()
+	_setup_color_swatches()
 	_update_editor()
 	_on_code_edit_caret_changed()
 
@@ -1244,58 +1245,116 @@ func _on_recent_selected(index: int) -> void:
 	)
 
 
-func _setup_color_gutter() -> void:
-	code_edit.add_gutter(-1)
-	_color_gutter = code_edit.get_gutter_count() - 1
-	code_edit.set_gutter_type(_color_gutter, TextEdit.GUTTER_TYPE_CUSTOM)
-	code_edit.set_gutter_custom_draw(_color_gutter, _draw_color_gutter)
-	code_edit.set_gutter_width(_color_gutter, 18)
-	code_edit.set_gutter_clickable(_color_gutter, true)
-	if not code_edit.gutter_clicked.is_connected(_on_gutter_clicked):
-		code_edit.gutter_clicked.connect(_on_gutter_clicked)
+func _setup_color_swatches() -> void:
+	if not code_edit.draw.is_connected(_draw_color_swatches):
+		code_edit.draw.connect(_draw_color_swatches)
+	if not code_edit.gui_input.is_connected(_on_swatch_gui_input):
+		code_edit.gui_input.connect(_on_swatch_gui_input)
+	var v_scroll: VScrollBar = code_edit.get_v_scroll_bar()
+	if v_scroll != null and not v_scroll.value_changed.is_connected(_queue_swatch_redraw):
+		v_scroll.value_changed.connect(_queue_swatch_redraw)
 
 
-func _find_hex_in_line(line: String) -> Dictionary:
-	var m: RegExMatch = _re_hex.search(line)
-	if m == null:
-		return {}
-	var hex: String = m.get_string(1)
-	if not Color.html_is_valid(hex):
-		return {}
-	return {"color": Color.html(hex), "from": m.get_start(1), "to": m.get_end(1)}
+func _queue_swatch_redraw(_value: float) -> void:
+	code_edit.queue_redraw()
 
 
-func _draw_color_gutter(line: int, gutter: int, area: Rect2) -> void:
-	var info: Dictionary = _find_hex_in_line(code_edit.get_line(line))
-	if info.is_empty():
+func _strip_line_comment(line: String) -> String:
+	var in_string: bool = false
+	for i: int in line.length():
+		var c: String = line[i]
+		if c == "\"":
+			in_string = not in_string
+		elif c == "#" and not in_string:
+			return line.substr(0, i)
+	return line
+
+
+func _find_colors_in_line(line: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var code: String = _strip_line_comment(line)
+	for m: RegExMatch in _re_hex.search_all(code):
+		if Color.html_is_valid(m.get_string(1)):
+			out.append({"color": Color.html(m.get_string(1)), "from": m.get_start(0), "to": m.get_end(0)})
+	var sentinel: Color = Color(-1, -1, -1, -1)
+	for m: RegExMatch in _re_word.search_all(code):
+		var start: int = m.get_start(0)
+		if not _is_value_position(code, start):
+			continue
+		var col: Color = Color.from_string(m.get_string(0), sentinel)
+		if col != sentinel:
+			out.append({"color": col, "from": start, "to": m.get_end(0)})
+	return out
+
+
+func _is_value_position(line: String, column: int) -> bool:
+	var in_string: bool = false
+	var has_separator: bool = false
+	for i: int in column:
+		var c: String = line[i]
+		if c == "\"":
+			in_string = not in_string
+		elif not in_string and (c == ":" or c == "=" or c == "("):
+			has_separator = true
+	return has_separator and not in_string
+
+
+func _draw_color_swatches() -> void:
+	_swatch_hitboxes.clear()
+	var first: int = code_edit.get_first_visible_line()
+	var last: int = code_edit.get_last_full_visible_line()
+	for line: int in range(first, last + 1):
+		if line < 0 or line >= code_edit.get_line_count():
+			continue
+		for hit: Dictionary in _find_colors_in_line(code_edit.get_line(line)):
+			var rect: Rect2 = code_edit.get_rect_at_line_column(line, hit["to"] - 1)
+			if rect.position.x < 0 or rect.position.y < 0:
+				continue
+			var size: float = maxf(rect.size.y - 4.0, 6.0)
+			var swatch: Rect2 = Rect2(rect.position.x + rect.size.x + 4.0, rect.position.y + 2.0, size, size)
+			code_edit.draw_rect(swatch, Color(0, 0, 0, 0.6))
+			code_edit.draw_rect(swatch.grow(-1.0), hit["color"])
+			_swatch_hitboxes.append({"rect": swatch, "line": line, "from": hit["from"], "to": hit["to"]})
+
+
+func _on_swatch_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
 		return
-	var swatch: Rect2 = area.grow(-3.0)
-	code_edit.draw_rect(swatch, Color(0, 0, 0, 0.5))
-	code_edit.draw_rect(swatch.grow(-1.0), info["color"])
+	var mb: InputEventMouseButton = event
+	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
+		return
+	for hit: Dictionary in _swatch_hitboxes:
+		if hit["rect"].has_point(mb.position):
+			_open_swatch_picker(hit)
+			code_edit.accept_event()
+			return
 
 
-func _on_gutter_clicked(line: int, gutter: int) -> void:
-	if gutter != _color_gutter:
+func _open_swatch_picker(hit: Dictionary) -> void:
+	var text: String = code_edit.get_line(hit["line"])
+	if hit["to"] > text.length():
 		return
-	var info: Dictionary = _find_hex_in_line(code_edit.get_line(line))
-	if info.is_empty():
-		return
+	var state: Dictionary = {"line": hit["line"], "from": hit["from"], "to": hit["to"]}
 	var popup: PopupPanel = PopupPanel.new()
 	var picker: ColorPicker = ColorPicker.new()
-	picker.color = info["color"]
-	picker.color_changed.connect(_replace_color.bind(line))
+	picker.color = Color.from_string(text.substr(hit["from"], hit["to"] - hit["from"]).strip_edges().trim_prefix("\"").trim_suffix("\""), Color.WHITE)
+	picker.color_changed.connect(_apply_swatch_color.bind(state))
 	popup.add_child(picker)
 	popup.popup_hide.connect(popup.queue_free)
 	EditorInterface.get_base_control().add_child(popup)
-	popup.popup_centered()
+	var origin: Vector2 = code_edit.get_screen_position() + hit["rect"].position + Vector2(0, hit["rect"].size.y)
+	popup.popup(Rect2i(Vector2i(origin), Vector2i.ZERO))
 
 
-func _replace_color(color: Color, line: int) -> void:
+func _apply_swatch_color(color: Color, state: Dictionary) -> void:
+	var line: int = state["line"]
 	if line < 0 or line >= code_edit.get_line_count():
 		return
 	var text: String = code_edit.get_line(line)
-	var info: Dictionary = _find_hex_in_line(text)
-	if info.is_empty():
+	var from: int = state["from"]
+	var to: int = state["to"]
+	if from < 0 or to > text.length():
 		return
-	var new_hex: String = "#" + color.to_html(color.a < 1.0)
-	code_edit.set_line(line, text.substr(0, info["from"]) + new_hex + text.substr(info["to"]))
+	var literal: String = "\"#%s\"" % color.to_html(color.a < 1.0)
+	code_edit.set_line(line, text.substr(0, from) + literal + text.substr(to))
+	state["to"] = from + literal.length()
