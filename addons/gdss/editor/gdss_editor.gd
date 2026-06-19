@@ -1363,11 +1363,13 @@ func _draw_color_swatches() -> void:
 		if line < 0 or line >= code_edit.get_line_count():
 			continue
 		for hit: Dictionary in _find_colors_in_line(code_edit.get_line(line)):
-			var rect: Rect2 = code_edit.get_rect_at_line_column(line, hit["to"] - 1)
-			if rect.position.x < 0 or rect.position.y < 0:
+			var after: Vector2 = code_edit.get_pos_at_line_column(line, hit["to"])
+			if after.x < 0 or after.y < 0:
 				continue
-			var size: float = maxf(rect.size.y - 4.0, 6.0)
-			var swatch: Rect2 = Rect2(rect.position.x + rect.size.x + 4.0, rect.position.y + 2.0, size, size)
+			var line_height: float = code_edit.get_line_height()
+			var swatch_size: float = maxf(line_height - 4.0, 6.0)
+			var swatch_y: float = after.y - line_height + (line_height - swatch_size) * 0.5
+			var swatch: Rect2 = Rect2(after.x + 4.0, swatch_y, swatch_size, swatch_size)
 			code_edit.draw_rect(swatch, Color(0, 0, 0, 0.6))
 			code_edit.draw_rect(swatch.grow(-1.0), hit["color"])
 			_swatch_hitboxes.append({"rect": swatch, "line": line, "from": hit["from"], "to": hit["to"]})
