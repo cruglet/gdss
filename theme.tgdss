@@ -128,6 +128,10 @@ Panel, PanelContainer {
 	FrostedPanel {
 		bg_color: blur()
 	}
+	
+	LiquidPanel {
+		bg_color: liquid_blur(3, BLACK, 0.1, 1, 0.7)
+	}
 }
 
 # @chunk Labels
