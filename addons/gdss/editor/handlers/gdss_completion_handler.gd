@@ -174,9 +174,20 @@ func _ensure_hint_panel() -> void:
 	_hint_panel.top_level = true
 	_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint_panel.visible = false
+	if theme.has_stylebox(&"panel", &"TooltipPanel"):
+		_hint_panel.add_theme_stylebox_override(&"panel", theme.get_stylebox(&"panel", &"TooltipPanel"))
+	else:
+		var sb: StyleBoxFlat = StyleBoxFlat.new()
+		sb.bg_color = theme.get_color(&"base_color", &"Editor") if theme.has_color(&"base_color", &"Editor") else Color(0.13, 0.14, 0.17)
+		sb.border_color = theme.get_color(&"accent_color", &"Editor") if theme.has_color(&"accent_color", &"Editor") else Color(0.3, 0.3, 0.35)
+		sb.set_border_width_all(1)
+		sb.set_corner_radius_all(4)
+		sb.set_content_margin_all(6.0)
+		_hint_panel.add_theme_stylebox_override(&"panel", sb)
 	_hint_label = Label.new()
 	_hint_label.add_theme_font_override(&"font", theme.get_font(&"source", &"EditorFonts"))
 	_hint_label.add_theme_font_size_override(&"font_size", theme.get_font_size(&"source_size", &"EditorFonts"))
+	_hint_label.add_theme_color_override(&"font_color", theme.get_color(&"font_color", &"Editor") if theme.has_color(&"font_color", &"Editor") else Color.WHITE)
 	_hint_panel.add_child(_hint_label)
 	editor.add_child(_hint_panel)
 
@@ -188,9 +199,9 @@ func _show_hint(text: String) -> void:
 	_hint_panel.reset_size()
 	var caret: Vector2 = editor.get_global_position() + editor.get_caret_draw_pos()
 	var bounds: Vector2 = editor.get_viewport_rect().size
-	var pos: Vector2 = Vector2(caret.x, caret.y - _hint_panel.size.y - 2.0)
+	var pos: Vector2 = Vector2(caret.x, caret.y + 4.0)
 	pos.x = clampf(pos.x, 4.0, maxf(bounds.x - _hint_panel.size.x - 4.0, 4.0))
-	pos.y = maxf(pos.y, 4.0)
+	pos.y = clampf(pos.y, 4.0, maxf(bounds.y - _hint_panel.size.y - 4.0, 4.0))
 	_hint_panel.global_position = pos
 
 
