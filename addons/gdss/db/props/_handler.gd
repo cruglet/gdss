@@ -960,6 +960,10 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 		if inner_rect.has_area():
 			if border_src is GdssGradient:
 				_draw_linear_gradient_ring(to_canvas_item, border_src as GdssGradient, inner_rect, rect, corner_radius, detail, skew_x, skew_y)
+			elif border_src is GdssBlur:
+				var border_tint: Color = (border_src as GdssBlur).tint
+				if border_tint.a > 0.0:
+					_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_tint, aa_size, detail, skew_x, skew_y)
 			elif border_src is Color and (border_src as Color).a > 0.0:
 				_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_src as Color, aa_size, detail, skew_x, skew_y)
 
@@ -1012,7 +1016,7 @@ func _set_param(key: StringName, value: Variant) -> void:
 
 
 func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
-	_ensure_gpu_ci(to_canvas_item, vals.get("bg_color") is GdssBlur)
+	_ensure_gpu_ci(to_canvas_item, vals.get("bg_color") is GdssBlur or vals.get("border_color") is GdssBlur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
 	var shadow_size: float = (shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
 	var pad: float = shadow_size + 2.0 if shadow_size > 0.5 else 0.0
@@ -1052,7 +1056,7 @@ func _push_fill(bg: Variant, pad_frac: Vector2) -> void:
 		var blur: GdssBlur = bg as GdssBlur
 		_set_param(&"u_fill_mode", 4)
 		_set_param(&"u_fill_a", blur.tint)
-		_set_param(&"u_blur", blur.strength)
+		_set_param(&"u_fill_glass", Vector4(blur.strength, blur.refraction, blur.highlight, blur.saturation))
 	elif bg is Texture2D:
 		_set_param(&"u_fill_mode", 3)
 		_set_param(&"u_tex", bg as Texture2D)
@@ -1072,6 +1076,11 @@ func _push_border(border_src: Variant, pad_frac: Vector2) -> void:
 		_set_param(&"u_border_b", grad.color_b)
 		_set_param(&"u_border_p0", _remap_uv(grad.p0, pad_frac))
 		_set_param(&"u_border_p1", _remap_uv(grad.p1, pad_frac))
+	elif border_src is GdssBlur:
+		var blur: GdssBlur = border_src as GdssBlur
+		_set_param(&"u_border_mode", 2)
+		_set_param(&"u_border_a", blur.tint)
+		_set_param(&"u_border_glass", Vector4(blur.strength, blur.refraction, blur.highlight, blur.saturation))
 	elif border_src is Color:
 		_set_param(&"u_border_mode", 0)
 		_set_param(&"u_border_a", border_src as Color)

@@ -17,6 +17,8 @@ var _methods: Array[GdssMethod] = []
 var _last_hover_word: String = ""
 
 var _completion_color: Color
+var _hint_panel: PanelContainer
+var _hint_label: Label
 
 static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*[:=]")
 static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*[:=]")
@@ -42,6 +44,9 @@ func _ready() -> void:
 	editor.symbol_validate.connect(_on_symbol_validate)
 	editor.symbol_lookup.connect(_on_symbol_lookup)
 	editor.gui_input.connect(_on_editor_gui_input)
+	editor.caret_changed.connect(_on_caret_changed)
+	editor.focus_exited.connect(_hide_hint)
+	editor.get_v_scroll_bar().value_changed.connect(_on_scrolled)
 	_parse_user_variables.call_deferred()
 
 
@@ -104,6 +109,7 @@ func _on_text_changed() -> void:
 	_parse_user_variables()
 	if _caret_in_comment():
 		editor.cancel_code_completion()
+		_hide_hint()
 		return
 	var word: String = _get_current_word()
 	_update_code_hint(word)
@@ -133,18 +139,18 @@ func _on_completion_requested() -> void:
 	_update_code_hint(word)
 
 
-func _update_code_hint(word: String) -> void:
+func _update_code_hint(_word: String) -> void:
 	var line: String = editor.get_line(editor.get_caret_line())
-	var col: int = editor.get_caret_column()
+	var col: int = mini(editor.get_caret_column(), line.length())
 	var paren_pos: int = line.rfind("(", col)
 	if paren_pos == -1:
-		editor.set_code_hint("")
+		_hide_hint()
 		return
 	var before_paren: String = line.substr(0, paren_pos).strip_edges()
 	var method_name: String = before_paren.split(" ")[-1].split(":")[-1].strip_edges()
 	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
 	if method == null:
-		editor.set_code_hint("")
+		_hide_hint()
 		return
 	var inside: String = line.substr(paren_pos + 1, col - paren_pos - 1)
 	var depth: int = 0
@@ -157,7 +163,49 @@ func _update_code_hint(word: String) -> void:
 			depth -= 1
 		elif c == "," and depth == 0:
 			active_param += 1
-	editor.set_code_hint(method.get_code_hint(active_param))
+	_show_hint(method.get_code_hint(active_param))
+
+
+func _ensure_hint_panel() -> void:
+	if _hint_panel != null:
+		return
+	var theme: Theme = EditorInterface.get_editor_theme()
+	_hint_panel = PanelContainer.new()
+	_hint_panel.top_level = true
+	_hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint_panel.visible = false
+	_hint_label = Label.new()
+	_hint_label.add_theme_font_override(&"font", theme.get_font(&"source", &"EditorFonts"))
+	_hint_label.add_theme_font_size_override(&"font_size", theme.get_font_size(&"source_size", &"EditorFonts"))
+	_hint_panel.add_child(_hint_label)
+	editor.add_child(_hint_panel)
+
+
+func _show_hint(text: String) -> void:
+	_ensure_hint_panel()
+	_hint_label.text = text
+	_hint_panel.visible = true
+	_hint_panel.reset_size()
+	var caret: Vector2 = editor.get_global_position() + editor.get_caret_draw_pos()
+	var bounds: Vector2 = editor.get_viewport_rect().size
+	var pos: Vector2 = Vector2(caret.x, caret.y - _hint_panel.size.y - 2.0)
+	pos.x = clampf(pos.x, 4.0, maxf(bounds.x - _hint_panel.size.x - 4.0, 4.0))
+	pos.y = maxf(pos.y, 4.0)
+	_hint_panel.global_position = pos
+
+
+func _hide_hint() -> void:
+	if _hint_panel != null:
+		_hint_panel.visible = false
+
+
+func _on_caret_changed() -> void:
+	_update_code_hint("")
+
+
+func _on_scrolled(_value: float) -> void:
+	if _hint_panel != null and _hint_panel.visible:
+		_update_code_hint("")
 
 
 func _update_completions(word: String) -> void:
