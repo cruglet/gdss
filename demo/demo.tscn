@@ -1,8 +1,10 @@
 [gd_scene format=3 uid="uid://e60ipkqqr145"]
 
 [ext_resource type="Script" uid="uid://b34dwnq1cakei" path="res://demo/demo.gd" id="1_d6po2"]
+[ext_resource type="Texture2D" uid="uid://brsvagw6ydiae" path="res://meta/icon.png" id="2_dar0o"]
+[ext_resource type="Script" uid="uid://bf00wqmhix504" path="res://demo/glass_drag.gd" id="3_drag"]
 
-[node name="Demo" type="Control" unique_id=1543317550 node_paths=PackedStringArray("toggle_button")]
+[node name="Demo" type="Control" unique_id=1205877970 node_paths=PackedStringArray("frosted", "liquid", "switch_button", "strength_slider", "refraction_slider", "strength_value", "refraction_value")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -10,463 +12,266 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_d6po2")
-toggle_button = NodePath("Background/Margin/Column/Header/SwitchButton")
+frosted = NodePath("Frosted")
+liquid = NodePath("Liquid")
+switch_button = NodePath("App/AppMargin/AppCol/Controls/Switch")
+strength_slider = NodePath("BottomBar/ControlBar/CBM/Grid/StrengthSlider")
+refraction_slider = NodePath("BottomBar/ControlBar/CBM/Grid/RefractionSlider")
+strength_value = NodePath("BottomBar/ControlBar/CBM/Grid/StrengthValue")
+refraction_value = NodePath("BottomBar/ControlBar/CBM/Grid/RefractionValue")
+metadata/gdss_mode = 1
 
-[node name="Background" type="PanelContainer" parent="." unique_id=589487203 groups=["gdss"]]
-layout_mode = 0
+[node name="App" type="PanelContainer" parent="." unique_id=703050771]
+layout_mode = 1
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="Margin" type="MarginContainer" parent="Background" unique_id=576206703]
+[node name="AppMargin" type="MarginContainer" parent="App" unique_id=763748051]
 layout_mode = 2
-theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
-theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 28
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 28
 
-[node name="Column" type="VBoxContainer" parent="Background/Margin" unique_id=465745925]
+[node name="AppCol" type="VBoxContainer" parent="App/AppMargin" unique_id=197270421]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Header" type="HBoxContainer" parent="Background/Margin/Column" unique_id=1452563589]
+[node name="Title" type="Label" parent="App/AppMargin/AppCol" unique_id=139173359]
+layout_mode = 2
+text = "GDSS 0.5 UI Demo"
+metadata/gdss_classes = PackedStringArray("Heading")
+
+[node name="Controls" type="HBoxContainer" parent="App/AppMargin/AppCol" unique_id=201497893]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Title" type="Label" parent="Background/Margin/Column/Header" unique_id=446977670 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "GDSS Demo"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="RandomizeButton" type="Button" parent="Background/Margin/Column/Header" unique_id=884577793 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Randomize accent"
-
-[node name="SwitchButton" type="Button" parent="Background/Margin/Column/Header" unique_id=1518789615 groups=["gdss"]]
+[node name="Switch" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=531596294]
 layout_mode = 2
 mouse_default_cursor_shape = 2
 text = "Switch to light"
 
-[node name="Scroll" type="ScrollContainer" parent="Background/Margin/Column" unique_id=1483821396]
+[node name="Randomize" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=1576448512]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Randomize accent"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Card" type="PanelContainer" parent="App/AppMargin/AppCol" unique_id=1699713585]
+layout_mode = 2
+size_flags_horizontal = 0
+metadata/gdss_classes = PackedStringArray("CardPanel")
+
+[node name="CM" type="MarginContainer" parent="App/AppMargin/AppCol/Card" unique_id=31453784]
+layout_mode = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="CV" type="VBoxContainer" parent="App/AppMargin/AppCol/Card/CM" unique_id=248439564]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="App/AppMargin/AppCol/Card/CM/CV" unique_id=2085598672]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Label"
+
+[node name="Sublabel" type="Label" parent="App/AppMargin/AppCol/Card/CM/CV" unique_id=930346891]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "Sublabel"
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="Row" type="HBoxContainer" parent="App/AppMargin/AppCol/Card/CM/CV" unique_id=130282901]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Button" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1052176415]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Button"
+
+[node name="GhostButton" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1174941247]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Ghost Button"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Filler" type="Control" parent="App/AppMargin/AppCol" unique_id=1668308820]
 layout_mode = 2
 size_flags_vertical = 3
-horizontal_scroll_mode = 0
 
-[node name="Grid" type="GridContainer" parent="Background/Margin/Column/Scroll" unique_id=1977747540]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/h_separation = 16
-theme_override_constants/v_separation = 16
-columns = 4
+[node name="TextureRect" type="TextureRect" parent="." unique_id=664598905]
+self_modulate = Color(1, 1, 1, 0.7490196)
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.363
+anchor_top = 0.22600001
+anchor_right = 0.637
+anchor_bottom = 0.77400005
+offset_left = 0.039978027
+offset_top = -0.08001709
+offset_right = -0.040039063
+offset_bottom = 0.079956055
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_dar0o")
+expand_mode = 1
+stretch_mode = 5
 
-[node name="Card1" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=534073914 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
+[node name="BottomBar" type="MarginContainer" parent="." unique_id=2054922631]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 28
 
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card1" unique_id=105385011]
+[node name="ControlBar" type="PanelContainer" parent="BottomBar" unique_id=1013338759]
 layout_mode = 2
-theme_override_constants/margin_left = 14
+size_flags_horizontal = 4
+metadata/gdss_classes = PackedStringArray("ControlBar")
+
+[node name="CBM" type="MarginContainer" parent="BottomBar/ControlBar" unique_id=1779955379]
+layout_mode = 2
+theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
+theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 14
 
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin" unique_id=504337496]
+[node name="Grid" type="GridContainer" parent="BottomBar/ControlBar/CBM" unique_id=1023149493]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/h_separation = 14
+theme_override_constants/v_separation = 10
+columns = 3
 
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=199065793 groups=["gdss"]]
+[node name="StrengthLabel" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=580953906]
 layout_mode = 2
-text = "Card 1"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
+theme_override_font_sizes/font_size = 14
+text = "Blur strength"
 
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=157443564 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1215793918 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1304247291]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body/Actions" unique_id=1145148443 groups=["gdss"]]
+[node name="StrengthSlider" type="HSlider" parent="BottomBar/ControlBar/CBM/Grid" unique_id=691048223]
+custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
+size_flags_vertical = 4
+max_value = 8.0
+step = 0.5
+value = 3.0
 
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body/Actions" unique_id=918289026 groups=["gdss"]]
+[node name="StrengthValue" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=1967743298]
+custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
+theme_override_font_sizes/font_size = 14
+text = "3.0"
+horizontal_alignment = 2
 
-[node name="Pill" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1026338500 groups=["gdss"]]
+[node name="RefractionLabel" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=1759687932]
 layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Pill action"
-metadata/gdss_classes = PackedStringArray("PillButton")
+theme_override_font_sizes/font_size = 14
+text = "Refraction"
 
-[node name="Disabled" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card1/Margin/Body" unique_id=1927635725 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-disabled = true
-text = "Disabled"
-
-[node name="Card2" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=961019697 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
+[node name="RefractionSlider" type="HSlider" parent="BottomBar/ControlBar/CBM/Grid" unique_id=1449161508]
+custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
-
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card2" unique_id=537984051]
-layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin" unique_id=1252841994]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=919823664 groups=["gdss"]]
-layout_mode = 2
-text = "Card 2"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=1625172302 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=1961175547 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body" unique_id=1193225744]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body/Actions" unique_id=1483054342 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
-
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card2/Margin/Body/Actions" unique_id=1763732013 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
-
-[node name="Card3" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=1504487092 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
-
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card3" unique_id=1943556955]
-layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin" unique_id=587711232]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=2137960383 groups=["gdss"]]
-layout_mode = 2
-text = "Card 3"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=1626594511 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=1122361937 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body" unique_id=667266791]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body/Actions" unique_id=1150745099 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
-
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card3/Margin/Body/Actions" unique_id=1541598720 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
-
-[node name="Card4" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=468885078 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
-
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card4" unique_id=666860901]
-layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin" unique_id=857933407]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=507012934 groups=["gdss"]]
-layout_mode = 2
-text = "Card 4"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=523301291 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=982543893 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body" unique_id=1013118721]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body/Actions" unique_id=600146185 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
-
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card4/Margin/Body/Actions" unique_id=1422172618 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
-
-[node name="Card5" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=960803907 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
-
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card5" unique_id=877367426]
-layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin" unique_id=1347378712]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=1893495366 groups=["gdss"]]
-layout_mode = 2
-text = "Card 5"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=807132018 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=73072989 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=843117973]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body/Actions" unique_id=662025307 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
-
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body/Actions" unique_id=1933748119 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
-
-[node name="Pill" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card5/Margin/Body" unique_id=222049489 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Pill action"
-metadata/gdss_classes = PackedStringArray("PillButton")
-
-[node name="Card6" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=204991413 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
-
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card6" unique_id=85352024]
-layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin" unique_id=1852623510]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=205328396 groups=["gdss"]]
-layout_mode = 2
-text = "Card 6"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=701880063 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=462207349 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=152555229]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body/Actions" unique_id=1491592546 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
-
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body/Actions" unique_id=353504411 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
-
-[node name="Disabled" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card6/Margin/Body" unique_id=1311604284 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-disabled = true
-text = "Disabled"
-
-[node name="Card7" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=685267047 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
-
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card7" unique_id=1732146032]
-layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin" unique_id=2014831152]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=374835859 groups=["gdss"]]
-layout_mode = 2
-text = "Card 7"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=11249696 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=1994867184 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body" unique_id=1431866359]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body/Actions" unique_id=1086176222 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
-
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card7/Margin/Body/Actions" unique_id=1958448458 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
-
-[node name="Card8" type="PanelContainer" parent="Background/Margin/Column/Scroll/Grid" unique_id=1692741552 groups=["gdss"]]
-custom_minimum_size = Vector2(230, 0)
-layout_mode = 2
-size_flags_horizontal = 3
-metadata/gdss_classes = PackedStringArray("CardPanel")
-
-[node name="Margin" type="MarginContainer" parent="Background/Margin/Column/Scroll/Grid/Card8" unique_id=2108108311]
-layout_mode = 2
-theme_override_constants/margin_left = 14
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 14
-
-[node name="Body" type="VBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin" unique_id=1368749089]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Heading" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=2122112310 groups=["gdss"]]
-layout_mode = 2
-text = "Card 8"
-metadata/gdss_classes = PackedStringArray("TitleLabel")
-
-[node name="Caption" type="Label" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=1827148029 groups=["gdss"]]
-layout_mode = 2
-text = "Buttons, inputs and a card surface, all GDSS-styled."
-autowrap_mode = 3
-metadata/gdss_classes = PackedStringArray("SubtitleLabel")
-
-[node name="Field" type="LineEdit" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=948120370 groups=["gdss"]]
-layout_mode = 2
-placeholder_text = "Type something…"
-
-[node name="Actions" type="HBoxContainer" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body" unique_id=264387667]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="Primary" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body/Actions" unique_id=1391450093 groups=["gdss"]]
-layout_mode = 2
-size_flags_horizontal = 3
-mouse_default_cursor_shape = 2
-text = "Action"
-
-[node name="Ghost" type="Button" parent="Background/Margin/Column/Scroll/Grid/Card8/Margin/Body/Actions" unique_id=20332613 groups=["gdss"]]
-layout_mode = 2
-mouse_default_cursor_shape = 2
-text = "Ghost"
-metadata/gdss_classes = PackedStringArray("GhostButton")
-
-[connection signal="pressed" from="Background/Margin/Column/Header/RandomizeButton" to="." method="_on_randomize_pressed"]
-[connection signal="pressed" from="Background/Margin/Column/Header/SwitchButton" to="." method="_on_switch_pressed"]
+size_flags_vertical = 4
+max_value = 3.0
+step = 0.1
+value = 1.0
+
+[node name="RefractionValue" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=107938574]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "1.0"
+horizontal_alignment = 2
+
+[node name="Frosted" type="Button" parent="." unique_id=1779138023]
+layout_mode = 0
+offset_left = 170.0
+offset_top = 250.0
+offset_right = 470.0
+offset_bottom = 470.0
+mouse_default_cursor_shape = 13
+script = ExtResource("3_drag")
+metadata/gdss_classes = PackedStringArray("FrostedButton")
+
+[node name="FC" type="CenterContainer" parent="Frosted" unique_id=1511978305]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FCol" type="VBoxContainer" parent="Frosted/FC" unique_id=2003203961]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="FL" type="Label" parent="Frosted/FC/FCol" unique_id=1866495402]
+layout_mode = 2
+text = "blur()"
+horizontal_alignment = 1
+metadata/gdss_classes = PackedStringArray("GlassLabel")
+
+[node name="FCap" type="Label" parent="Frosted/FC/FCol" unique_id=1702145281]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "frosted backdrop"
+horizontal_alignment = 1
+metadata/gdss_classes = PackedStringArray("Caption")
+
+[node name="Liquid" type="Button" parent="." unique_id=1908222028]
+layout_mode = 0
+offset_left = 640.0
+offset_top = 260.0
+offset_right = 880.0
+offset_bottom = 500.0
+mouse_default_cursor_shape = 13
+script = ExtResource("3_drag")
+metadata/gdss_classes = PackedStringArray("LiquidButton")
+
+[node name="LC" type="CenterContainer" parent="Liquid" unique_id=1039396583]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LCol" type="VBoxContainer" parent="Liquid/LC" unique_id=1664959552]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="LL" type="Label" parent="Liquid/LC/LCol" unique_id=1233686828]
+layout_mode = 2
+text = "liquid_blur()"
+horizontal_alignment = 1
+metadata/gdss_classes = PackedStringArray("GlassLabel")
+
+[node name="LCap" type="Label" parent="Liquid/LC/LCol" unique_id=975949675]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "refracting glass"
+horizontal_alignment = 1
+metadata/gdss_classes = PackedStringArray("Caption")
+
+[connection signal="pressed" from="App/AppMargin/AppCol/Controls/Switch" to="." method="_on_switch_pressed"]
+[connection signal="pressed" from="App/AppMargin/AppCol/Controls/Randomize" to="." method="_on_randomize_pressed"]
+[connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/StrengthSlider" to="." method="_on_strength_slider_value_changed"]
+[connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/RefractionSlider" to="." method="_on_refraction_slider_value_changed"]
