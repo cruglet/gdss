@@ -1377,7 +1377,7 @@ func _find_colors_in_line(line: String) -> Array[Dictionary]:
 		var start: int = m.get_start(0)
 		if not _is_value_position(code, start):
 			continue
-		var col: Color = Color.from_string(m.get_string(0), sentinel)
+		var col: Color = GdssInterpreter.parse_named_color(m.get_string(0), sentinel)
 		if col != sentinel:
 			out.append({"color": col, "from": start, "to": m.get_end(0)})
 	return out
@@ -1399,20 +1399,25 @@ func _draw_color_swatches() -> void:
 	_swatch_hitboxes.clear()
 	var first: int = code_edit.get_first_visible_line()
 	var last: int = code_edit.get_last_full_visible_line()
+	var line_height: float = code_edit.get_line_height()
+	var swatch_size: float = maxf(line_height - 4.0, 6.0)
 	for line: int in range(first, last + 1):
 		if line < 0 or line >= code_edit.get_line_count():
 			continue
-		for hit: Dictionary in _find_colors_in_line(code_edit.get_line(line)):
-			var after: Vector2 = code_edit.get_pos_at_line_column(line, hit["to"])
-			if after.x < 0 or after.y < 0:
-				continue
-			var line_height: float = code_edit.get_line_height()
-			var swatch_size: float = maxf(line_height - 4.0, 6.0)
-			var swatch_y: float = after.y - line_height + (line_height - swatch_size) * 0.5
-			var swatch: Rect2 = Rect2(after.x + 10.0, swatch_y, swatch_size, swatch_size)
+		var colors: Array[Dictionary] = _find_colors_in_line(code_edit.get_line(line))
+		if colors.is_empty():
+			continue
+		var anchor: Vector2 = code_edit.get_pos_at_line_column(line, code_edit.get_line(line).length())
+		if anchor.x < 0 or anchor.y < 0:
+			continue
+		var swatch_y: float = anchor.y - line_height + (line_height - swatch_size) * 0.5
+		var cursor_x: float = anchor.x + 12.0
+		for hit: Dictionary in colors:
+			var swatch: Rect2 = Rect2(cursor_x, swatch_y, swatch_size, swatch_size)
 			code_edit.draw_rect(swatch, Color(0, 0, 0, 0.6))
 			code_edit.draw_rect(swatch.grow(-1.0), hit["color"])
 			_swatch_hitboxes.append({"rect": swatch, "line": line, "from": hit["from"], "to": hit["to"]})
+			cursor_x += swatch_size + 4.0
 
 
 func _on_swatch_gui_input(event: InputEvent) -> void:

@@ -13,6 +13,10 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 	return "normal"
 
 
+func get_extra_states() -> PackedStringArray:
+	return ["hover_pressed"]
+
+
 func get_events() -> PackedStringArray:
 	return ["mouse_entered", "mouse_exited", "button_down", "button_up",
 	"toggled", "focus_entered", "focus_exited"]

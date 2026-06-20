@@ -201,9 +201,23 @@ const NAMED_COLORS: PackedStringArray = [
 	"POWDER_BLUE", "PURPLE", "REBECCA_PURPLE", "RED", "ROSY_BROWN", "ROYAL_BLUE", "SADDLE_BROWN",
 	"SALMON", "SANDY_BROWN", "SEA_GREEN", "SEASHELL", "SIENNA", "SILVER", "SKY_BLUE", "SLATE_BLUE",
 	"SLATE_GRAY", "SNOW", "SPRING_GREEN", "STEEL_BLUE", "TAN", "TEAL", "THISTLE", "TOMATO",
-	"TRANSPARENT", "TURQUOISE", "VIOLET", "WEB_GRAY", "WEB_GREEN", "WEB_MAROON", "WEB_PURPLE",
-	"WHEAT", "WHITE", "WHITE_SMOKE", "YELLOW", "YELLOW_GREEN"
+	"TRANSPARENT", "TRANSPARENT_BLACK", "TRANSPARENT_WHITE", "TURQUOISE", "VIOLET", "WEB_GRAY",
+	"WEB_GREEN", "WEB_MAROON", "WEB_PURPLE", "WHEAT", "WHITE", "WHITE_SMOKE", "YELLOW", "YELLOW_GREEN"
 ]
+
+static var COLOR_ALIASES: Dictionary = {
+	"TRANSPARENT_BLACK": Color(0, 0, 0, 0),
+	"TRANSPARENT_WHITE": Color(1, 1, 1, 0),
+}
+
+
+## Resolves a named color, honouring GDSS aliases (such as TRANSPARENT_BLACK)
+## before falling back to Godot's built-in color names.
+static func parse_named_color(name: String, fallback: Color) -> Color:
+	var alias: Variant = COLOR_ALIASES.get(name.to_upper())
+	if alias is Color:
+		return alias
+	return Color.from_string(name, fallback)
 
 
 func _is_valid_color_value(val: String) -> bool:
@@ -212,7 +226,7 @@ func _is_valid_color_value(val: String) -> bool:
 		return true
 	if val.contains("("):
 		return true
-	if not Color.from_string(clean, Color(-1, -1, -1, -1)).is_equal_approx(Color(-1, -1, -1, -1)):
+	if not parse_named_color(clean, Color(-1, -1, -1, -1)).is_equal_approx(Color(-1, -1, -1, -1)):
 		return true
 	return false
 
@@ -266,10 +280,7 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 		return
 
 	var args_raw: String = value_str.substr(args_start + 1, args_end - args_start - 1).strip_edges()
-	var args: Array[String] = []
-	if not args_raw.is_empty():
-		for arg: String in args_raw.split(","):
-			args.append(arg.strip_edges())
+	var args: Array[String] = _split_top_level_args(args_raw)
 
 	var required_count: int = 0
 	for param: GdssMethod.Param in gdss_method.parameters:
@@ -285,7 +296,42 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 		return
 
 	for ai: int in args.size():
-		_check_method_arg_type(args[ai], gdss_method.parameters[ai], method_name, errors, line)
+		if args[ai].contains("("):
+			_check_method_call(args[ai], _method_name_of(args[ai]), null, known_methods, errors, line)
+		else:
+			_check_method_arg_type(args[ai], gdss_method.parameters[ai], method_name, errors, line)
+
+
+func _split_top_level_args(args_raw: String) -> Array[String]:
+	var result: Array[String] = []
+	if args_raw.is_empty():
+		return result
+	var current: String = ""
+	var depth: int = 0
+	var in_quote: bool = false
+	var quote_char: String = ""
+	for c: String in args_raw:
+		if in_quote:
+			current += c
+			if c == quote_char:
+				in_quote = false
+		elif c == "\"" or c == "'":
+			in_quote = true
+			quote_char = c
+			current += c
+		elif c == "(":
+			depth += 1
+			current += c
+		elif c == ")":
+			depth -= 1
+			current += c
+		elif c == "," and depth == 0:
+			result.append(current.strip_edges())
+			current = ""
+		else:
+			current += c
+	result.append(current.strip_edges())
+	return result
 
 
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
@@ -1294,43 +1340,7 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 		var lookahead: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
 		var lookahead2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
 		if lookahead == "(":
-			var method_name: String = t
-			pos += 2
-			var raw_args: Array[String] = []
-			var current_arg: String = ""
-			var depth: int = 1
-			var in_quote: bool = false
-			var quote_char: String = ""
-			while pos < tokens.size() and depth > 0:
-				var tok: String = tokens[pos]
-				if in_quote:
-					if tok == quote_char:
-						in_quote = false
-					current_arg += tok
-				elif tok == "\"" or tok == "'":
-					in_quote = true
-					quote_char = tok
-					current_arg += tok
-				elif tok == "(":
-					depth += 1
-					current_arg += tok
-				elif tok == ")":
-					depth -= 1
-					if depth == 0:
-						if not current_arg.strip_edges().is_empty():
-							raw_args.append(current_arg.strip_edges())
-					else:
-						current_arg += tok
-				elif tok == ",":
-					if not current_arg.strip_edges().is_empty():
-						raw_args.append(current_arg.strip_edges())
-					current_arg = ""
-				else:
-					if not current_arg.is_empty():
-						current_arg += " "
-					current_arg += tok
-				pos += 1
-			return [{"__gdss_method__": method_name, "args": raw_args}, pos]
+			return _parse_method_call(tokens, pos)
 		if lookahead == "{":
 			break
 		if lookahead == ":" and (lookahead2 == "{" or known_states.has(lookahead2.to_lower())):
@@ -1342,6 +1352,35 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 		parts.append(t)
 		pos += 1
 	return [_parse_value(parts), pos]
+
+
+func _parse_method_call(tokens: Array[String], pos: int) -> Array:
+	var method_name: String = tokens[pos]
+	pos += 2
+	var args: Array = []
+	var current_parts: Array[String] = []
+	while pos < tokens.size():
+		var tok: String = tokens[pos]
+		if tok == ")":
+			pos += 1
+			break
+		if tok == ",":
+			if not current_parts.is_empty():
+				args.append(" ".join(current_parts))
+				current_parts = []
+			pos += 1
+			continue
+		var nxt: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
+		if nxt == "(":
+			var nested: Array = _parse_method_call(tokens, pos)
+			args.append(nested[0])
+			pos = nested[1]
+			continue
+		current_parts.append(tok)
+		pos += 1
+	if not current_parts.is_empty():
+		args.append(" ".join(current_parts))
+	return [{"__gdss_method__": method_name, "args": args}, pos]
 
 
 func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> void:

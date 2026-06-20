@@ -44,10 +44,12 @@ var _method_args_cache: Dictionary = {}
 var _gdss_node: GdssNode = null
 
 static var _shader: Shader = null
+static var _blur_shader: Shader = null
 static var _rr_cache: Dictionary = {}
 static var _tri_cache: Dictionary = {}
 
 var _gpu_material: ShaderMaterial = null
+var _gpu_is_blur: bool = false
 var _gpu_ci: RID = RID()
 var _gpu_parent: RID = RID()
 var _gpu_last: Dictionary = {}
@@ -654,7 +656,7 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 		if s.begins_with("#") and Color.html_is_valid(s):
 			return Color.html(s)
 		if not s.begins_with("__gdss_"):
-			var named: Color = Color.from_string(s, Color(-1, -1, -1, -1))
+			var named: Color = GdssInterpreter.parse_named_color(s, Color(-1, -1, -1, -1))
 			if named.r != -1:
 				return named
 	return raw
@@ -671,11 +673,14 @@ func _resolve_composite_part(part: String) -> int:
 	return 0
 
 
-func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
+func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Array[Variant]:
 	var method_name: String = descriptor["__gdss_method__"]
 	var raw_args: Array = descriptor.get("args", [])
 	var has_live_ref: bool = false
-	for raw: String in raw_args:
+	for raw: Variant in raw_args:
+		if raw is Dictionary:
+			has_live_ref = true
+			break
 		var s: String = (raw as String).strip_edges()
 		if s.begins_with("$") or s.begins_with("__gdss_global__") or s.begins_with("__gdss_instance__"):
 			has_live_ref = true
@@ -688,6 +693,10 @@ func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
 	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
 	var resolved: Array[Variant] = []
 	for arg_index: int in raw_args.size():
+		var param: GdssMethod.Param = method.parameters[arg_index] if method != null and arg_index < method.parameters.size() else null
+		if raw_args[arg_index] is Dictionary:
+			resolved.append(_resolve_value(raw_args[arg_index], null, state_key))
+			continue
 		var stripped: String = (raw_args[arg_index] as String).strip_edges()
 		if stripped == "pass":
 			resolved.append(method.parameters[arg_index].default_value if method != null and arg_index < method.parameters.size() else null)
@@ -710,7 +719,12 @@ func _resolve_method_args(descriptor: Dictionary) -> Array[Variant]:
 				resolved.append(GdssInterpreter._instance_defaults.get(key, null))
 		else:
 			var unquoted: String = stripped.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
-			resolved.append(method._resolve_arg(unquoted) if method != null else unquoted)
+			var resolved_arg: Variant = method._resolve_arg(unquoted) if method != null else unquoted
+			if resolved_arg is String and param != null and param.type == GdssMethod.ParamType.COLOR:
+				var named: Color = GdssInterpreter.parse_named_color(resolved_arg as String, Color(-1, -1, -1, -1))
+				if named.r != -1:
+					resolved_arg = named
+			resolved.append(resolved_arg)
 	if not has_live_ref:
 		_method_args_cache[cache_key] = resolved
 	return resolved
@@ -721,7 +735,7 @@ func _call_method(descriptor: Dictionary, fallback: Variant, state_key: String =
 	var method: GdssMethod = GDSS._get_gdss_methods().get(name)
 	if method == null:
 		return fallback
-	var resolved_args: Array[Variant] = _resolve_method_args(descriptor)
+	var resolved_args: Array[Variant] = _resolve_method_args(descriptor, state_key)
 	var node_id: int = ref.get_instance_id() if ref != null else -1
 	if method.returns_texture:
 		var result: Variant = method.call_method(resolved_args, node_id, state_key)
@@ -930,6 +944,10 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 			_draw_radial_gradient_rect(to_canvas_item, bgrad, rect, corner_radius, detail, skew_x, skew_y)
 		else:
 			_draw_linear_gradient_rect(to_canvas_item, bgrad, rect, corner_radius, detail, skew_x, skew_y)
+	elif bg is GdssBlur:
+		var blur_tint: Color = (bg as GdssBlur).tint
+		if blur_tint.a > 0.0:
+			_draw_rect(to_canvas_item, rect, blur_tint, corner_radius, aa_size, detail, skew_x, skew_y)
 	elif bg is Texture2D:
 		_draw_texture_in_rect(to_canvas_item, bg as Texture2D, rect, corner_radius, detail, skew_x, skew_y)
 	elif bg is Color and (bg as Color).a > 0.0:
@@ -952,14 +970,25 @@ static func _get_shared_shader() -> Shader:
 	return _shader
 
 
-func _ensure_gpu_ci(to_canvas_item: RID) -> void:
+static func _get_blur_shader() -> Shader:
+	if _blur_shader == null:
+		_blur_shader = load("res://addons/gdss/db/props/gdss_blur.gdshader") as Shader
+	return _blur_shader
+
+
+func _ensure_gpu_ci(to_canvas_item: RID, want_blur: bool = false) -> void:
 	if not _gpu_ci.is_valid():
 		_gpu_ci = RenderingServer.canvas_item_create()
 		_gpu_material = ShaderMaterial.new()
-		_gpu_material.shader = _get_shared_shader()
+		_gpu_is_blur = want_blur
+		_gpu_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
 		RenderingServer.canvas_item_set_material(_gpu_ci, _gpu_material.get_rid())
 		RenderingServer.canvas_item_set_draw_behind_parent(_gpu_ci, true)
 		_gpu_parent = RID()
+	elif _gpu_is_blur != want_blur:
+		_gpu_is_blur = want_blur
+		_gpu_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
+		_gpu_last.clear()
 	if _gpu_parent != to_canvas_item:
 		RenderingServer.canvas_item_set_parent(_gpu_ci, to_canvas_item)
 		_gpu_parent = to_canvas_item
@@ -983,7 +1012,7 @@ func _set_param(key: StringName, value: Variant) -> void:
 
 
 func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
-	_ensure_gpu_ci(to_canvas_item)
+	_ensure_gpu_ci(to_canvas_item, vals.get("bg_color") is GdssBlur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
 	var shadow_size: float = (shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
 	var pad: float = shadow_size + 2.0 if shadow_size > 0.5 else 0.0
@@ -1019,6 +1048,11 @@ func _push_fill(bg: Variant, pad_frac: Vector2) -> void:
 		_set_param(&"u_grad_p0", _remap_uv(grad.p0, pad_frac))
 		_set_param(&"u_grad_p1", _remap_uv(grad.p1, pad_frac))
 		_set_param(&"u_fill_mode", grad.mode)
+	elif bg is GdssBlur:
+		var blur: GdssBlur = bg as GdssBlur
+		_set_param(&"u_fill_mode", 4)
+		_set_param(&"u_fill_a", blur.tint)
+		_set_param(&"u_blur", blur.strength)
 	elif bg is Texture2D:
 		_set_param(&"u_fill_mode", 3)
 		_set_param(&"u_tex", bg as Texture2D)

@@ -87,6 +87,7 @@
 [ext_resource type="Resource" path="res://addons/gdss/db/props/transition_func.tres" id="77_g42bk"]
 [ext_resource type="Resource" path="res://addons/gdss/db/props/transition_time.tres" id="78_3wexu"]
 [ext_resource type="Resource" path="res://addons/gdss/db/props/transition_type.tres" id="79_l2vks"]
+[ext_resource type="Resource" path="res://addons/gdss/db/methods/blur.tres" id="80_blur"]
 
 [resource]
 script = ExtResource("1_dm4kf")
@@ -174,7 +175,8 @@ method_list = Dictionary[String, ExtResource("1_yv5ta")]({
 "grayscale": ExtResource("17_gray"),
 "invert": ExtResource("18_inv"),
 "complement": ExtResource("19_comp"),
-"contrast": ExtResource("20_con")
+"contrast": ExtResource("20_con"),
+"blur": ExtResource("80_blur")
 })
 component_list = Dictionary[String, ExtResource("1_miyk3")]({
 "Stylebox": ExtResource("2_dl7k7"),

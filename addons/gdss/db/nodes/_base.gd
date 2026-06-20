@@ -86,12 +86,19 @@ func _validate_property(property: Dictionary) -> void:
 @abstract func get_active_state(canvas_item: CanvasItem) -> String
 
 
+func get_extra_states() -> PackedStringArray:
+	return []
+
+
 func _ensure_theme() -> void:
 	if not _theme_dirty:
 		return
 	var theme: Theme = ThemeDB.get_default_theme()
 	var type: StringName = base_type
 	_states = theme.get_stylebox_list(type)
+	for extra: String in get_extra_states():
+		if not _states.has(extra):
+			_states.append(extra)
 	_icons = theme.get_icon_list(type)
 	_font_sizes = theme.get_font_size_list(type)
 	_fonts = theme.get_font_list(type)

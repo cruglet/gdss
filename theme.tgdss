@@ -124,6 +124,10 @@ Panel, PanelContainer {
 		bg_color: linear_gradient($surface_2, $bg, 160)
 		border_color: $border
 	}
+	
+	FrostedPanel {
+		bg_color: blur()
+	}
 }
 
 # @chunk Labels
