@@ -394,6 +394,26 @@ static func clear_instance_vars(node: Node) -> void:
 		GdssNodeHandler.refresh(node as CanvasItem)
 
 
+## Forces [param node] to re-evaluate its GDSS styling immediately.
+## [br][br]
+## Re-checks the node's active visual state, so changes to properties GDSS cannot
+## observe through a signal (such as a [Button]'s [code]disabled[/code] flag) take
+## effect right away, then reapplies every resolved value and queues a redraw.
+## Does nothing if [param node] is not a [CanvasItem] styled by GDSS.
+## [codeblock]
+## my_button.disabled = true
+## GDSS.refresh(my_button)
+## [/codeblock]
+static func refresh(node: Node) -> void:
+	if node == null or not node is CanvasItem:
+		return
+	var canvas_item: CanvasItem = node as CanvasItem
+	GdssNodeHandler.refresh(canvas_item)
+	var gdss_node: GdssNode = _get_gdss_nodes().get(canvas_item.get_class())
+	if gdss_node != null:
+		gdss_node.update_state(canvas_item)
+
+
 ## Returns the GDSS classes currently applied to [param node], in priority order.
 ## [codeblock]
 ## var classes: PackedStringArray = GDSS.get_classes(my_button)

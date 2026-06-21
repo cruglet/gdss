@@ -110,6 +110,7 @@ var current_state: String = "":
 
 var _tweened_values: Dictionary[String, Variant] = {}
 var _tween: Tween = null
+var _state_sync_queued: bool = false
 
 
 func _notification(what: int) -> void:
@@ -433,6 +434,17 @@ func _safe_redraw() -> void:
 	var node: CanvasItem = ref
 	if node != null:
 		node.queue_redraw()
+
+
+func _sync_active_state() -> void:
+	_state_sync_queued = false
+	var node: CanvasItem = ref
+	if node == null:
+		return
+	var gdss_node: GdssNode = _resolve_gdss_node()
+	if gdss_node == null:
+		return
+	current_state = gdss_node.get_active_state(node)
 
 
 func _start_transition(from_state: String, to_state: String) -> void:
@@ -903,6 +915,11 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
+	if not Engine.is_editor_hint() and _slot_state.is_empty() and not gdss_node.is_static:
+		var active: String = gdss_node.get_active_state(ref)
+		if active != current_state and not _state_sync_queued:
+			_state_sync_queued = true
+			_sync_active_state.call_deferred()
 	var entry: Dictionary = _resolve_entry()
 	var state: String = _get_state()
 	_apply_dynamic_nonstyle(gdss_node, entry, state)
