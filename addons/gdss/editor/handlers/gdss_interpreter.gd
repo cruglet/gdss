@@ -3,6 +3,8 @@ class_name GdssInterpreter
 extends Node
 
 signal parsed_changed
+signal source_loaded(source: String)
+signal saved
 
 static var parsed: Dictionary[String, Dictionary] = {}
 static var globals: Dictionary = {}
@@ -28,10 +30,7 @@ static var _re_scheme: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
 static var _re_meta: RegEx = RegEx.create_from_string(r"^@meta\b")
 static var _re_import: RegEx = RegEx.create_from_string(r"^@import\s+[\"\'](.+?)[\"\']")
 
-@export var editor: GdssEditor
-
 var _defaults: Dictionary[String, Dictionary] = {}
-var _error_timer: Timer
 
 
 static func get_instance() -> GdssInterpreter:
@@ -57,25 +56,16 @@ static func _collect_class_names(classes: Dictionary, names: PackedStringArray) 
 
 
 func _ready() -> void:
-	if not editor.is_running_as_plugin():
-		set_process(false)
-		return
-	
 	_inst = self
+
+
+func initialize() -> void:
 	_build_defaults()
 	_load_from_file()
-	_error_timer = Timer.new()
-	_error_timer.wait_time = 0.5
-	_error_timer.one_shot = true
-	_error_timer.timeout.connect(_on_error_check_timeout)
-	add_child(_error_timer)
-	if Engine.is_editor_hint():
-		if not editor.get_code_edit().text_changed.is_connected(_on_text_changed):
-			editor.get_code_edit().text_changed.connect(_on_text_changed)
-		if OS.is_debug_build():
-			EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_editor_file_saved)
-	await get_tree().process_frame
-	editor.display_errors(check_errors(editor.get_full_source()))
+	if Engine.is_editor_hint() and OS.is_debug_build() and Engine.has_singleton(&"EditorInterface"):
+		var fs: Object = Engine.get_singleton(&"EditorInterface").call(&"get_resource_filesystem")
+		if fs != null and not fs.is_connected(&"filesystem_changed", _on_editor_file_saved):
+			fs.connect(&"filesystem_changed", _on_editor_file_saved)
 
 
 func _notification(what: int) -> void:
@@ -114,15 +104,6 @@ func _on_editor_file_saved() -> void:
 	_load_from_file()
 	if Engine.is_editor_hint():
 		_force_viewport_redraw()
-
-
-func _on_text_changed() -> void:
-	editor._prompt_save()
-	_error_timer.start()
-
-
-func _on_error_check_timeout() -> void:
-	editor.display_errors(check_errors(editor.get_full_source()))
 
 
 func _strip_line_comment(s: String) -> String:
@@ -587,17 +568,14 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 		errors.append(["@meta default_scheme '%s' is not a defined @scheme" % default_scheme, default_line])
 
 
-func save_current() -> void:
-	if editor == null:
-		return
+func save_current(source: String) -> void:
 	_saving = true
-	var source: String = editor.get_full_source()
 	GdssStorage.write_source(GdssStorage.get_save_path(), source)
 	parsed = interpret(source)
 	GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	GdssStorage.write_compiled(source, _build_bundle(), _last_modified)
-	editor._user_saved()
+	saved.emit()
 	parsed_changed.emit()
 	if Engine.is_editor_hint():
 		_force_viewport_redraw()
@@ -605,7 +583,12 @@ func save_current() -> void:
 
 
 func _force_viewport_redraw() -> void:
-	var viewport_container: Control = EditorInterface.get_editor_viewport_2d().get_parent() as Control
+	if not Engine.has_singleton(&"EditorInterface"):
+		return
+	var viewport: Object = Engine.get_singleton(&"EditorInterface").call(&"get_editor_viewport_2d")
+	if viewport == null:
+		return
+	var viewport_container: Control = (viewport as Node).get_parent() as Control
 	if viewport_container == null:
 		return
 	var original_size: Vector2 = viewport_container.size
@@ -626,11 +609,7 @@ func _load_from_file() -> void:
 	_composite_map_cache.clear()
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
-	if Engine.is_editor_hint() and is_instance_valid(editor) and editor.is_running_as_plugin():
-		if editor.get_code_edit().text_changed.is_connected(_on_text_changed):
-			editor.get_code_edit().text_changed.disconnect(_on_text_changed)
-		editor.set_full_source(source)
-		editor.get_code_edit().text_changed.connect(_on_text_changed)
+	source_loaded.emit(source)
 	parsed = interpret(source)
 	_ensure_compiled_fresh(source)
 	parsed_changed.emit()

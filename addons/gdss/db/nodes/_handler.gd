@@ -193,8 +193,10 @@ static func unbind(canvas_item: CanvasItem) -> void:
 	_all_dirty = true
 	gdss_node.unbind_canvas_item(canvas_item)
 	GDSS.clear_instance_vars(canvas_item)
-	if Engine.is_editor_hint() and EditorInterface.get_edited_scene_root() != null:
-		EditorInterface.mark_scene_as_unsaved()
+	if Engine.is_editor_hint() and Engine.has_singleton(&"EditorInterface"):
+		var ei: Object = Engine.get_singleton(&"EditorInterface")
+		if ei.call(&"get_edited_scene_root") != null:
+			ei.call(&"mark_scene_as_unsaved")
 
 
 static func _clear_overrides_for(control: Control, gdss_node: GdssNode) -> void:

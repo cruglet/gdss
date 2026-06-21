@@ -41,6 +41,7 @@ var _error_bg: Color = Color.RED
 var _all_errors: Array = []
 var _highlighted_lines: PackedInt32Array = []
 var _error_cursor: int = -1
+var _error_timer: Timer
 var _search_bar: VBoxContainer
 var _search_field: LineEdit
 var _search_label: Label
@@ -114,6 +115,7 @@ func _ready() -> void:
 	_setup_location_toggle()
 	_setup_menu_bar()
 	_push_recent(GdssStorage.get_save_path())
+	_setup_interpreter()
 	_setup_chunk_tabs()
 	_setup_search()
 	_setup_color_swatches()
@@ -322,7 +324,7 @@ func _create_chunk(chunk_name: String) -> void:
 	code_edit.text = ""
 	_rebuild_chunk_tabs()
 	_clear_suppress_dirty.call_deferred()
-	GdssInterpreter.get_instance().save_current()
+	GdssInterpreter.get_instance().save_current(get_full_source())
 
 
 func _on_chunk_closed(idx: int) -> void:
@@ -405,7 +407,7 @@ func _on_chunk_rename(idx: int) -> void:
 		if not new_name.is_empty():
 			_chunks[idx]["name"] = new_name
 			_rebuild_chunk_tabs()
-			GdssInterpreter.get_instance().save_current()
+			GdssInterpreter.get_instance().save_current(get_full_source())
 	)
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)
@@ -473,6 +475,53 @@ func get_code_edit() -> CodeEdit:
 	return code_edit
 
 
+func _setup_interpreter() -> void:
+	_error_timer = Timer.new()
+	_error_timer.wait_time = 0.5
+	_error_timer.one_shot = true
+	_error_timer.timeout.connect(_on_error_check_timeout)
+	add_child(_error_timer)
+	if not code_edit.text_changed.is_connected(_on_source_changed):
+		code_edit.text_changed.connect(_on_source_changed)
+	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
+	if interpreter == null:
+		return
+	if not interpreter.source_loaded.is_connected(_on_interpreter_source_loaded):
+		interpreter.source_loaded.connect(_on_interpreter_source_loaded)
+	if not interpreter.saved.is_connected(_on_interpreter_saved):
+		interpreter.saved.connect(_on_interpreter_saved)
+	interpreter.initialize()
+
+
+func _on_source_changed() -> void:
+	_prompt_save()
+	_error_timer.start()
+
+
+func _on_error_check_timeout() -> void:
+	_recheck_errors()
+
+
+func _recheck_errors() -> void:
+	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
+	if interpreter != null:
+		display_errors(interpreter.check_errors(get_full_source()))
+
+
+func _on_interpreter_source_loaded(source: String) -> void:
+	var was_connected: bool = code_edit.text_changed.is_connected(_on_source_changed)
+	if was_connected:
+		code_edit.text_changed.disconnect(_on_source_changed)
+	set_full_source(source)
+	if was_connected:
+		code_edit.text_changed.connect(_on_source_changed)
+	_recheck_errors.call_deferred()
+
+
+func _on_interpreter_saved() -> void:
+	_user_saved()
+
+
 func _goto_error(direction: int) -> void:
 	if _all_errors.is_empty():
 		return
@@ -538,7 +587,7 @@ func _on_code_edit_input(event: InputEvent) -> void:
 		_apply_font_size()
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_S and key.is_command_or_control_pressed():
-		GdssInterpreter.get_instance().save_current()
+		GdssInterpreter.get_instance().save_current(get_full_source())
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_I and key.is_command_or_control_pressed() and key.shift_pressed:
 		_convert_spaces_to_tabs()
@@ -630,7 +679,7 @@ func _setup_menu_bar() -> void:
 func _on_menu_id_pressed(id: int) -> void:
 	match id:
 		MENU_SAVE:
-			GdssInterpreter.get_instance().save_current()
+			GdssInterpreter.get_instance().save_current(get_full_source())
 		MENU_NEW:
 			_new_file()
 		MENU_OPEN:
@@ -1087,7 +1136,7 @@ func upsert_meta_block(block_text: String) -> void:
 	_suppress_dirty = true
 	code_edit.text = _chunks[_active_chunk]["content"]
 	_clear_suppress_dirty.call_deferred()
-	interpreter.save_current()
+	interpreter.save_current(get_full_source())
 
 
 func _insert_meta_at_top(content: String, block_text: String) -> String:
@@ -1282,7 +1331,7 @@ func _confirm_unsaved(on_proceed: Callable) -> void:
 	dialog.confirmed.connect(func() -> void:
 		var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
 		if interpreter != null:
-			interpreter.save_current()
+			interpreter.save_current(get_full_source())
 		on_proceed.call()
 		dialog.queue_free()
 	)

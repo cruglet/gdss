@@ -17,8 +17,10 @@ func _ready() -> void:
 	_last_modified = GdssStorage.get_latest_modified()
 	get_tree().node_added.connect(_on_node_added)
 	_bind_tree.bind(get_tree().root).call_deferred()
-	if Engine.is_editor_hint() and OS.is_debug_build():
-		EditorInterface.get_resource_filesystem().filesystem_changed.connect(_on_editor_saved)
+	if Engine.is_editor_hint() and OS.is_debug_build() and Engine.has_singleton(&"EditorInterface"):
+		var fs: Object = Engine.get_singleton(&"EditorInterface").call(&"get_resource_filesystem")
+		if fs != null and not fs.is_connected(&"filesystem_changed", _on_editor_saved):
+			fs.connect(&"filesystem_changed", _on_editor_saved)
 
 
 func _notification(what: int) -> void:
