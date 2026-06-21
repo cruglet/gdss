@@ -5,6 +5,7 @@ extends Node
 static var _code_editor_ref: CodeEdit
 static var _re_hex: RegEx = RegEx.create_from_string(r"\"(#[0-9A-Fa-f]{3,8})\"")
 static var _re_word: RegEx = RegEx.create_from_string(r"[A-Za-z_][A-Za-z_0-9]*")
+static var _auto_checked: bool = false
 
 @export_group("refs")
 @export var code_edit: CodeEdit
@@ -29,6 +30,12 @@ var _saved_label: Label
 var _saved_tween: Tween
 
 var _updater: GdssUpdater
+var _version_button: Button
+var _update_available: bool = false
+var _latest_version: String = ""
+var _latest_url: String = ""
+var _checking: bool = false
+var _check_silent: bool = false
 var _chunk_tabs: TabBar
 var _chunks: Array[Dictionary] = []
 var _active_chunk: int = 0
@@ -113,6 +120,7 @@ func _ready() -> void:
 	code_edit.caret_changed.connect(_on_code_edit_caret_changed)
 	_setup_outline_toggle()
 	_setup_location_toggle()
+	_setup_version_button()
 	_setup_menu_bar()
 	_push_recent(GdssStorage.get_save_path())
 	_setup_interpreter()
@@ -184,6 +192,49 @@ func _on_location_toggled(pressed: bool) -> void:
 	dialog.confirmed.connect(dialog.queue_free)
 	EditorInterface.get_base_control().add_child(dialog)
 	dialog.popup_centered()
+
+
+func _setup_version_button() -> void:
+	if toggle_map_button == null:
+		return
+	_ensure_updater()
+	_version_button = Button.new()
+	_version_button.theme_type_variation = &"FlatButton"
+	_version_button.pressed.connect(_on_version_button_pressed)
+	var toolbar: Node = toggle_map_button.get_parent()
+	toolbar.add_child(_version_button)
+	toolbar.move_child(_version_button, 1)
+	_set_update_state(false, _updater.get_current_version(), "")
+	if not _auto_checked:
+		_auto_checked = true
+		_run_update_check(true)
+
+
+func _on_version_button_pressed() -> void:
+	if _update_available:
+		_prompt_install()
+	else:
+		_run_update_check(false)
+
+
+func _set_update_state(available: bool, version: String, url: String) -> void:
+	_update_available = available
+	_latest_version = version if available else ""
+	_latest_url = url if available else ""
+	if _version_button == null:
+		return
+	var editor_theme: Theme = EditorInterface.get_editor_theme()
+	if available:
+		_version_button.text = "Update to %s" % version
+		_version_button.tooltip_text = "GDSS %s is available, click to update" % version
+		_version_button.add_theme_color_override(&"font_color", editor_theme.get_color(&"accent_color", &"Editor"))
+		if editor_theme.has_icon(&"Reload", &"EditorIcons"):
+			_version_button.icon = editor_theme.get_icon(&"Reload", &"EditorIcons")
+	else:
+		_version_button.text = "v%s" % version
+		_version_button.tooltip_text = "GDSS %s, click to check for updates" % version
+		_version_button.remove_theme_color_override(&"font_color")
+		_version_button.icon = null
 
 
 func _setup_chunk_tabs() -> void:
@@ -1177,25 +1228,49 @@ func _show_info(title: String, message: String) -> void:
 	dialog.popup_centered()
 
 
-func _check_for_updates() -> void:
+func _ensure_updater() -> void:
 	if _updater == null:
 		_updater = GdssUpdater.new()
 		add_child(_updater)
-	_updater.check_completed.connect(_on_update_checked, CONNECT_ONE_SHOT)
+		_updater.check_completed.connect(_on_update_checked)
+
+
+func _check_for_updates() -> void:
+	_run_update_check(false)
+
+
+func _run_update_check(silent: bool) -> void:
+	_ensure_updater()
+	if _checking:
+		if not silent:
+			_check_silent = false
+		return
+	_checking = true
+	_check_silent = silent
 	_updater.check()
 
 
 func _on_update_checked(result: Dictionary) -> void:
+	_checking = false
 	if not result.get("ok", false):
-		_show_info("Update check failed", str(result.get("message", "Unknown error.")))
+		if not _check_silent:
+			_show_info("Update check failed", str(result.get("message", "Unknown error.")))
 		return
 	if not result.get("update", false):
-		_show_info("GDSS is up to date", "You have the latest version (%s)." % result.get("current"))
+		_set_update_state(false, str(result.get("current")), "")
+		if not _check_silent:
+			_show_info("GDSS is up to date", "You have the latest version (%s)." % result.get("current"))
 		return
+	_set_update_state(true, str(result.get("latest")), str(result.get("url")))
+	if not _check_silent:
+		_prompt_install()
+
+
+func _prompt_install() -> void:
 	var confirm: ConfirmationDialog = ConfirmationDialog.new()
 	confirm.title = "Update available"
-	confirm.dialog_text = "GDSS %s is available — you have %s.\n\nUpdating overwrites the files in res://addons/gdss. Reload the project afterward to apply.\n\nUpdate now?" % [result.get("latest"), result.get("current")]
-	confirm.confirmed.connect(_install_update.bind(str(result.get("latest")), str(result.get("url"))))
+	confirm.dialog_text = "GDSS %s is available, you have %s.\n\nUpdating overwrites the files in res://addons/gdss. Reload the project afterward to apply.\n\nUpdate now?" % [_latest_version, _updater.get_current_version()]
+	confirm.confirmed.connect(_install_update.bind(_latest_version, _latest_url))
 	confirm.confirmed.connect(confirm.queue_free)
 	confirm.canceled.connect(confirm.queue_free)
 	_base_control().add_child(confirm)

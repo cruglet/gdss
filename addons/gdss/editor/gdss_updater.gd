@@ -15,6 +15,7 @@ var _http: HTTPRequest
 
 func _ready() -> void:
 	_http = HTTPRequest.new()
+	_http.timeout = 10.0
 	add_child(_http)
 
 
