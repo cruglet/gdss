@@ -32,7 +32,7 @@ func _ready() -> void:
 
 # A Control-based glass dropdown (PanelContainer + GlassMenu class). Being a Control it
 # refracts the app behind it via liquid_blur and pops in/out with the on_show/on_hide
-# transition — unlike a Window PopupMenu, whose embedded subwindow can't sample the backdrop.
+# transition - unlike a Window PopupMenu, whose embedded subwindow can't sample the backdrop.
 func _build_menu() -> void:
 	_menu_panel = PanelContainer.new()
 	_menu_panel.set_meta(GDSS.CLASSES_META, PackedStringArray(["GlassMenu"]))

@@ -200,7 +200,7 @@ static func bind(canvas_item: Node, apply: bool = true, gdss_node: GdssNode = nu
 		return
 	var control: Variant = canvas_item
 	# Batch every stylebox-override add into one theme-changed notification (a Button
-	# binds the same handler to ~9 state slots — 9 propagations become 1). The
+	# binds the same handler to ~9 state slots - 9 propagations become 1). The
 	# value overrides are applied after, each in its own bulk inside _apply_overrides.
 	control.begin_bulk_theme_override()
 	var handlers: Array[GdssPropHandler] = []

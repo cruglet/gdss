@@ -4,9 +4,9 @@ extends Object
 
 ## To enable GDSS, select a themable node and find the [b]GDSS[/b] mode dropdown under the "Theme"
 ## property group. It works like [enum Node.ProcessMode]:[br]
-## • [b]Enable[/b] — always style this node.[br]
-## • [b]Disable[/b] — never style this node.[br]
-## • [b]Inherit[/b] (default) — follow the nearest ancestor that is explicitly Enabled or Disabled.[br][br]
+## • [b]Enable[/b] - always style this node.[br]
+## • [b]Disable[/b] - never style this node.[br]
+## • [b]Inherit[/b] (default) - follow the nearest ancestor that is explicitly Enabled or Disabled.[br][br]
 ## Because of Inherit, you can set one container to [b]Enable[/b] and leave its children on Inherit to
 ## style an entire subtree at once, and newly instantiated or reparented nodes adopt the GDSS state of
 ## wherever they land. A dimmed line under the dropdown shows the resolved "Effective" state and where it
@@ -19,7 +19,7 @@ var HowToEnable: GDSSDocumentation
 ## GDSS stylesheets are saved as plain-text [b].tgdss[/b] files, which are ideal for version control and
 ## work directly with the built-in editor.[br][br]
 ## When you export your project, GDSS automatically compiles the active stylesheet into a compact binary
-## [b].gdssc[/b] artifact that ships in the build and is read at runtime — you don't manage that file
+## [b].gdssc[/b] artifact that ships in the build and is read at runtime - you don't manage that file
 ## yourself (it is regenerated on save and injected into exports).[br][br]
 ## Switch the active stylesheet from the editor's [b]File[/b] menu (New, Open, Open Recent, Save As,
 ## Rename) or via [code]Project > Project Settings > Gdss > Storage > Save Path[/code]. Only one

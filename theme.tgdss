@@ -1,5 +1,5 @@
 # @chunk main
-# Simple GDSS 0.5.x showcase theme.
+# Simple GDSS 0.7.0 showcase theme.
 @meta {
 	name: "GDSS Demo"
 	description: "GDSS showcase: schemes, methods, glass, calc(), opacity, and events."
@@ -287,7 +287,7 @@ Label {
 	}
 
 	# Theme-type-variation target ("%Variation"): auto-applied to any Label whose
-	# theme_type_variation == "TooltipLabel" — including Godot's own tooltips.
+	# theme_type_variation == "TooltipLabel" - including Godot's own tooltips.
 	%TooltipLabel {
 		font_color: $accent
 		font_size: 13
