@@ -9,7 +9,7 @@ static var _all_cache: Array[GdssPropHandler] = []
 static var _all_dirty: bool = true
 
 
-static func get_handler(canvas_item: CanvasItem, state: String = "") -> GdssPropHandler:
+static func get_handler(canvas_item: Node, state: String = "") -> GdssPropHandler:
 	var id: int = canvas_item.get_instance_id()
 	if not _registry.has(id):
 		return null
@@ -20,15 +20,55 @@ static func get_all_handlers() -> Array[GdssPropHandler]:
 	if not _all_dirty:
 		return _all_cache
 	_all_cache.clear()
-	for slots: Dictionary in _registry.values():
-		for handler: GdssPropHandler in slots.values():
+	var dead: Array[int] = []
+	for id: int in _registry:
+		if not is_instance_valid(instance_from_id(id)):
+			dead.append(id)
+			continue
+		var slots: Dictionary = _registry[id]
+		for state: String in slots:
+			var handler: GdssPropHandler = slots[state]
 			if handler != null:
 				_all_cache.append(handler)
+	for id: int in dead:
+		purge(id)
 	_all_dirty = false
 	return _all_cache
 
 
-static func get_handlers(canvas_item: CanvasItem) -> Array[GdssPropHandler]:
+## Marks the cached handler array as stale so the next call to [method
+## get_all_handlers] rebuilds it (and prunes any dead entries).
+static func mark_dirty() -> void:
+	_all_dirty = true
+
+
+## Releases everything GDSS holds for the node whose instance id is [param id].
+## Erases its registry slot (freeing the handlers, and with them their GPU
+## resources), purges per-node method caches, and drops any instance variables.
+## Idempotent: safe to call for an id that was already purged.
+static func purge(id: int) -> void:
+	if _registry.has(id):
+		for handler: GdssPropHandler in (_registry[id] as Dictionary).values():
+			if handler != null:
+				handler._free_gpu_ci()
+		_registry.erase(id)
+		_all_dirty = true
+	for method: GdssMethod in GDSS._get_gdss_methods().values():
+		if method.returns_texture:
+			method.purge_node(id)
+	GdssInterpreter._instance_vars.erase(id)
+
+
+## Deferred teardown guard: purges the node's GDSS state only if the instance is
+## genuinely gone. Routed through [code]call_deferred[/code] from tree-exit hooks
+## so a reparent (remove-then-readd in the same frame) does not tear anything down.
+static func _check_purge(id: int) -> void:
+	if is_instance_valid(instance_from_id(id)):
+		return
+	purge(id)
+
+
+static func get_handlers(canvas_item: Node) -> Array[GdssPropHandler]:
 	var result: Array[GdssPropHandler] = []
 	if canvas_item == null:
 		return result
@@ -39,29 +79,59 @@ static func get_handlers(canvas_item: CanvasItem) -> Array[GdssPropHandler]:
 	return result
 
 
-static func is_enabled(canvas_item: CanvasItem) -> bool:
+## Returns the live {state -> handler} slots dict for a node WITHOUT copying it
+## (unlike get_handlers, which allocates an Array). Hot-path callers iterate this
+## directly; they must not mutate the returned dict.
+static func get_slots(canvas_item: Node) -> Dictionary:
+	if canvas_item == null:
+		return {}
+	return _registry.get(canvas_item.get_instance_id(), {})
+
+
+## Returns the one handler that owns node-level concerns (e.g. on_show/on_hide
+## visibility events): the unslotted handler for stateful nodes, else the first
+## slot for static nodes. Null if the node has no handlers.
+static func get_primary_handler(canvas_item: Node) -> GdssPropHandler:
+	if canvas_item == null:
+		return null
+	var slots: Dictionary = _registry.get(canvas_item.get_instance_id(), {})
+	if slots.has(""):
+		return slots[""]
+	for state: String in slots:
+		return slots[state]
+	return null
+
+
+static func is_enabled(canvas_item: Node) -> bool:
 	return GDSS.resolve_mode(canvas_item)
 
 
-static func is_bound(canvas_item: CanvasItem) -> bool:
+static func is_bound(canvas_item: Node) -> bool:
 	return _registry.has(canvas_item.get_instance_id())
 
 
-static func refresh(canvas_item: CanvasItem) -> void:
+static func refresh(canvas_item: Node) -> void:
 	if canvas_item == null:
 		return
-	for handler: GdssPropHandler in get_handlers(canvas_item):
-		handler.reapply()
-	canvas_item.queue_redraw()
+	var slots: Dictionary = get_slots(canvas_item)
+	for state: String in slots:
+		var handler: GdssPropHandler = slots[state]
+		if handler != null:
+			handler.reapply()
+	# Window-derived nodes have no queue_redraw; reapply() already fired emit_changed()
+	# on each handler, which notifies the window to re-render.
+	if canvas_item is CanvasItem:
+		(canvas_item as CanvasItem).queue_redraw()
 
 
 static func rebind_tree(node: Node) -> void:
 	if node == null:
 		return
 	if node is CanvasItem:
-		var canvas_item: CanvasItem = node as CanvasItem
-		_migrate_legacy(canvas_item)
-		apply_mode(canvas_item)
+		_migrate_legacy(node as CanvasItem)
+		apply_mode(node)
+	elif node is Window:
+		apply_mode(node)
 	for child: Node in node.get_children():
 		rebind_tree(child)
 
@@ -69,13 +139,13 @@ static func rebind_tree(node: Node) -> void:
 static func apply_mode_tree(node: Node) -> void:
 	if node == null:
 		return
-	if node is CanvasItem:
-		apply_mode(node as CanvasItem)
+	if node is CanvasItem or node is Window:
+		apply_mode(node)
 	for child: Node in node.get_children():
 		apply_mode_tree(child)
 
 
-static func apply_mode(canvas_item: CanvasItem) -> void:
+static func apply_mode(canvas_item: Node) -> void:
 	if not GDSS._get_gdss_nodes().has(canvas_item.get_class()):
 		return
 	if GDSS.resolve_mode(canvas_item):
@@ -118,19 +188,27 @@ static func _migrate_legacy(canvas_item: CanvasItem) -> void:
 		canvas_item.set_meta(GDSS.MODE_META, GDSS.GdssMode.ENABLE)
 
 
-static func bind(canvas_item: CanvasItem, apply: bool = true) -> void:
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
+static func bind(canvas_item: Node, apply: bool = true, gdss_node: GdssNode = null) -> void:
+	# gdss_node may be passed by the caller (e.g. runtime._try_bind already looked it
+	# up) to avoid a redundant class->node dictionary fetch per bound node.
+	if gdss_node == null:
+		gdss_node = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if gdss_node == null:
 		return
-	var control: Control = canvas_item as Control
-	if control == null:
+	# Control and Window both expose the theme-override API; everything else is unstylable.
+	if not (canvas_item is Control or canvas_item is Window):
 		return
+	var control: Variant = canvas_item
+	# Batch every stylebox-override add into one theme-changed notification (a Button
+	# binds the same handler to ~9 state slots — 9 propagations become 1). The
+	# value overrides are applied after, each in its own bulk inside _apply_overrides.
+	control.begin_bulk_theme_override()
+	var handlers: Array[GdssPropHandler] = []
 	if gdss_node.is_static:
 		for state: String in gdss_node.states:
 			var handler: GdssPropHandler = _obtain(canvas_item, control, state, state)
 			handler._slot_state = state
-			if apply:
-				handler._apply_overrides(false)
+			handlers.append(handler)
 	else:
 		var states: PackedStringArray = gdss_node.states
 		var first_slot: String = states[0] if not states.is_empty() else ""
@@ -138,12 +216,15 @@ static func bind(canvas_item: CanvasItem, apply: bool = true) -> void:
 		for state: String in states:
 			if control.get_theme_stylebox(state) != handler:
 				control.add_theme_stylebox_override(state, handler)
-		if apply:
+		handlers.append(handler)
+	control.end_bulk_theme_override()
+	if apply:
+		for handler: GdssPropHandler in handlers:
 			handler._apply_overrides(false)
 	gdss_node.bind_canvas_item(canvas_item)
 
 
-static func _obtain(canvas_item: CanvasItem, control: Control, state: String, slot: String) -> GdssPropHandler:
+static func _obtain(canvas_item: Node, control: Variant, state: String, slot: String) -> GdssPropHandler:
 	var slots: Dictionary = _registry.get_or_add(canvas_item.get_instance_id(), {})
 	var handler: GdssPropHandler = slots.get(state)
 	if handler == null and not slot.is_empty():
@@ -170,14 +251,14 @@ static func _connect_editor(handler: GdssPropHandler) -> void:
 		interp.parsed_changed.connect(handler._on_parsed_changed)
 
 
-static func unbind(canvas_item: CanvasItem) -> void:
+static func unbind(canvas_item: Node) -> void:
 	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 	if gdss_node == null:
 		printerr("Could not unbind %s of type \"%s\"" % [canvas_item, canvas_item.get_class()])
 		return
-	var control: Control = canvas_item as Control
-	if control == null:
+	if not (canvas_item is Control or canvas_item is Window):
 		return
+	var control: Variant = canvas_item
 	_clear_overrides_for(control, gdss_node)
 	var interp: GdssInterpreter = GdssInterpreter.get_instance() if Engine.is_editor_hint() else null
 	var slots: Dictionary = _registry.get(canvas_item.get_instance_id(), {})
@@ -199,7 +280,7 @@ static func unbind(canvas_item: CanvasItem) -> void:
 			ei.call(&"mark_scene_as_unsaved")
 
 
-static func _clear_overrides_for(control: Control, gdss_node: GdssNode) -> void:
+static func _clear_overrides_for(control: Variant, gdss_node: GdssNode) -> void:
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		match prop.category:
 			GdssProp.Category.COLOR:
@@ -226,15 +307,15 @@ static func _clear_overrides_for(control: Control, gdss_node: GdssNode) -> void:
 # it. Pair with reapply_overrides() to restore the live preview afterwards.
 static func strip_overrides() -> void:
 	for id: int in _registry.keys():
-		var canvas_item: CanvasItem = instance_from_id(id) as CanvasItem
+		var canvas_item: Node = instance_from_id(id) as Node
 		if not is_instance_valid(canvas_item):
 			continue
 		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 		if gdss_node == null:
 			continue
-		var control: Control = canvas_item as Control
-		if control == null:
+		if not (canvas_item is Control or canvas_item is Window):
 			continue
+		var control: Variant = canvas_item
 		_clear_overrides_for(control, gdss_node)
 		for state: String in gdss_node.states:
 			control.remove_theme_stylebox_override(state)
@@ -244,15 +325,15 @@ static func strip_overrides() -> void:
 # that are already in the registry.
 static func reapply_overrides() -> void:
 	for id: int in _registry.keys():
-		var canvas_item: CanvasItem = instance_from_id(id) as CanvasItem
+		var canvas_item: Node = instance_from_id(id) as Node
 		if not is_instance_valid(canvas_item):
 			continue
 		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
 		if gdss_node == null:
 			continue
-		var control: Control = canvas_item as Control
-		if control == null:
+		if not (canvas_item is Control or canvas_item is Window):
 			continue
+		var control: Variant = canvas_item
 		for handler: GdssPropHandler in _registry.get(id, {}).values():
 			if handler == null:
 				continue

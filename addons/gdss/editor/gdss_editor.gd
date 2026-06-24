@@ -195,15 +195,20 @@ func _on_location_toggled(pressed: bool) -> void:
 
 
 func _setup_version_button() -> void:
-	if toggle_map_button == null:
+	# Live in the bottom status bar (caret_pos_label's row), pinned to the far right.
+	if caret_pos_label == null:
+		return
+	var status_bar: Node = caret_pos_label.get_parent()
+	if status_bar == null:
 		return
 	_ensure_updater()
+	var separator: VSeparator = VSeparator.new()
+	status_bar.add_child(separator)
 	_version_button = Button.new()
 	_version_button.theme_type_variation = &"FlatButton"
+	_version_button.focus_mode = Control.FOCUS_NONE
 	_version_button.pressed.connect(_on_version_button_pressed)
-	var toolbar: Node = toggle_map_button.get_parent()
-	toolbar.add_child(_version_button)
-	toolbar.move_child(_version_button, 1)
+	status_bar.add_child(_version_button)
 	_set_update_state(false, _updater.get_current_version(), "")
 	if not _auto_checked:
 		_auto_checked = true
@@ -680,6 +685,9 @@ func _setup_menu_bar() -> void:
 		return
 	var menu_bar: MenuBar = MenuBar.new()
 	menu_bar.flat = true
+	# Render the menu inside the editor panel instead of the OS-native global menu
+	# (otherwise on macOS the File/Edit/Help menus hijack the system menu bar).
+	menu_bar.prefer_global_menu = false
 	_file_menu = PopupMenu.new()
 	_file_menu.name = "File"
 	_file_menu.add_item("New…", MENU_NEW)

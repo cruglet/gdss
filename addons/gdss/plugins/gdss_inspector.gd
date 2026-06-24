@@ -340,8 +340,8 @@ func _parse_property(object: Object, type: Variant.Type, name: String, hint_type
 			return true
 
 	if is_enabled:
-		if name == "theme_type_variation":
-			return true
+		# theme_type_variation stays visible: GDSS now targets it via "/Variation { }"
+		# selectors, so users need to be able to set it.
 		if name.begins_with("theme_override") and not GDSS.DEBUG_MODE:
 			return true
 

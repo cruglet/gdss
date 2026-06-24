@@ -90,15 +90,27 @@ func get_extra_states() -> PackedStringArray:
 	return []
 
 
+# If non-empty, GDSS binds ONLY these stylebox slots (replacing the theme's full
+# stylebox list). Used by Window-derived nodes to target just their background.
+func get_only_states() -> PackedStringArray:
+	return []
+
+
 func _ensure_theme() -> void:
 	if not _theme_dirty:
 		return
 	var theme: Theme = ThemeDB.get_default_theme()
 	var type: StringName = base_type
-	_states = theme.get_stylebox_list(type)
-	for extra: String in get_extra_states():
-		if not _states.has(extra):
-			_states.append(extra)
+	# get_only_states() lets Window-derived nodes (PopupMenu, Window) restrict GDSS to
+	# their background slot instead of binding every theme stylebox (separator, hover, …).
+	var only: PackedStringArray = get_only_states()
+	if not only.is_empty():
+		_states = only.duplicate()
+	else:
+		_states = theme.get_stylebox_list(type)
+		for extra: String in get_extra_states():
+			if not _states.has(extra):
+				_states.append(extra)
 	_icons = theme.get_icon_list(type)
 	_font_sizes = theme.get_font_size_list(type)
 	_fonts = theme.get_font_list(type)
@@ -145,25 +157,48 @@ func get_default_events() -> PackedStringArray:
 	return ["item_rect_changed", "visibility_changed"]
 
 
-func bind_canvas_item(canvas_item: CanvasItem) -> void:
+func bind_canvas_item(canvas_item: Node) -> void:
 	var events: PackedStringArray = get_events()
 	events.append_array(get_default_events())
 	for event: String in events:
+		# has_signal guard: Window-derived nodes lack some Control signals (item_rect_changed).
 		if not canvas_item.is_connected(event, _update_state):
 			canvas_item.connect(event, _update_state, CONNECT_APPEND_SOURCE_OBJECT)
 
 
-func unbind_canvas_item(canvas_item: CanvasItem) -> void:
+func unbind_canvas_item(canvas_item: Node) -> void:
 	var events: PackedStringArray = get_events()
 	events.append_array(get_default_events())
 	for event: String in events:
-		if canvas_item.is_connected(event, _update_state):
+		if canvas_item.has_signal(event) and canvas_item.is_connected(event, _update_state):
 			canvas_item.disconnect(event, _update_state)
+
+
+# Godot 4.7 Control offset-transform properties, exposed to GDSS as animatable
+# node properties. Defaults match Godot's so a node that styles none of them keeps
+# an identity transform. Set offset_transform_enabled: true to activate.
+static var _transform_props: Array[GdssProp] = []
+static func _get_transform_props() -> Array[GdssProp]:
+	if not _transform_props.is_empty():
+		return _transform_props
+	_transform_props = [
+		GdssProp.create("offset_transform_enabled", GDSS.Type.BOOLEAN, false, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("offset_transform_position", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("offset_transform_position_ratio", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("offset_transform_scale", GDSS.Type.VECTOR2, Vector2.ONE, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("offset_transform_rotation", GDSS.Type.FLOAT, 0.0, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("offset_transform_pivot", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("offset_transform_pivot_ratio", GDSS.Type.VECTOR2, Vector2(0.5, 0.5), GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("offset_transform_visual_only", GDSS.Type.BOOLEAN, true, GdssProp.Category.NODE_PROPERTY),
+	]
+	return _transform_props
 
 
 func get_enabled_props() -> Array[GdssProp]:
 	if not _props_dirty:
 		return _props_cache
+	_ensure_theme()
+	var td: Dictionary[String, Variant] = _theme_defaults
 	var props: Array[GdssProp] = []
 	var db: GdssDB = GDSS.get_db()
 	var overrides: Dictionary[String, GdssProp] = db.property_list
@@ -174,19 +209,30 @@ func get_enabled_props() -> Array[GdssProp]:
 		if component != null:
 			props.append_array(component.properties)
 	props.append_array(unique_properties)
-	for item_name: String in constants:
+	if base_type == &"Control" or ClassDB.is_parent_class(base_type, &"Control"):
+		props.append_array(_get_transform_props())
+	for item_name: String in _constants:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
 		elif db.boolean_overrides.has(item_name):
 			props.append(GdssProp.create(item_name, GDSS.Type.BOOLEAN, db.boolean_overrides[item_name], GdssProp.Category.CONST))
 		else:
-			props.append(GdssProp.create(item_name, GDSS.Type.INT, theme_defaults.get(item_name, 0), GdssProp.Category.CONST))
-	for item_name: String in font_sizes:
-		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.INT, theme_defaults.get(item_name, 0), GdssProp.Category.FONT_SIZE)))
-	for item_name: String in fonts:
-		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.FONT, theme_defaults.get(item_name, null), GdssProp.Category.FONT)))
-	for item_name: String in icons:
-		props.append(overrides.get(item_name, GdssProp.create(item_name, GDSS.Type.ICON, theme_defaults.get(item_name, null), GdssProp.Category.ICON)))
+			props.append(GdssProp.create(item_name, GDSS.Type.INT, td.get(item_name, 0), GdssProp.Category.CONST))
+	for item_name: String in _font_sizes:
+		if overrides.has(item_name):
+			props.append(overrides[item_name])
+		else:
+			props.append(GdssProp.create(item_name, GDSS.Type.INT, td.get(item_name, 0), GdssProp.Category.FONT_SIZE))
+	for item_name: String in _fonts:
+		if overrides.has(item_name):
+			props.append(overrides[item_name])
+		else:
+			props.append(GdssProp.create(item_name, GDSS.Type.FONT, td.get(item_name, null), GdssProp.Category.FONT))
+	for item_name: String in _icons:
+		if overrides.has(item_name):
+			props.append(overrides[item_name])
+		else:
+			props.append(GdssProp.create(item_name, GDSS.Type.ICON, td.get(item_name, null), GdssProp.Category.ICON))
 	var grouped_colors: Dictionary = {}
 	var subprop_overrides: Array[GdssProp] = []
 	for override_prop: GdssProp in overrides.values():
@@ -195,16 +241,16 @@ func get_enabled_props() -> Array[GdssProp]:
 		var any_match: bool = false
 		for subprop_name: String in override_prop.category_subproperties:
 			grouped_colors[subprop_name] = true
-			if colors.has(subprop_name):
+			if _colors.has(subprop_name):
 				any_match = true
 		if any_match:
 			subprop_overrides.append(override_prop)
 	props.append_array(subprop_overrides)
-	for item_name: String in colors:
+	for item_name: String in _colors:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
 		elif not grouped_colors.has(item_name):
-			props.append(GdssProp.create(item_name, GDSS.Type.COLOR, theme_defaults.get(item_name, Color.TRANSPARENT), GdssProp.Category.COLOR))
+			props.append(GdssProp.create(item_name, GDSS.Type.COLOR, td.get(item_name, Color.TRANSPARENT), GdssProp.Category.COLOR))
 	_props_cache = props
 	_props_dirty = false
 	return _props_cache
@@ -225,18 +271,23 @@ func _update_state(...a: Array) -> void:
 	update_state(a.get(a.size() - 1))
 
 
-func update_state(canvas_item: CanvasItem) -> void:
+func update_state(canvas_item: Node) -> void:
 	if not canvas_item:
 		return
 	if is_static:
-		var handlers: Array[GdssPropHandler] = GdssNodeHandler.get_handlers(canvas_item)
-		if handlers.is_empty():
-			return
-		for handler: GdssPropHandler in handlers:
-			handler._apply_overrides(false)
-			handler.emit_changed()
-		canvas_item.queue_redraw()
+		var slots: Dictionary = GdssNodeHandler.get_slots(canvas_item)
+		var applied: bool = false
+		for state: String in slots:
+			var handler: GdssPropHandler = slots[state]
+			if handler != null:
+				handler._apply_overrides(false)
+				handler.emit_changed()
+				applied = true
+		if applied and canvas_item is CanvasItem:
+			(canvas_item as CanvasItem).queue_redraw()
+		return
+	if not canvas_item is CanvasItem:
 		return
 	var handler: GdssPropHandler = GdssNodeHandler.get_handler(canvas_item)
 	if handler != null:
-		handler.current_state = get_active_state(canvas_item)
+		handler.current_state = get_active_state(canvas_item as CanvasItem)

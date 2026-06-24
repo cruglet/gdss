@@ -6,9 +6,11 @@ extends GdssNode
 func get_active_state(canvas_item: CanvasItem) -> String:
 	var button: Button = canvas_item as Button
 	if button.disabled: return "disabled"
-	if button.is_hovered() and button.button_pressed and button.toggle_mode: return "hover_pressed"
-	if button.button_pressed: return "pressed"
-	if button.is_hovered(): return "hover"
+	var pressed: bool = button.button_pressed
+	var hovered: bool = button.is_hovered()
+	if hovered and pressed and button.toggle_mode: return "hover_pressed"
+	if pressed: return "pressed"
+	if hovered: return "hover"
 	if button.has_focus(true): return "focus"
 	return "normal"
 

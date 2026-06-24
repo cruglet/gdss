@@ -13,13 +13,45 @@ extends Control
 @export var strength_value: Label
 @export var refraction_value: Label
 
+@onready var anim_card: PanelContainer = $AnimCard
+@onready var menu_btn: Button = $App/AppMargin/AppCol/Showcase/FeatureRow/MenuBtn
+
 var _dark: bool = true
+var _menu: PopupMenu
 
 
 func _ready() -> void:
+	get_window().content_scale_factor = DisplayServer.screen_get_scale()
+	# Embed subwindows so the GDSS-styled PopupMenu renders inside the app window.
+	get_window().gui_embed_subwindows = true
 	GDSS.set_scheme("dark")
 	_on_strength_slider_value_changed(strength_slider.value)
 	_on_refraction_slider_value_changed(refraction_slider.value)
+	_build_menu()
+
+
+# A GDSS-styled PopupMenu (Window-derived) opened from the showcase row.
+func _build_menu() -> void:
+	_menu = PopupMenu.new()
+	_menu.add_item("Profile")
+	_menu.add_item("Settings")
+	_menu.add_separator()
+	_menu.add_item("Sign out")
+	menu_btn.add_child(_menu)
+
+
+func _on_menu_pressed() -> void:
+	_menu.reset_size()
+	_menu.position = Vector2i(menu_btn.get_screen_position()) + Vector2i(0, int(menu_btn.size.y) + 4)
+	_menu.popup()
+
+
+# Plays the AnimCard's on_show()/on_hide() one-shot transition.
+func _on_toggle_card_pressed() -> void:
+	if anim_card.visible:
+		GDSS.hide(anim_card)
+	else:
+		GDSS.show(anim_card)
 
 
 func _on_switch_pressed() -> void:

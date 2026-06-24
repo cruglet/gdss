@@ -42,7 +42,7 @@ theme_override_constants/separation = 16
 
 [node name="Title" type="Label" parent="App/AppMargin/AppCol" unique_id=139173359]
 layout_mode = 2
-text = "GDSS 0.5 UI Demo"
+text = "GDSS 0.6 UI Demo"
 metadata/gdss_classes = PackedStringArray("Heading")
 
 [node name="Controls" type="HBoxContainer" parent="App/AppMargin/AppCol" unique_id=201497893]
@@ -52,6 +52,7 @@ theme_override_constants/separation = 8
 [node name="Switch" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=531596294]
 layout_mode = 2
 mouse_default_cursor_shape = 2
+theme_override_font_sizes/font_size = 14
 text = "Switch to light"
 
 [node name="Randomize" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=1576448512]
@@ -94,12 +95,52 @@ theme_override_constants/separation = 8
 [node name="Button" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1052176415]
 layout_mode = 2
 mouse_default_cursor_shape = 2
+theme_override_font_sizes/font_size = 14
 text = "Button"
 
 [node name="GhostButton" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1174941247]
 layout_mode = 2
 mouse_default_cursor_shape = 2
 text = "Ghost Button"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="Showcase" type="VBoxContainer" parent="App/AppMargin/AppCol"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ShowcaseTitle" type="Label" parent="App/AppMargin/AppCol/Showcase"]
+layout_mode = 2
+text = "0.6 feature showcase"
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="VariationLabel" type="Label" parent="App/AppMargin/AppCol/Showcase"]
+layout_mode = 2
+theme_type_variation = &"TooltipLabel"
+text = "This line is styled via the \"TooltipLabel\" theme-type variation."
+
+[node name="FeatureRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Showcase"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="LiftBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_override_font_sizes/font_size = 14
+text = "Hover me — I lift"
+metadata/gdss_classes = PackedStringArray("LiftButton")
+
+[node name="MenuBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_override_font_sizes/font_size = 14
+text = "Open menu ▾"
+metadata/gdss_classes = PackedStringArray("GhostButton")
+
+[node name="ToggleBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_override_font_sizes/font_size = 14
+text = "Toggle card"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
 [node name="Filler" type="Control" parent="App/AppMargin/AppCol" unique_id=1668308820]
@@ -271,7 +312,47 @@ text = "refracting glass"
 horizontal_alignment = 1
 metadata/gdss_classes = PackedStringArray("Caption")
 
+[node name="AnimCard" type="PanelContainer" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -190.0
+offset_top = -72.0
+offset_right = 190.0
+offset_bottom = 72.0
+grow_horizontal = 2
+grow_vertical = 2
+metadata/gdss_classes = PackedStringArray("AnimCard")
+
+[node name="ACMargin" type="MarginContainer" parent="AnimCard"]
+layout_mode = 2
+theme_override_constants/margin_left = 22
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 22
+theme_override_constants/margin_bottom = 18
+
+[node name="ACCol" type="VBoxContainer" parent="AnimCard/ACMargin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="ACTitle" type="Label" parent="AnimCard/ACMargin/ACCol"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "on_show() / on_hide()"
+
+[node name="ACBody" type="Label" parent="AnimCard/ACMargin/ACCol"]
+layout_mode = 2
+autowrap_mode = 2
+text = "Pops in with BACK easing and shrinks away on hide — driven by GDSS.show() / GDSS.hide()."
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
 [connection signal="pressed" from="App/AppMargin/AppCol/Controls/Switch" to="." method="_on_switch_pressed"]
 [connection signal="pressed" from="App/AppMargin/AppCol/Controls/Randomize" to="." method="_on_randomize_pressed"]
 [connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/StrengthSlider" to="." method="_on_strength_slider_value_changed"]
 [connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/RefractionSlider" to="." method="_on_refraction_slider_value_changed"]
+[connection signal="pressed" from="App/AppMargin/AppCol/Showcase/FeatureRow/MenuBtn" to="." method="_on_menu_pressed"]
+[connection signal="pressed" from="App/AppMargin/AppCol/Showcase/FeatureRow/ToggleBtn" to="." method="_on_toggle_card_pressed"]

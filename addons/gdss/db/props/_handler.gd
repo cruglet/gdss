@@ -4,6 +4,7 @@ extends StyleBox
 
 static var _texture_cache: Dictionary = {}
 static var _corner_start_angles: Array[float] = [PI, PI * 1.5, 0.0, PI * 0.5]
+const _DEFAULT_SHADOW_COLOR: Color = Color(0, 0, 0, 0.4)
 
 const _TRANSITION_FUNCS: Dictionary = {
 	"LINEAR": Tween.TRANS_LINEAR, "SINE": Tween.TRANS_SINE, "QUINT": Tween.TRANS_QUINT,
@@ -28,13 +29,21 @@ static func tween_ease(type_enum: GDSS.TransitionType) -> Tween.EaseType:
 var _slot_state: String = ""
 
 var _ref_path: NodePath = NodePath()
-var _ref_node: CanvasItem = null
-var _ref_node_rt: CanvasItem = null
+# Typed Node (not CanvasItem) so Window-derived styled nodes (PopupMenu, Window,
+# dialogs) can be handled alongside Controls. CanvasItem-only ops go through helpers.
+var _ref_node: Node = null
+var _ref_node_rt: Node = null
 var _applying: bool = false
 
 var _entry_cache: Dictionary = {}
 var _entry_cache_dirty: bool = true
 var _entry_cache_classes: PackedStringArray = []
+var _entry_cache_variation: String = ""
+# Set of prop names present in ANY state of the resolved entry. Lets _apply_overrides
+# skip node properties the stylesheet never sets (e.g. the 8 offset_transform props on
+# nodes that don't use them) instead of resolving + control.get-checking each one.
+var _styled_props_cache: Dictionary = {}
+var _styled_props_dirty: bool = true
 
 var _animatable_cache: Dictionary = {}
 var _animatable_dirty: bool = true
@@ -63,7 +72,7 @@ var _style_vals_state: String = "￿"
 var _nonstyle_dynamic: Array[GdssProp] = []
 var _nonstyle_state: String = "￿"
 
-var ref: CanvasItem:
+var ref: Node:
 	get:
 		if Engine.is_editor_hint():
 			if is_instance_valid(_ref_node):
@@ -73,7 +82,7 @@ var ref: CanvasItem:
 			var tree: SceneTree = Engine.get_main_loop() as SceneTree
 			if tree == null:
 				return null
-			var resolved: CanvasItem = tree.root.get_node_or_null(_ref_path) as CanvasItem
+			var resolved: Node = tree.root.get_node_or_null(_ref_path)
 			if is_instance_valid(resolved):
 				_ref_node = resolved
 				_connect_ref_signals(_ref_node)
@@ -112,6 +121,12 @@ var _tweened_values: Dictionary[String, Variant] = {}
 var _tween: Tween = null
 var _state_sync_queued: bool = false
 
+# on_show()/on_hide() event state. _self_toggle swallows the visibility_changed our
+# own visible= writes fire (so re-showing to play an exit anim can't recurse).
+# _last_visible filters parent-driven changes (where the node's own visible is unchanged).
+var _self_toggle: bool = false
+var _last_visible: bool = true
+
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
@@ -128,7 +143,7 @@ func _notification(what: int) -> void:
 			interp.parsed_changed.disconnect(cb)
 
 
-func _connect_ref_signals(v: CanvasItem) -> void:
+func _connect_ref_signals(v: Node) -> void:
 	if Engine.is_editor_hint():
 		if not v.is_connected("renamed", _on_ref_renamed):
 			v.connect("renamed", _on_ref_renamed)
@@ -154,7 +169,7 @@ func _apply_dynamic_nonstyle(gdss_node: GdssNode, entry: Dictionary, state: Stri
 	if _nonstyle_dynamic.is_empty():
 		return
 	_applying = true
-	var control: Control = ref as Control
+	var control: Variant = ref
 	for prop: GdssProp in _nonstyle_dynamic:
 		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		if val == null:
@@ -205,19 +220,19 @@ func _on_ref_tree_entered_rt() -> void:
 
 
 func _on_ref_tree_exiting_rt() -> void:
+	# Reparent-safe: free the GPU child item (re-created on the next draw under the
+	# new canvas parent) and refresh the cached path, but KEEP _ref_node_rt so the
+	# handler still resolves while detached and dead-handler pruning works. Authoritative
+	# teardown (registry slot, per-node caches, instance vars) happens via the runtime's
+	# tree_exited hook -> GdssNodeHandler.purge once the node is truly gone.
 	_free_gpu_ci()
-	if is_instance_valid(_ref_node_rt):
-		if _ref_node_rt.is_inside_tree():
-			_ref_path = _ref_node_rt.get_path()
-		var id: int = _ref_node_rt.get_instance_id()
-		for method: GdssMethod in GDSS._get_gdss_methods().values():
-			if method.returns_texture:
-				method.purge_node(id)
-	_ref_node_rt = null
+	if is_instance_valid(_ref_node_rt) and _ref_node_rt.is_inside_tree():
+		_ref_path = _ref_node_rt.get_path()
 
 
 func _invalidate_entry_cache() -> void:
 	_entry_cache_dirty = true
+	_styled_props_dirty = true
 	_entry_cache = {}
 	_animatable_dirty = true
 	_method_args_cache.clear()
@@ -232,7 +247,7 @@ func _invalidate_entry_cache() -> void:
 func _resolve_gdss_node() -> GdssNode:
 	if _gdss_node != null:
 		return _gdss_node
-	var node: CanvasItem = ref
+	var node: Node = ref
 	if node == null:
 		return null
 	_gdss_node = GDSS._get_gdss_nodes().get(node.get_class())
@@ -258,13 +273,13 @@ func _on_parsed_changed() -> void:
 
 
 func _clear_overrides() -> void:
-	var node: CanvasItem = ref
+	var node: Node = ref
 	if node == null:
 		return
 	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
-	var control: Control = node as Control
+	var control: Variant = node
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		match prop.category:
 			GdssProp.Category.COLOR:
@@ -285,7 +300,7 @@ func _clear_overrides() -> void:
 
 
 func _apply_overrides(clear: bool = true) -> void:
-	var node: CanvasItem = ref
+	var node: Node = ref
 	if node == null or _applying:
 		return
 	var gdss_node: GdssNode = _resolve_gdss_node()
@@ -294,12 +309,21 @@ func _apply_overrides(clear: bool = true) -> void:
 	if not GDSS.resolve_mode(node):
 		return
 	_applying = true
+	var control: Variant = node
+	# Batch every add/remove theme-override into a single theme-changed notification
+	# per node, instead of one propagation per override. Big win when many nodes bind
+	# at once (scene instantiate / re-enter), where per-override propagation is O(depth).
+	control.begin_bulk_theme_override()
 	if clear:
 		_clear_overrides()
-	var control: Control = node as Control
 	var entry: Dictionary = _resolve_entry()
 	var state: String = _get_state()
+	var styled: Dictionary = _entry_styled_props(entry)
 	for prop: GdssProp in gdss_node.get_enabled_props():
+		# Node properties the stylesheet never sets (e.g. unused offset_transform_*) are
+		# left at their default — skip resolving + control.get-checking them every bind.
+		if prop.category == GdssProp.Category.NODE_PROPERTY and not styled.has(prop.name):
+			continue
 		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		if val == null:
 			val = prop.get_default_value()
@@ -312,10 +336,11 @@ func _apply_overrides(clear: bool = true) -> void:
 				set_content_margin(SIDE_BOTTOM, padding.w)
 			continue
 		_apply_theme_prop(prop, control, gdss_node, val)
+	control.end_bulk_theme_override()
 	_applying = false
 
 
-func _apply_theme_prop(prop: GdssProp, control: Control, gdss_node: GdssNode, val: Variant) -> void:
+func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, val: Variant) -> void:
 	match prop.category:
 		GdssProp.Category.COLOR:
 			if val is Color:
@@ -359,11 +384,11 @@ func _apply_theme_prop(prop: GdssProp, control: Control, gdss_node: GdssNode, va
 		GdssProp.Category.NODE_PROPERTY:
 			if prop.type == GDSS.Type.CURSOR:
 				control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
-			else:
+			elif control.get(prop.name) != val:
 				control.set(prop.name, val)
 
 
-func _override_color_if_custom(control: Control, gdss_node: GdssNode, key: String, val: Color) -> void:
+func _override_color_if_custom(control: Variant, gdss_node: GdssNode, key: String, val: Color) -> void:
 	var theme_def: Variant = gdss_node.theme_defaults.get(key, null)
 	if theme_def is Color and val.is_equal_approx(theme_def as Color):
 		return
@@ -373,7 +398,7 @@ func _override_color_if_custom(control: Control, gdss_node: GdssNode, key: Strin
 
 
 func _apply_single_override(prop: GdssProp, val: Variant) -> void:
-	var node: CanvasItem = ref
+	var node: Node = ref
 	if node == null:
 		return
 	var gdss_node: GdssNode = _resolve_gdss_node()
@@ -381,7 +406,7 @@ func _apply_single_override(prop: GdssProp, val: Variant) -> void:
 		return
 	if val == null:
 		val = prop.get_default_value()
-	_apply_theme_prop(prop, node as Control, gdss_node, val)
+	_apply_theme_prop(prop, node, gdss_node, val)
 
 
 func reapply() -> void:
@@ -424,41 +449,51 @@ func _get_animatable_props() -> Dictionary:
 		return _animatable_cache
 	for prop: GdssProp in gdss_node.get_enabled_props():
 		match prop.type:
-			GDSS.Type.COLOR, GDSS.Type.COMPOSITE4, GDSS.Type.FLOAT, GDSS.Type.INT:
+			GDSS.Type.COLOR, GDSS.Type.COMPOSITE4, GDSS.Type.FLOAT, GDSS.Type.INT, GDSS.Type.VECTOR2:
 				_animatable_cache[prop.name] = prop
 	_animatable_dirty = false
 	return _animatable_cache
 
 
 func _safe_redraw() -> void:
-	var node: CanvasItem = ref
-	if node != null:
-		node.queue_redraw()
+	var node: Node = ref
+	if node == null:
+		return
+	if node is CanvasItem:
+		(node as CanvasItem).queue_redraw()
+	else:
+		emit_changed() # Window-derived nodes redraw via theme-changed notification
 
 
 func _sync_active_state() -> void:
 	_state_sync_queued = false
-	var node: CanvasItem = ref
-	if node == null:
+	var node: Node = ref
+	if not node is CanvasItem:
 		return
 	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
-	current_state = gdss_node.get_active_state(node)
+	current_state = gdss_node.get_active_state(node as CanvasItem)
 
 
-func _start_transition(from_state: String, to_state: String) -> void:
-	var transition_time: float = _get_parsed_val("transition_time", to_state, 0.0)
+func _start_transition(from_state: String, to_state: String, timing_state: String = "", on_finished: Callable = Callable()) -> void:
+	# timing_state selects which block supplies transition_time/func/type (defaults to
+	# to_state; on_show/on_hide events pass their own key). on_finished fires after the
+	# tween completes (or immediately if there's nothing to tween) — used to hide on on_hide.
+	var ts: String = timing_state if not timing_state.is_empty() else to_state
+	var transition_time: float = _get_parsed_val("transition_time", ts, 0.0)
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
 		_tweened_values.clear()
+		if on_finished.is_valid():
+			on_finished.call()
 		return
 
 	var gdss_node: GdssNode = _resolve_gdss_node()
 	var default_state: String = gdss_node.states[0] if gdss_node and not gdss_node.states.is_empty() else "all"
 	var resolved_from: String = from_state if not from_state.is_empty() else default_state
 
-	var trans: Tween.TransitionType = _TRANSITION_FUNCS.get(_get_parsed_val("transition_func", to_state, "LINEAR"), Tween.TRANS_LINEAR)
-	var ease: Tween.EaseType = _EASE_TYPES.get(_get_parsed_val("transition_type", to_state, "EASE_IN_OUT"), Tween.EASE_IN_OUT)
+	var trans: Tween.TransitionType = _TRANSITION_FUNCS.get(_get_parsed_val("transition_func", ts, "LINEAR"), Tween.TRANS_LINEAR)
+	var ease: Tween.EaseType = _EASE_TYPES.get(_get_parsed_val("transition_type", ts, "EASE_IN_OUT"), Tween.EASE_IN_OUT)
 
 	var tweener_count: int = 0
 	var pending_tween: Tween = (Engine.get_main_loop() as SceneTree).create_tween()
@@ -538,6 +573,28 @@ func _start_transition(from_state: String, to_state: String) -> void:
 				, from, to, transition_time)
 				tweener_count += 1
 
+			GDSS.Type.VECTOR2:
+				var fallback: Vector2 = prop.get_default_value() if prop.get_default_value() is Vector2 else Vector2.ZERO
+				var from_val: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
+				var to_val: Variant = _get_parsed_val(prop_name, to_state, fallback)
+				if not from_val is Vector2 or not to_val is Vector2:
+					continue
+				var from: Vector2 = from_val as Vector2
+				var to: Vector2 = to_val as Vector2
+				if from == to:
+					continue
+				var captured: String = prop_name
+				var captured_prop: GdssProp = prop
+				_tweened_values[captured] = from
+				pending_tween.tween_method(func(v: Vector2) -> void:
+					_tweened_values[captured] = v
+					if is_style:
+						_safe_redraw()
+					else:
+						_apply_single_override(captured_prop, v)
+				, from, to, transition_time)
+				tweener_count += 1
+
 			GDSS.Type.FLOAT:
 				var fallback: float = float(prop.get_default_value())
 				var from: float = float(_tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback)))
@@ -577,6 +634,8 @@ func _start_transition(from_state: String, to_state: String) -> void:
 
 	if tweener_count == 0:
 		pending_tween.kill()
+		if on_finished.is_valid():
+			on_finished.call()
 		return
 
 	if _tween:
@@ -586,7 +645,93 @@ func _start_transition(from_state: String, to_state: String) -> void:
 		_tweened_values.clear()
 		_apply_overrides()
 		_safe_redraw()
+		if on_finished.is_valid():
+			on_finished.call()
 	)
+
+
+# The visual state the node settles into after an enter animation / animates out of
+# before an exit: the bound slot for static nodes, else the active interaction state.
+func _resting_state(gdss_node: GdssNode, node: Node) -> String:
+	if not _slot_state.is_empty():
+		return _slot_state
+	if not gdss_node.is_static and node is CanvasItem:
+		var active: String = gdss_node.get_active_state(node as CanvasItem)
+		if not active.is_empty():
+			return active
+	return gdss_node.states[0] if not gdss_node.states.is_empty() else "all"
+
+
+# Runtime hook (connected to the node's visibility_changed via the runtime autoload).
+func _on_node_visibility_changed() -> void:
+	if _self_toggle:
+		_self_toggle = false
+		return
+	var node: Control = ref as Control
+	if node == null:
+		return
+	var vis: bool = node.visible
+	if vis == _last_visible:
+		return # an ancestor toggled; this node's own `visible` didn't change
+	_last_visible = vis
+	if vis:
+		_play_show()
+	else:
+		_play_hide()
+
+
+# Snap to the on_show() values, then animate to the resting state.
+func _play_show() -> void:
+	var node: Node = ref
+	if node == null:
+		return
+	var gdss_node: GdssNode = _resolve_gdss_node()
+	if gdss_node == null or not _resolve_entry().has("on_show"):
+		return
+	_start_transition("on_show", _resting_state(gdss_node, node), "on_show")
+	_apply_overrides(false) # apply the snapped (on_show) node-property values immediately
+
+
+# Re-show the node so the exit animation can play, animate resting -> on_hide() values,
+# then actually hide once the tween finishes.
+func _play_hide() -> void:
+	var node: Control = ref as Control
+	if node == null:
+		return
+	var gdss_node: GdssNode = _resolve_gdss_node()
+	if gdss_node == null or not _resolve_entry().has("on_hide") or not node.is_inside_tree():
+		# No exit animation: make sure the node ends up hidden.
+		if node != null and node.visible:
+			_self_toggle = true
+			node.visible = false
+		return
+	if not node.visible:
+		_self_toggle = true
+		node.visible = true
+	_start_transition(_resting_state(gdss_node, node), "on_hide", "on_hide", func() -> void:
+		if is_instance_valid(node) and node.visible:
+			_self_toggle = true
+			node.visible = false
+	)
+
+
+# Interrupt-safe programmatic visibility (GDSS.show/hide/set_visible). Because intent
+# is explicit we don't depend on the visibility_changed signal to detect it.
+func _request_visible(want_visible: bool) -> void:
+	var node: Control = ref as Control
+	if node == null:
+		return
+	if want_visible:
+		if not node.visible:
+			_self_toggle = true
+			node.visible = true
+		_last_visible = true
+		_play_show()
+	else:
+		if not node.visible:
+			return
+		_last_visible = false
+		_play_hide()
 
 
 # Recursively searches a _classes tree for a given name, returning the entry or {}.
@@ -628,28 +773,56 @@ func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
 # Builds a merged entry dict by starting from parsed[ref.get_class()] and then
 # layering each gdss_class in order (lowest to highest priority).
 # Each name is looked up in the current entry's "_classes", allowing nesting.
+## Set of prop names appearing in any state of the resolved entry (cached). A prop
+## styled in ANY state stays in the set, so state-transition resets still run; only
+## properties the stylesheet never sets are skipped by _apply_overrides.
+func _entry_styled_props(entry: Dictionary) -> Dictionary:
+	if not _styled_props_dirty:
+		return _styled_props_cache
+	_styled_props_cache.clear()
+	for key: String in entry:
+		if key == "_classes" or key == "_variations":
+			continue
+		var sd: Variant = entry[key]
+		if sd is Dictionary:
+			for prop_name: String in (sd as Dictionary):
+				_styled_props_cache[prop_name] = true
+	_styled_props_dirty = false
+	return _styled_props_cache
+
+
 func _resolve_entry() -> Dictionary:
 	if ref == null:
 		return {}
 	var current_classes: PackedStringArray = ref.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray
-	if not _entry_cache_dirty and _entry_cache_classes == current_classes:
+	var variation: String = String((ref as Control).theme_type_variation) if ref is Control else ""
+	if not _entry_cache_dirty and _entry_cache_classes == current_classes and _entry_cache_variation == variation:
 		return _entry_cache
+	_styled_props_dirty = true # entry is being recomputed; its styled-prop set is stale
 	var parsed: Dictionary[String, Dictionary] = GdssInterpreter.parsed
 	var selector: String = ref.get_class()
 	if not parsed.has(selector):
 		return {}
 	var entry: Dictionary = parsed[selector]
-	if current_classes.is_empty():
+	var variations: Dictionary = parsed[selector].get("_variations", {})
+	var has_variation: bool = not variation.is_empty() and variations.has(variation)
+	if current_classes.is_empty() and not has_variation:
 		_entry_cache = entry
 		_entry_cache_classes = current_classes
+		_entry_cache_variation = variation
 		_entry_cache_dirty = false
 		return entry
+	# Layer order (lowest to highest priority): base type -> theme_type_variation
+	# -> explicit gdss_classes. Classes win because they're the explicit runtime layer.
+	if has_variation:
+		entry = _merge_entries(entry, variations[variation])
 	for gdss_class_name: String in current_classes:
 		var override: Dictionary = _find_class_in_tree(parsed[selector].get("_classes", {}), gdss_class_name)
 		if not override.is_empty():
 			entry = _merge_entries(entry, override)
 	_entry_cache = entry
 	_entry_cache_classes = current_classes
+	_entry_cache_variation = variation
 	_entry_cache_dirty = false
 	return entry
 
@@ -665,8 +838,10 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 			return _call_method(d, fallback, state_key)
 	if raw is String:
 		var s: String = raw as String
-		if s.begins_with("#") and Color.html_is_valid(s):
-			return Color.html(s)
+		if not s.is_empty() and s.unicode_at(0) == 35: # '#'
+			if Color.html_is_valid(s):
+				return Color.html(s)
+			return raw
 		if not s.begins_with("__gdss_"):
 			var named: Color = GdssInterpreter.parse_named_color(s, Color(-1, -1, -1, -1))
 			if named.r != -1:
@@ -786,6 +961,8 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 	if not raw is String:
 		return raw
 	var s: String = raw as String
+	if not s.begins_with("__gdss_"):
+		return raw
 	if s.begins_with("__gdss_global__"):
 		var name: String = s.substr("__gdss_global__".length())
 		if GdssInterpreter.globals.has(name):
@@ -828,13 +1005,18 @@ func _get_val_cached(key: String, entry: Dictionary, state: String, fallback: Va
 		return _tweened_values[key]
 	if entry.is_empty():
 		return fallback
+	# Parsed raw values are never null, so null unambiguously means "key absent",
+	# which lets us probe each dict once instead of has()+[].
 	var raw: Variant = null
-	if entry.has(state) and (entry[state] as Dictionary).has(key):
-		raw = entry[state][key]
-	elif entry.has("all") and (entry["all"] as Dictionary).has(key):
-		raw = entry["all"][key]
-	else:
-		return fallback
+	var sd: Variant = entry.get(state)
+	if sd is Dictionary:
+		raw = (sd as Dictionary).get(key)
+	if raw == null:
+		var ad: Variant = entry.get("all")
+		if ad is Dictionary:
+			raw = (ad as Dictionary).get(key)
+		if raw == null:
+			return fallback
 	return _resolve_value(raw, fallback, state)
 
 
@@ -880,10 +1062,16 @@ func _build_style_vals(gdss_node: GdssNode, entry: Dictionary, state: String) ->
 
 
 func _raw_entry_val(entry: Dictionary, state: String, key: String) -> Variant:
-	if entry.has(state) and (entry[state] as Dictionary).has(key):
-		return entry[state][key]
-	if entry.has("all") and (entry["all"] as Dictionary).has(key):
-		return entry["all"][key]
+	var sd: Variant = entry.get(state)
+	if sd is Dictionary:
+		var v: Variant = (sd as Dictionary).get(key)
+		if v != null:
+			return v
+	var ad: Variant = entry.get("all")
+	if ad is Dictionary:
+		var v2: Variant = (ad as Dictionary).get(key)
+		if v2 != null:
+			return v2
 	return null
 
 
@@ -915,9 +1103,9 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	var gdss_node: GdssNode = _resolve_gdss_node()
 	if gdss_node == null:
 		return
-	if not Engine.is_editor_hint() and _slot_state.is_empty() and not gdss_node.is_static:
-		var active: String = gdss_node.get_active_state(ref)
-		if active != current_state and not _state_sync_queued:
+	if not Engine.is_editor_hint() and ref is CanvasItem and _slot_state.is_empty() and not gdss_node.is_static and not _state_sync_queued:
+		var active: String = gdss_node.get_active_state(ref as CanvasItem)
+		if active != current_state:
 			_state_sync_queued = true
 			_sync_active_state.call_deferred()
 	var entry: Dictionary = _resolve_entry()
@@ -1033,7 +1221,9 @@ func _set_param(key: StringName, value: Variant) -> void:
 
 
 func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
-	_ensure_gpu_ci(to_canvas_item, vals.get("bg_color") is GdssBlur or vals.get("border_color") is GdssBlur)
+	var bg: Variant = vals.get("bg_color", Color.TRANSPARENT)
+	var border_src: Variant = vals.get("border_color", Color.TRANSPARENT)
+	_ensure_gpu_ci(to_canvas_item, bg is GdssBlur or border_src is GdssBlur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
 	var shadow_size: float = (shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
 	var pad: float = shadow_size + 2.0 if shadow_size > 0.5 else 0.0
@@ -1046,10 +1236,10 @@ func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	_set_param(&"u_border_widths", Vector4(vals.get("border", Vector4i.ZERO)))
 	_set_param(&"u_shadow", shadow)
 	_set_param(&"u_aa", 1.0 if anti_aliasing else 0.0)
-	var shadow_src: Variant = vals.get("shadow_color", Color(0, 0, 0, 0.4))
-	_set_param(&"u_shadow_color", shadow_src if shadow_src is Color else Color(0, 0, 0, 0.4))
-	_push_fill(vals.get("bg_color", Color.TRANSPARENT), pad_frac)
-	_push_border(vals.get("border_color", Color.TRANSPARENT), pad_frac)
+	var shadow_src: Variant = vals.get("shadow_color", _DEFAULT_SHADOW_COLOR)
+	_set_param(&"u_shadow_color", shadow_src if shadow_src is Color else _DEFAULT_SHADOW_COLOR)
+	_push_fill(bg, pad_frac)
+	_push_border(border_src, pad_frac)
 	var xform: Transform2D = _skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
 	if not _gpu_emitted or quad != _gpu_quad or xform != _gpu_xform:
 		_gpu_quad = quad
@@ -1114,8 +1304,11 @@ func _skew_transform(rect: Rect2, skew_x: float, skew_y: float) -> Transform2D:
 	if skew_x == 0.0 and skew_y == 0.0:
 		return Transform2D.IDENTITY
 	var center: Vector2 = rect.position + rect.size * 0.5
-	var shear: Transform2D = Transform2D(Vector2(1.0, skew_y), Vector2(skew_x, 1.0), Vector2.ZERO)
-	return Transform2D.IDENTITY.translated(center) * shear * Transform2D.IDENTITY.translated(-center)
+	var bx: Vector2 = Vector2(1.0, skew_y)
+	var by: Vector2 = Vector2(skew_x, 1.0)
+	# translate(center) * shear * translate(-center) folded into one transform:
+	# result(p) = M*p + (center - M*center), with basis M = (bx, by).
+	return Transform2D(bx, by, center - (bx * center.x + by * center.y))
 
 
 func _draw_texture_in_rect(to_canvas_item: RID, tex: Texture2D, rect: Rect2, corner_radii: Vector4, detail: int, skew_x: float, skew_y: float) -> void:

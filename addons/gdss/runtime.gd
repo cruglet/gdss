@@ -135,18 +135,18 @@ func _ensure_parsed() -> void:
 
 
 func _bind_tree(node: Node) -> void:
-	if node is CanvasItem:
-		_try_bind(node as CanvasItem)
+	if node is CanvasItem or node is Window:
+		_try_bind(node)
 	for child: Node in node.get_children():
 		_bind_tree(child)
 
 
 func _on_node_added(node: Node) -> void:
-	if node is CanvasItem:
-		_try_bind(node as CanvasItem)
+	if node is CanvasItem or node is Window:
+		_try_bind(node)
 
 
-func _try_bind(canvas_item: CanvasItem) -> void:
+func _try_bind(canvas_item: Node) -> void:
 	if not GDSS.resolve_mode(canvas_item):
 		if GdssNodeHandler.is_bound(canvas_item):
 			GdssNodeHandler.unbind(canvas_item)
@@ -156,3 +156,41 @@ func _try_bind(canvas_item: CanvasItem) -> void:
 		return
 	GdssNodeHandler.bind(canvas_item)
 	gdss_node.update_state(canvas_item)
+	var exit_cb: Callable = _on_styled_node_exited.bind(canvas_item.get_instance_id())
+	if not canvas_item.tree_exited.is_connected(exit_cb):
+		canvas_item.tree_exited.connect(exit_cb)
+	# on_show/on_hide events drive off visibility_changed (CanvasItem; not all Windows
+	# expose it). has_signal keeps the connect safe for Window-derived nodes.
+	if canvas_item.has_signal(&"visibility_changed"):
+		var vis_cb: Callable = _on_styled_visibility_changed.bind(canvas_item)
+		if not canvas_item.visibility_changed.is_connected(vis_cb):
+			canvas_item.visibility_changed.connect(vis_cb)
+			var primary: GdssPropHandler = GdssNodeHandler.get_primary_handler(canvas_item)
+			if primary != null:
+				primary._last_visible = canvas_item.visible
+
+
+# Runtime teardown counterpart to _on_node_added: a styled node that leaves the
+# tree for good must drop its registry slot, or GdssNodeHandler._registry (and
+# every handler StyleBox it holds) grows without bound. tree_exited also fires on
+# a plain remove or a reparent, so we only purge when the node is actually being
+# destroyed; an ambiguous removal is re-checked deferred, by which point a
+# reparented node is valid again and a freed one is gone.
+func _on_styled_node_exited(id: int) -> void:
+	var obj: Object = instance_from_id(id)
+	if not is_instance_valid(obj):
+		GdssNodeHandler.purge(id)
+		return
+	if (obj as Node).is_queued_for_deletion():
+		GdssNodeHandler.purge(id)
+		return
+	GdssNodeHandler._check_purge.call_deferred(id)
+
+
+# Drives on_show()/on_hide() one-shot transitions off the node's own visibility.
+func _on_styled_visibility_changed(canvas_item: Node) -> void:
+	if not is_instance_valid(canvas_item):
+		return
+	var handler: GdssPropHandler = GdssNodeHandler.get_primary_handler(canvas_item)
+	if handler != null:
+		handler._on_node_visibility_changed()

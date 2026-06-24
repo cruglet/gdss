@@ -64,7 +64,18 @@ Button {
 		bg_color: darken($accent, 0.1)
 		expand: 0 0 0 0
 	}
-	
+
+	# Godot 4.7 offset_transform: lifts and scales up on hover. It's visual_only by
+	# default, so it never reflows the layout; the Button transition tweens it.
+	LiftButton {
+		offset_transform_enabled: true
+
+		:hover {
+			offset_transform_scale: 1.06 1.06
+			offset_transform_position: 0 -4
+		}
+	}
+
 	GhostButton {
 		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
 		border_color: $accent
@@ -148,6 +159,42 @@ PanelContainer {
 		border: 1 1 1 1
 		corner_radius: 16 16 16 16
 	}
+
+	# Pop in/out via on_show()/on_hide() events. GDSS.show()/hide() (or just
+	# toggling `visible`) plays these one-shot transitions; offset_transform keeps
+	# it visual-only so nothing reflows while it animates.
+	AnimCard {
+		bg_color: $surface_2
+		border_color: $accent
+		border: 2 2 2 2
+		corner_radius: 18 18 18 18
+		offset_transform_enabled: true
+
+		on_show() {
+			offset_transform_scale: 0.6 0.6
+			transition_time: 0.3
+			transition_func: BACK
+			transition_type: EASE_OUT
+		}
+
+		on_hide() {
+			offset_transform_scale: 0.7 0.7
+			transition_time: 0.16
+			transition_func: QUAD
+			transition_type: EASE_IN
+		}
+	}
+}
+
+# @chunk Popups
+# PopupMenu is a Window-derived node (not a Control); GDSS styles its panel with
+# the same GPU pipeline when subwindows are embedded.
+PopupMenu {
+	bg_color: $surface_2
+	border_color: $border
+	border: 1 1 1 1
+	corner_radius: 12 12 12 12
+	font_color: $text
 }
 
 # @chunk Labels
@@ -175,6 +222,13 @@ Label {
 	Caption {
 		font_size: 12
 		font_color: $text_dim
+	}
+
+	# Theme-type-variation target ("%Variation"): auto-applied to any Label whose
+	# theme_type_variation == "TooltipLabel" — including Godot's own tooltips.
+	%TooltipLabel {
+		font_color: $accent
+		font_size: 13
 	}
 }
 

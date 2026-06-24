@@ -71,6 +71,7 @@ func _get_property_list() -> Array[Dictionary]:
 		GDSS.Type.BOOLEAN: props.append({"name": "default_value", "type": TYPE_BOOL})
 		GDSS.Type.COLOR: props.append({"name": "default_value", "type": TYPE_COLOR})
 		GDSS.Type.COMPOSITE4: props.append({"name": "default_value", "type": TYPE_VECTOR4I})
+		GDSS.Type.VECTOR2: props.append({"name": "default_value", "type": TYPE_VECTOR2})
 		GDSS.Type.COMPOSITE: props.append({"name": "default_value", "type": TYPE_STRING})
 		GDSS.Type.CURSOR: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.CursorType.keys())})
 		GDSS.Type.TRANSITION_TYPE: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionType.keys())})
@@ -118,6 +119,8 @@ func get_default_value() -> Variant:
 			return Color.TRANSPARENT
 		GDSS.Type.COMPOSITE4:
 			return Vector4i.ZERO
+		GDSS.Type.VECTOR2:
+			return Vector2.ZERO
 		GDSS.Type.COMPOSITE:
 			return ""
 	return 0
@@ -137,6 +140,7 @@ func get_info() -> Dictionary:
 		GDSS.Type.COLOR: type_name = "COLOR"
 		GDSS.Type.COMPOSITE: type_name = "COMPOSITE"
 		GDSS.Type.COMPOSITE4: type_name = "COMPOSITE4"
+		GDSS.Type.VECTOR2: type_name = "VECTOR2"
 		GDSS.Type.CURSOR: type_name = "CURSOR"
 		GDSS.Type.TRANSITION_TYPE: type_name = "TRANSITION_TYPE"
 		GDSS.Type.TRANSITION_FUNC: type_name = "TRANSITION_FUNC"

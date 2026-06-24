@@ -190,15 +190,30 @@ static var COLOR_ALIASES: Dictionary = {
 	"TRANSPARENT_BLACK": Color(0, 0, 0, 0),
 	"TRANSPARENT_WHITE": Color(1, 1, 1, 0),
 }
+# Memoizes name -> Color (success) or name -> false (not a color), keyed by raw name.
+# parse_named_color is probed for every non-hex string value (cursors, enums, etc.),
+# so caching misses too avoids repeating to_upper()/from_string() on the hot path.
+# Bounded by the distinct string values in the stylesheet. Fallback is applied per call.
+static var _named_color_cache: Dictionary = {}
 
 
 ## Resolves a named color, honouring GDSS aliases (such as TRANSPARENT_BLACK)
 ## before falling back to Godot's built-in color names.
 static func parse_named_color(name: String, fallback: Color) -> Color:
+	var cached: Variant = _named_color_cache.get(name)
+	if cached != null:
+		return cached if cached is Color else fallback
 	var alias: Variant = COLOR_ALIASES.get(name.to_upper())
 	if alias is Color:
+		_named_color_cache[name] = alias
 		return alias
-	return Color.from_string(name, fallback)
+	const SENTINEL: Color = Color(-1, -1, -1, -1)
+	var resolved: Color = Color.from_string(name, SENTINEL)
+	if resolved != SENTINEL:
+		_named_color_cache[name] = resolved
+		return resolved
+	_named_color_cache[name] = false
+	return fallback
 
 
 func _is_valid_color_value(val: String) -> bool:
@@ -503,7 +518,7 @@ func check_errors(source: String) -> Array[Array]:
 				var all_props: Array[GdssProp] = gdss_node.get_enabled_props()
 				var matched_prop: GdssProp = null
 				for p: GdssProp in all_props:
-					if p.name == prop_name or p.composite_of.has(prop_name):
+					if p.name == prop_name or p.composite_of.has(prop_name) or p.category_subproperties.has(prop_name):
 						matched_prop = p
 						break
 
@@ -1210,10 +1225,27 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 			pos = block_end
 			continue
 
+		# Event block: name(...) { ... } e.g. on_show() { ... }. Distinct from states
+		# by the parens; stored under the (lowercased) event name as its own entry key.
+		if next == "(":
+			var close: int = pos + 2
+			while close < tokens.size() and tokens[close] != ")":
+				close += 1
+			if not parent_selector.is_empty() and close + 1 < tokens.size() and tokens[close + 1] == "{":
+				_ensure_selector(result, parent_selector, known_states)
+				pos = _parse_props_into(tokens, close + 2, result, parent_selector, token.to_lower(), known_states)
+			else:
+				pos = close + 1
+			continue
+
 		if next == ":" and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens[pos + 3] == "{":
-			var child_container: Dictionary = _get_child_container(result, parent_selector)
-			_ensure_selector(child_container, token, known_states)
-			pos = _parse_props_into(tokens, pos + 4, child_container, token, next2.to_lower(), known_states)
+			# "%Variation" targets a node's theme_type_variation; a prefix-less name is a
+			# regular gdss class (applied via gdss_classes / GDSS.add_class).
+			var is_variation: bool = token.begins_with("%") and not parent_selector.is_empty()
+			var child_name: String = token.substr(1) if is_variation else token
+			var child_container: Dictionary = _get_variation_container(result, parent_selector) if is_variation else _get_child_container(result, parent_selector)
+			_ensure_selector(child_container, child_name, known_states)
+			pos = _parse_props_into(tokens, pos + 4, child_container, child_name, next2.to_lower(), known_states)
 			continue
 
 		if token == ":" and next2 == "{":
@@ -1225,11 +1257,15 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 			continue
 
 		if next == "{":
-			var child_container: Dictionary = _get_child_container(result, parent_selector)
-			_ensure_selector(child_container, token, known_states)
+			# "%Variation" targets a node's theme_type_variation; a prefix-less name is a
+			# regular gdss class (applied via gdss_classes / GDSS.add_class).
+			var is_variation: bool = token.begins_with("%") and not parent_selector.is_empty()
+			var child_name: String = token.substr(1) if is_variation else token
+			var child_container: Dictionary = _get_variation_container(result, parent_selector) if is_variation else _get_child_container(result, parent_selector)
+			_ensure_selector(child_container, child_name, known_states)
 			if not parent_selector.is_empty():
-				_inherit(child_container, token, result[parent_selector])
-			pos = _parse_block(tokens, pos + 2, child_container, token, known_states)
+				_inherit(child_container, child_name, result[parent_selector])
+			pos = _parse_block(tokens, pos + 2, child_container, child_name, known_states)
 			continue
 
 		if next == ":":
@@ -1253,6 +1289,17 @@ func _get_child_container(result: Dictionary, parent_selector: String) -> Dictio
 	if not result[parent_selector].has("_classes"):
 		result[parent_selector]["_classes"] = {}
 	return result[parent_selector]["_classes"]
+
+
+# Container for theme-type-variation blocks ("/FlatButton { }"), kept separate
+# from "_classes" so variations are auto-applied from a node's theme_type_variation
+# rather than from explicit gdss_classes.
+func _get_variation_container(result: Dictionary, parent_selector: String) -> Dictionary:
+	if parent_selector.is_empty():
+		return result
+	if not result[parent_selector].has("_variations"):
+		result[parent_selector]["_variations"] = {}
+	return result[parent_selector]["_variations"]
 
 
 func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
@@ -1319,7 +1366,12 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 		var lookahead: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
 		var lookahead2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
 		if lookahead == "(":
-			return _parse_method_call(tokens, pos)
+			# "name(...)" is a method-call value only when it STARTS the value. After a
+			# value is already collected, a "name(" begins the next statement (e.g. an
+			# on_show()/on_hide() event block), so end this value here.
+			if parts.is_empty():
+				return _parse_method_call(tokens, pos)
+			break
 		if lookahead == "{":
 			break
 		if lookahead == ":" and (lookahead2 == "{" or known_states.has(lookahead2.to_lower())):
@@ -1388,6 +1440,8 @@ func _parse_value(parts: Array[String]) -> Variant:
 			return Vector4i(int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]))
 		if all_int_resolvable:
 			return {"__gdss_composite4__": [parts[0], parts[1], parts[2], parts[3]]}
+	if parts.size() == 2 and parts[0].is_valid_float() and parts[1].is_valid_float():
+		return Vector2(float(parts[0]), float(parts[1]))
 	if parts.size() == 1:
 		var token: String = parts[0].trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 		if token.to_lower() == "true":

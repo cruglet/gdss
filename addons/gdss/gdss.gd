@@ -27,6 +27,7 @@ enum Type {
 	TRANSITION_FUNC,
 	ICON,
 	FONT,
+	VECTOR2,
 }
 
 enum CursorType {
@@ -279,6 +280,8 @@ static func _lerp_value(from_val: Variant, to_val: Variant, t: float) -> Variant
 		return (from_val as Color).lerp(to_val as Color, t)
 	if from_val is Vector4i and to_val is Vector4i:
 		return Vector4i(Vector4(from_val as Vector4i).lerp(Vector4(to_val as Vector4i), t))
+	if from_val is Vector2 and to_val is Vector2:
+		return (from_val as Vector2).lerp(to_val as Vector2, t)
 	if (from_val is float or from_val is int) and (to_val is float or to_val is int):
 		var result: float = lerpf(float(from_val), float(to_val), t)
 		if from_val is int and to_val is int:
@@ -412,6 +415,36 @@ static func refresh(node: Node) -> void:
 	var gdss_node: GdssNode = _get_gdss_nodes().get(canvas_item.get_class())
 	if gdss_node != null:
 		gdss_node.update_state(canvas_item)
+
+
+## Sets [param node]'s visibility, playing its GDSS [code]on_show()[/code] /
+## [code]on_hide()[/code] transition if one is defined. Unlike toggling
+## [code]visible[/code] directly, this is interrupt-safe during an exit animation
+## (it knows the intended visibility). Falls back to setting [code]visible[/code]
+## for nodes GDSS isn't styling.
+## [codeblock]
+## GDSS.set_visible(my_menu, false) # plays on_hide(), then hides
+## [/codeblock]
+static func set_visible(node: Node, visible: bool) -> void:
+	if node is CanvasItem:
+		var handler: GdssPropHandler = GdssNodeHandler.get_primary_handler(node as CanvasItem)
+		if handler != null:
+			handler._request_visible(visible)
+			return
+	if node != null:
+		node.set("visible", visible)
+
+
+## Shows [param node], playing its [code]on_show()[/code] transition if defined.
+## See [method set_visible].
+static func show(node: Node) -> void:
+	set_visible(node, true)
+
+
+## Hides [param node], playing its [code]on_hide()[/code] transition if defined
+## (the node stays visible until the exit animation finishes). See [method set_visible].
+static func hide(node: Node) -> void:
+	set_visible(node, false)
 
 
 ## Returns the GDSS classes currently applied to [param node], in priority order.
@@ -557,17 +590,18 @@ static func gpu_panels_enabled() -> bool:
 
 
 static func _flush_global_refresh() -> void:
+	# queue_redraw() is idempotent within a frame, so no per-item dedup set is needed
+	# (a static multi-slot node redrawing twice is a free no-op, cheaper than hashing).
 	_global_flush_scheduled = false
-	var seen: Dictionary[int, bool] = {}
+	var found_dead: bool = false
 	for handler: GdssPropHandler in GdssNodeHandler.get_all_handlers():
 		var item: CanvasItem = handler.ref
 		if item == null:
+			found_dead = true
 			continue
-		var id: int = item.get_instance_id()
-		if seen.has(id):
-			continue
-		seen[id] = true
 		item.queue_redraw()
+	if found_dead:
+		GdssNodeHandler.mark_dirty()
 	_emit_globals_changed()
 
 
