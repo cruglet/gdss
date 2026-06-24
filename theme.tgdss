@@ -1,11 +1,11 @@
 # @chunk main
 # Simple GDSS 0.5.x showcase theme.
 @meta {
-	name: "GDSS 0.5 Demo"
-	description: "GDSS 0.5 showcase: schemes, methods, and glass."
+	name: "GDSS Demo"
+	description: "GDSS showcase: schemes, methods, glass, calc(), opacity, and events."
 	default_scheme: dark
 	author: "Cruglet"
-	version: "0.5.1"
+	version: "0.7.0"
 }
 
 # @chunk Palette
@@ -39,6 +39,7 @@
 @instance var glass_refraction: 1.0
 
 var radius: 12
+@global var unit: 12
 # @chunk Buttons
 Button {
 	bg_color: $accent
@@ -73,6 +74,17 @@ Button {
 		:hover {
 			transform_scale: 1.06 1.06
 			transform_position: 0 -4
+		}
+	}
+
+	BounceButton {
+		transform_enabled: true
+		transform_scale: 1 1
+		on_pressed() {
+			transform_scale: 0.88 0.88
+			transition_time: 0.18
+			transition_func: BACK
+			transition_type: EASE_OUT
 		}
 	}
 
@@ -185,9 +197,11 @@ PanelContainer {
 		border: 1 1 1 1
 		corner_radius: 22 22 22 22
 		transform_enabled: true
+		opacity: 1
 
 		on_show() {
 			transform_scale: 0.6 0.6
+			opacity: 0
 			transition_time: 0.3
 			transition_func: BACK
 			transition_type: EASE_OUT
@@ -195,6 +209,7 @@ PanelContainer {
 
 		on_hide() {
 			transform_scale: 0.7 0.7
+			opacity: 0
 			transition_time: 0.16
 			transition_func: QUAD
 			transition_type: EASE_IN
@@ -246,6 +261,11 @@ Label {
 	
 	Heading {
 		font_size: 28
+		font_color: $text
+	}
+
+	CalcLabel {
+		font_size: calc($unit * 2)
 		font_color: $text
 	}
 	
