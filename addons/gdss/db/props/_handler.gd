@@ -113,7 +113,8 @@ var current_state: String = "":
 		if s == current_state:
 			return
 		var previous: String = current_state
-		_start_transition(current_state, s)
+		if not previous.is_empty():
+			_start_transition(previous, s)
 		current_state = s
 		_apply_overrides(not previous.is_empty())
 		if ref != null:
@@ -340,21 +341,20 @@ func _apply_overrides(clear: bool = true) -> void:
 	var state: String = _get_state()
 	var styled: Dictionary = _entry_styled_props(entry)
 	for prop: GdssProp in gdss_node.get_enabled_props():
-		# Node properties the stylesheet never sets (e.g. unused offset_transform_*) are
-		# left at their default — skip resolving + control.get-checking them every bind.
-		if prop.category == GdssProp.Category.NODE_PROPERTY and not styled.has(prop.name):
-			continue
-		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-		if val == null:
-			val = prop.get_default_value()
 		if prop.category == GdssProp.Category.STYLE:
 			if prop.name == "padding":
-				var padding: Vector4 = Vector4(val)
+				var pad_raw: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+				var padding: Vector4 = Vector4(pad_raw if pad_raw != null else prop.get_default_value())
 				set_content_margin(SIDE_LEFT, padding.x)
 				set_content_margin(SIDE_RIGHT, padding.y)
 				set_content_margin(SIDE_TOP, padding.z)
 				set_content_margin(SIDE_BOTTOM, padding.w)
 			continue
+		if not styled.has(prop.name):
+			continue
+		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+		if val == null:
+			val = prop.get_default_value()
 		_apply_theme_prop(prop, control, gdss_node, val)
 	control.end_bulk_theme_override()
 	_applying = false
@@ -1158,11 +1158,20 @@ func _get_raw_parsed_val(key: String, state: String) -> Variant:
 
 func _build_style_vals(gdss_node: GdssNode, entry: Dictionary, state: String) -> Dictionary:
 	if not _tweened_values.is_empty():
-		var fresh: Dictionary = {}
+		if _style_vals_state != state or _style_vals_cache.is_empty():
+			var fresh: Dictionary = {}
+			for prop: GdssProp in gdss_node.get_style_props():
+				var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+				fresh[prop.name] = fv if fv != null else prop.get_default_value()
+			return fresh
+		var out: Dictionary = _style_vals_cache.duplicate()
+		for prop: GdssProp in _style_dynamic:
+			var dv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+			out[prop.name] = dv if dv != null else prop.get_default_value()
 		for prop: GdssProp in gdss_node.get_style_props():
-			var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-			fresh[prop.name] = fv if fv != null else prop.get_default_value()
-		return fresh
+			if _tweened_values.has(prop.name):
+				out[prop.name] = _tweened_values[prop.name]
+		return out
 	if _style_vals_state != state:
 		_style_vals_cache.clear()
 		_style_dynamic.clear()
