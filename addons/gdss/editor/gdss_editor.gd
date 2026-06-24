@@ -651,7 +651,7 @@ func _on_code_edit_input(event: InputEvent) -> void:
 	if key.keycode == KEY_SLASH and key.is_command_or_control_pressed():
 		_toggle_comment()
 		code_edit.get_viewport().set_input_as_handled()
-	if key.keycode == KEY_D and key.is_command_or_control_pressed():
+	if key.keycode == KEY_D and key.is_command_or_control_pressed() and not key.shift_pressed:
 		_select_next_occurrence()
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_F and key.is_command_or_control_pressed():
@@ -665,6 +665,9 @@ func _on_code_edit_input(event: InputEvent) -> void:
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_F8:
 		_goto_error(-1 if key.shift_pressed else 1)
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_D and key.is_command_or_control_pressed() and key.shift_pressed and Engine.is_editor_hint():
+		EditorInterface.distraction_free_mode = not EditorInterface.distraction_free_mode
 		code_edit.get_viewport().set_input_as_handled()
 
 

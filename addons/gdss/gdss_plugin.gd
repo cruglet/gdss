@@ -17,7 +17,6 @@ var inspector_plugin: GdssInspectorPlugin
 var export_plugin: GdssExportPlugin
 var import_plugin: GdssImportPlugin
 var gdss_dock: GdssDock
-var was_in_distraction_free_mode: bool = false
 var _loading_scene: bool = false
 
 
@@ -199,11 +198,6 @@ func _make_visible(visible: bool) -> void:
 	if not _has_main_screen() or not is_instance_valid(gdss_editor):
 		return
 	gdss_editor.set(&"visible", visible)
-	if visible:
-		was_in_distraction_free_mode = EditorInterface.distraction_free_mode
-		EditorInterface.distraction_free_mode = true
-	if not was_in_distraction_free_mode and not visible:
-		EditorInterface.distraction_free_mode = false
 
 
 func _get_plugin_name() -> String:
