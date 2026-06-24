@@ -1184,13 +1184,13 @@ func _tokenize(source: String) -> Array[String]:
 	return tokens
 
 
-func _ensure_selector(result: Dictionary, selector: String, known_states: PackedStringArray) -> void:
+func _ensure_selector(result: Dictionary, selector: String, _known_states: PackedStringArray) -> void:
+	# States are created lazily by _set_prop / _inherit as they're actually styled, so an
+	# entry no longer carries ~70 empty state dicts (smaller parsed data + far cheaper
+	# entry scans, e.g. the styled-prop set). Unstyled states resolve via "all"/default.
 	if result.has(selector):
 		return
-	var entry: Dictionary = {"all": {}, "_classes": {}}
-	for state: String in known_states:
-		entry[state] = {}
-	result[selector] = entry
+	result[selector] = {"all": {}, "_classes": {}}
 
 
 func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray) -> int:
@@ -1416,10 +1416,14 @@ func _parse_method_call(tokens: Array[String], pos: int) -> Array:
 
 func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> void:
 	for state: String in parent_data:
-		if state == "_classes" or not result[child].has(state):
+		if state == "_classes" or state == "_variations":
 			continue
 		if not parent_data[state] is Dictionary:
 			continue
+		# States are no longer pre-created, so create the child's state on demand to keep
+		# inheriting the parent's styled states.
+		if not result[child].has(state):
+			result[child][state] = {}
 		for prop: String in parent_data[state]:
 			if not result[child][state].has(prop):
 				result[child][state][prop] = parent_data[state][prop]
