@@ -26,12 +26,12 @@
 }
 
 @scheme light {
-	bg: "#eceef5"
+	bg: "#d4d8e4"
 	surface: "#ffffff"
-	surface_2: "#e6e9f2"
-	text: "#1b1e28"
-	text_dim: "#6a7088"
-	border: "#00000018"
+	surface_2: "#f3f5fb"
+	text: "#0f111a"
+	text_dim: "#4c5470"
+	border: "#00000038"
 }
 
 # Per-node knobs so the sliders can retune the glass live.

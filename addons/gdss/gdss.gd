@@ -599,6 +599,7 @@ static func _flush_global_refresh() -> void:
 		if item == null:
 			found_dead = true
 			continue
+		handler.refresh_globals()
 		if item is CanvasItem:
 			(item as CanvasItem).queue_redraw()
 		else:

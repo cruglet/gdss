@@ -356,6 +356,8 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 			if val is int or val is float:
 				var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
 				if theme_def is int and int(val) == int(theme_def):
+					if control.has_theme_constant_override(prop.name):
+						control.remove_theme_constant_override(prop.name)
 					return
 				if control.has_theme_constant_override(prop.name) and control.get_theme_constant(prop.name) == int(val):
 					return
@@ -364,6 +366,8 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 			if val is int or val is float:
 				var theme_def: Variant = gdss_node.theme_defaults.get(prop.name, null)
 				if theme_def is int and int(val) == int(theme_def):
+					if control.has_theme_font_size_override(prop.name):
+						control.remove_theme_font_size_override(prop.name)
 					return
 				if control.has_theme_font_size_override(prop.name) and control.get_theme_font_size(prop.name) == int(val):
 					return
@@ -395,6 +399,8 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 func _override_color_if_custom(control: Variant, gdss_node: GdssNode, key: String, val: Color) -> void:
 	var theme_def: Variant = gdss_node.theme_defaults.get(key, null)
 	if theme_def is Color and val.is_equal_approx(theme_def as Color):
+		if control.has_theme_color_override(key):
+			control.remove_theme_color_override(key)
 		return
 	if control.has_theme_color_override(key) and control.get_theme_color(key).is_equal_approx(val):
 		return
@@ -418,6 +424,35 @@ func reapply() -> void:
 	_invalidate_entry_cache()
 	_apply_overrides()
 	emit_changed()
+
+
+func refresh_globals() -> void:
+	if _applying:
+		return
+	var node: Node = ref
+	if node == null:
+		return
+	var gdss_node: GdssNode = _resolve_gdss_node()
+	if gdss_node == null:
+		return
+	var entry: Dictionary = _resolve_entry()
+	if entry.is_empty():
+		return
+	var state: String = _get_state()
+	if _nonstyle_state != state:
+		_classify_nonstyle(gdss_node, entry, state)
+	if _nonstyle_dynamic.is_empty():
+		return
+	_applying = true
+	var control: Variant = node
+	control.begin_bulk_theme_override()
+	for prop: GdssProp in _nonstyle_dynamic:
+		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+		if val == null:
+			val = prop.get_default_value()
+		_apply_theme_prop(prop, control, gdss_node, val)
+	control.end_bulk_theme_override()
+	_applying = false
 
 
 func _get_cursor_shape(type: String) -> Control.CursorShape:
