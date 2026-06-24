@@ -870,6 +870,8 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4__"):
 		var parts: Array = (raw as Dictionary)["__gdss_composite4__"]
 		return Vector4i(_resolve_composite_part(parts[0]), _resolve_composite_part(parts[1]), _resolve_composite_part(parts[2]), _resolve_composite_part(parts[3]))
+	if raw is Dictionary and (raw as Dictionary).has("__gdss_calc__"):
+		return _eval_calc((raw as Dictionary)["__gdss_calc__"])
 	raw = _resolve_sentinel(raw, fallback)
 	if raw is Dictionary:
 		var d: Dictionary = raw as Dictionary
@@ -886,6 +888,43 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 			if named.r != -1:
 				return named
 	return raw
+
+
+func _eval_calc(node: Variant) -> float:
+	if not node is Dictionary:
+		return 0.0
+	var d: Dictionary = node as Dictionary
+	if d.has("calc_num"):
+		return float(d["calc_num"])
+	if d.has("calc_ref"):
+		return _calc_ref_value(d["calc_ref"])
+	if d.has("calc_neg"):
+		return -_eval_calc(d["calc_neg"])
+	if d.has("calc_op"):
+		var l: float = _eval_calc(d["l"])
+		var r: float = _eval_calc(d["r"])
+		match d["calc_op"]:
+			"+": return l + r
+			"-": return l - r
+			"*": return l * r
+			"/": return l / r if r != 0.0 else 0.0
+	return 0.0
+
+
+func _calc_ref_value(token: String) -> float:
+	var t: String = token
+	if t.begins_with("$"):
+		t = "__gdss_global__" + t.substr(1)
+	var resolved: Variant = _resolve_sentinel(t, null)
+	if resolved == null and token.begins_with("$"):
+		resolved = _resolve_sentinel("__gdss_instance__" + token.substr(1), null)
+		if resolved == null:
+			resolved = _resolve_sentinel("__gdss_local__" + token.substr(1), null)
+	if resolved is int or resolved is float:
+		return float(resolved)
+	if resolved is String and (resolved as String).is_valid_float():
+		return float(resolved)
+	return 0.0
 
 
 func _resolve_composite_part(part: String) -> int:
@@ -1125,6 +1164,8 @@ func _is_dynamic_raw(raw: Variant) -> bool:
 				if part is String and ((part as String).begins_with("__gdss_global__") or (part as String).begins_with("__gdss_instance__")):
 					return true
 			return false
+		if d.has("__gdss_calc__"):
+			return _calc_has_dynamic_ref(d["__gdss_calc__"])
 		if not d.has("__gdss_method__"):
 			return false
 		for arg: Variant in d.get("args", []):
@@ -1133,6 +1174,20 @@ func _is_dynamic_raw(raw: Variant) -> bool:
 			var a: String = (arg as String).strip_edges()
 			if a.begins_with("__gdss_global__") or a.begins_with("__gdss_instance__") or a.begins_with("$"):
 				return true
+	return false
+
+
+func _calc_has_dynamic_ref(node: Variant) -> bool:
+	if not node is Dictionary:
+		return false
+	var d: Dictionary = node as Dictionary
+	if d.has("calc_ref"):
+		var r: String = d["calc_ref"]
+		return r.begins_with("__gdss_global__") or r.begins_with("__gdss_instance__") or r.begins_with("$")
+	if d.has("calc_neg"):
+		return _calc_has_dynamic_ref(d["calc_neg"])
+	if d.has("calc_op"):
+		return _calc_has_dynamic_ref(d["l"]) or _calc_has_dynamic_ref(d["r"])
 	return false
 
 

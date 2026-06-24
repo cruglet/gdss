@@ -259,6 +259,8 @@ func _check_method_arg_type(arg: String, param: GdssMethod.Param, method_name: S
 
 
 func _check_method_call(value_str: String, method_name: String, prop: GdssProp, known_methods: Dictionary, errors: Array[Array], line: int) -> void:
+	if method_name == "calc":
+		return
 	if not known_methods.has(method_name):
 		errors.append(["Unknown method '%s()'" % method_name, line])
 		return
@@ -330,9 +332,31 @@ func _split_top_level_args(args_raw: String) -> Array[String]:
 	return result
 
 
+func _check_calc_value(value_str: String, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
+	var open_count: int = value_str.count("(")
+	var close_count: int = value_str.count(")")
+	if open_count != close_count:
+		errors.append(["Unbalanced parentheses in calc() expression", line])
+		return
+	var body_start: int = value_str.find("(")
+	var body: String = value_str.substr(body_start + 1, value_str.rfind(")") - body_start - 1)
+	if body.strip_edges().is_empty():
+		errors.append(["calc() expression is empty", line])
+		return
+	var rx: RegEx = RegEx.new()
+	rx.compile("\\$([A-Za-z_][A-Za-z0-9_]*)")
+	for m: RegExMatch in rx.search_all(body):
+		var var_name: String = m.get_string(1)
+		if _is_undefined_var(var_name, declared_vars):
+			errors.append(["Undefined variable '$%s' in calc()" % var_name, line])
+
+
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
 	if value_str.contains("("):
 		var method_name: String = _method_name_of(value_str)
+		if method_name == "calc":
+			_check_calc_value(value_str, declared_vars, errors, line)
+			return
 		_check_method_call(value_str, method_name, prop, known_methods, errors, line)
 		return
 	
@@ -533,7 +557,10 @@ func check_errors(source: String) -> Array[Array]:
 						errors.append(["Undefined variable '$%s'" % var_name, i])
 				elif value_str.contains("("):
 					var method_name: String = _method_name_of(value_str)
-					_check_method_call(value_str, method_name, null, known_methods, errors, i)
+					if method_name == "calc":
+						_check_calc_value(value_str, declared_vars, errors, i)
+					else:
+						_check_method_call(value_str, method_name, null, known_methods, errors, i)
 		else:
 			errors.append(["Stray token '%s': expected a property or block" % stripped, i])
 
@@ -1370,6 +1397,8 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 			# value is already collected, a "name(" begins the next statement (e.g. an
 			# on_show()/on_hide() event block), so end this value here.
 			if parts.is_empty():
+				if t == "calc":
+					return _parse_calc(tokens, pos)
 				return _parse_method_call(tokens, pos)
 			break
 		if lookahead == "{":
@@ -1412,6 +1441,90 @@ func _parse_method_call(tokens: Array[String], pos: int) -> Array:
 	if not current_parts.is_empty():
 		args.append(" ".join(current_parts))
 	return [{"__gdss_method__": method_name, "args": args}, pos]
+
+
+func _parse_calc(tokens: Array[String], pos: int) -> Array:
+	var depth: int = 0
+	var close: int = pos + 1
+	while close < tokens.size():
+		if tokens[close] == "(":
+			depth += 1
+		elif tokens[close] == ")":
+			depth -= 1
+			if depth == 0:
+				break
+		close += 1
+	var inner: Array[String] = tokens.slice(pos + 2, close)
+	var lexed: Array[String] = _calc_lex(" ".join(inner))
+	var state: Dictionary = {"toks": lexed, "i": 0}
+	var ast: Variant = _calc_expr(state)
+	return [{"__gdss_calc__": ast}, close + 1]
+
+
+func _calc_lex(raw: String) -> Array[String]:
+	var out: Array[String] = []
+	var i: int = 0
+	var n: int = raw.length()
+	while i < n:
+		var ch: String = raw[i]
+		if ch == " " or ch == "\t":
+			i += 1
+			continue
+		if ch == "+" or ch == "-" or ch == "*" or ch == "/" or ch == "(" or ch == ")":
+			out.append(ch)
+			i += 1
+			continue
+		var start: int = i
+		while i < n:
+			var c: String = raw[i]
+			if c == " " or c == "\t" or c == "+" or c == "-" or c == "*" or c == "/" or c == "(" or c == ")":
+				break
+			i += 1
+		out.append(raw.substr(start, i - start))
+	return out
+
+
+func _calc_peek(state: Dictionary) -> String:
+	return state["toks"][state["i"]] if state["i"] < (state["toks"] as Array).size() else ""
+
+
+func _calc_advance(state: Dictionary) -> String:
+	var t: String = _calc_peek(state)
+	state["i"] = state["i"] + 1
+	return t
+
+
+func _calc_expr(state: Dictionary) -> Variant:
+	var node: Variant = _calc_term(state)
+	while _calc_peek(state) == "+" or _calc_peek(state) == "-":
+		var op: String = _calc_advance(state)
+		node = {"calc_op": op, "l": node, "r": _calc_term(state)}
+	return node
+
+
+func _calc_term(state: Dictionary) -> Variant:
+	var node: Variant = _calc_factor(state)
+	while _calc_peek(state) == "*" or _calc_peek(state) == "/":
+		var op: String = _calc_advance(state)
+		node = {"calc_op": op, "l": node, "r": _calc_factor(state)}
+	return node
+
+
+func _calc_factor(state: Dictionary) -> Variant:
+	var t: String = _calc_peek(state)
+	if t == "-":
+		_calc_advance(state)
+		return {"calc_neg": _calc_factor(state)}
+	if t == "(":
+		_calc_advance(state)
+		var node: Variant = _calc_expr(state)
+		if _calc_peek(state) == ")":
+			_calc_advance(state)
+		return node
+	_calc_advance(state)
+	if t.is_valid_float() or t.is_valid_int():
+		return {"calc_num": float(t)}
+	return {"calc_ref": t}
 
 
 func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> void:
