@@ -42,9 +42,6 @@ func _exit_tree() -> void:
 		scene_changed.disconnect(_on_scene_changed)
 	if get_tree() != null and get_tree().node_added.is_connected(_on_editor_node_added):
 		get_tree().node_added.disconnect(_on_editor_node_added)
-	var editor_settings: EditorSettings = EditorInterface.get_editor_settings()
-	if editor_settings.settings_changed.is_connected(_on_editor_settings_changed):
-		editor_settings.settings_changed.disconnect(_on_editor_settings_changed)
 	if is_instance_valid(gdss_dock):
 		remove_dock(gdss_dock)
 		gdss_dock.queue_free()
@@ -77,7 +74,6 @@ func _setup_settings() -> void:
 		"hint": PROPERTY_HINT_ENUM,
 		"hint_string": "Dock,Main Screen"
 	})
-	editor_settings.settings_changed.connect(_on_editor_settings_changed)
 	if not ProjectSettings.has_setting("gdss/storage/save_path"):
 		ProjectSettings.set_setting("gdss/storage/save_path", "res://theme.tgdss")
 		ProjectSettings.set_initial_value("gdss/storage/save_path", "res://theme.tgdss")
@@ -193,10 +189,6 @@ func _prompt_reload() -> void:
 	dialog.canceled.connect(dialog.queue_free)
 	EditorInterface.get_base_control().add_child(dialog)
 	dialog.popup_centered()
-
-
-func _on_editor_settings_changed() -> void:
-	pass
 
 
 func _has_main_screen() -> bool:

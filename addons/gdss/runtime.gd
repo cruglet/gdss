@@ -68,24 +68,28 @@ func _reload_parsed() -> void:
 	var raw: Variant = data["parsed"]
 	if not raw is Dictionary:
 		return
+	var parsed_data: Dictionary = raw
 	GdssInterpreter.parsed.clear()
-	for key: String in (raw as Dictionary):
-		var val: Variant = (raw as Dictionary)[key]
+	for key: String in parsed_data:
+		var val: Variant = parsed_data[key]
 		if val is Dictionary:
 			GdssInterpreter.parsed[key] = val
 	if data.has("local_vars") and data["local_vars"] is Dictionary:
+		var local_vars: Dictionary = data["local_vars"]
 		GdssInterpreter._local_vars.clear()
-		for key: String in (data["local_vars"] as Dictionary):
-			GdssInterpreter._local_vars[key] = (data["local_vars"] as Dictionary)[key]
+		for key: String in local_vars:
+			GdssInterpreter._local_vars[key] = local_vars[key]
 	_apply_scheme_meta(data)
 	if data.has("global_defaults") and data["global_defaults"] is Dictionary:
+		var global_defaults: Dictionary = data["global_defaults"]
 		GdssInterpreter._global_defaults.clear()
-		for key: String in (data["global_defaults"] as Dictionary):
-			GdssInterpreter._global_defaults[key] = (data["global_defaults"] as Dictionary)[key]
+		for key: String in global_defaults:
+			GdssInterpreter._global_defaults[key] = global_defaults[key]
 	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
+		var instance_defaults: Dictionary = data["instance_defaults"]
 		GdssInterpreter._instance_defaults.clear()
-		for key: String in (data["instance_defaults"] as Dictionary):
-			GdssInterpreter._instance_defaults[key] = (data["instance_defaults"] as Dictionary)[key]
+		for key: String in instance_defaults:
+			GdssInterpreter._instance_defaults[key] = instance_defaults[key]
 		GdssInterpreter._instance_scheme_base = GdssInterpreter._instance_defaults.duplicate(true)
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if method.returns_texture:
@@ -102,6 +106,8 @@ func _refresh_all_handlers() -> void:
 		if item == null:
 			continue
 		handler.reapply() # reapply() emits changed, which repaints Window-derived nodes
+		if handler == GdssNodeHandler.get_primary_handler(item):
+			_connect_event_signals(item)
 		if item is CanvasItem:
 			(item as CanvasItem).queue_redraw()
 
@@ -187,15 +193,34 @@ func _connect_event_signals(canvas_item: Node) -> void:
 	if primary == null:
 		return
 	var entry: Dictionary = primary._resolve_entry()
-	if entry.is_empty():
+	for sig: String in _EVENT_SIGNALS:
+		if not canvas_item.has_signal(sig):
+			continue
+		var info: Array = _EVENT_SIGNALS[sig]
+		var cb: Callable = Callable(primary, info[1])
+		var want: bool = not entry.is_empty() and entry.has(info[0])
+		var connected: bool = canvas_item.is_connected(sig, cb)
+		if want and not connected:
+			canvas_item.connect(sig, cb)
+		elif connected and not want:
+			canvas_item.disconnect(sig, cb)
+
+
+func _disconnect_node_signals(canvas_item: Node) -> void:
+	if canvas_item.has_signal(&"visibility_changed"):
+		var vis_cb: Callable = _on_styled_visibility_changed.bind(canvas_item)
+		if canvas_item.visibility_changed.is_connected(vis_cb):
+			canvas_item.visibility_changed.disconnect(vis_cb)
+	var primary: GdssPropHandler = GdssNodeHandler.get_primary_handler(canvas_item)
+	if primary == null:
 		return
 	for sig: String in _EVENT_SIGNALS:
-		var info: Array = _EVENT_SIGNALS[sig]
-		if not entry.has(info[0]) or not canvas_item.has_signal(sig):
+		if not canvas_item.has_signal(sig):
 			continue
+		var info: Array = _EVENT_SIGNALS[sig]
 		var cb: Callable = Callable(primary, info[1])
-		if not canvas_item.is_connected(sig, cb):
-			canvas_item.connect(sig, cb)
+		if canvas_item.is_connected(sig, cb):
+			canvas_item.disconnect(sig, cb)
 
 
 # Runtime teardown counterpart to _on_node_added: a styled node that leaves the

@@ -28,7 +28,7 @@ static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*:\s*(.+)
 static var _re_bad_annotation: RegEx = RegEx.create_from_string(r"^@(\w+)")
 static var _re_scheme: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
 static var _re_meta: RegEx = RegEx.create_from_string(r"^@meta\b")
-static var _re_import: RegEx = RegEx.create_from_string(r"^@import\s+[\"\'](.+?)[\"\']")
+static var _re_import: RegEx = RegEx.create_from_string(r"^@import\s+([\"'])(.+?)\1")
 
 var _defaults: Dictionary[String, Dictionary] = {}
 
@@ -150,6 +150,10 @@ func _split_statements(line: String) -> PackedStringArray:
 
 func _method_name_of(call_text: String) -> String:
 	return call_text.substr(0, call_text.find("(")).strip_edges()
+
+
+func _is_quoted_literal(s: String) -> bool:
+	return s.length() >= 2 and ((s.begins_with("\"") and s.ends_with("\"")) or (s.begins_with("'") and s.ends_with("'")))
 
 
 func _is_undefined_var(var_name: String, declared_vars: Dictionary) -> bool:
@@ -290,7 +294,7 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 		if required_count == total_count:
 			errors.append(["Method '%s()' expects %d argument(s), got %d" % [method_name, required_count, args.size()], line])
 		else:
-			errors.append(["Method '%s()' expects %d–%d argument(s), got %d" % [method_name, required_count, total_count, args.size()], line])
+			errors.append(["Method '%s()' expects %d-%d argument(s), got %d" % [method_name, required_count, total_count, args.size()], line])
 		return
 
 	for ai: int in args.size():
@@ -343,16 +347,36 @@ func _check_calc_value(value_str: String, declared_vars: Dictionary, errors: Arr
 	if body.strip_edges().is_empty():
 		errors.append(["calc() expression is empty", line])
 		return
-	var rx: RegEx = RegEx.new()
-	rx.compile("\\$([A-Za-z_][A-Za-z0-9_]*)")
-	for m: RegExMatch in rx.search_all(body):
-		var var_name: String = m.get_string(1)
-		if _is_undefined_var(var_name, declared_vars):
-			errors.append(["Undefined variable '$%s' in calc()" % var_name, line])
+	var tokens: Array[String] = _calc_lex(body)
+	if tokens.is_empty():
+		errors.append(["calc() expression is empty", line])
+		return
+	var expect_operand: bool = true
+	for t: String in tokens:
+		if t == "(":
+			expect_operand = true
+			continue
+		if t == ")":
+			expect_operand = false
+			continue
+		if t == "+" or t == "-" or t == "*" or t == "/":
+			if expect_operand and t != "+" and t != "-":
+				errors.append(["calc() has a misplaced '%s' operator" % t, line])
+			expect_operand = true
+			continue
+		if t.begins_with("$"):
+			var var_name: String = t.substr(1)
+			if _is_undefined_var(var_name, declared_vars):
+				errors.append(["Undefined variable '$%s' in calc()" % var_name, line])
+		elif not t.is_valid_float():
+			errors.append(["calc() operand '%s' must be a number or $variable" % t, line])
+		expect_operand = false
+	if expect_operand:
+		errors.append(["calc() expression is incomplete", line])
 
 
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
-	if value_str.contains("("):
+	if not _is_quoted_literal(value_str) and value_str.contains("("):
 		var method_name: String = _method_name_of(value_str)
 		if method_name == "calc":
 			_check_calc_value(value_str, declared_vars, errors, line)
@@ -365,7 +389,7 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		actual_type = GDSS.Type.INT
 	
 	if actual_type == GDSS.Type.COMPOSITE4:
-		var parts: PackedStringArray = value_str.split(" ", false)
+		var parts: PackedStringArray = value_str.replace("\t", " ").split(" ", false)
 		if parts.size() != 4:
 			errors.append(["Property '%s' expects 4 integer values, got %d" % [prop_name, parts.size()], line])
 			return
@@ -446,7 +470,7 @@ func check_errors(source: String) -> Array[Array]:
 					declared_vars[m.get_string(1)] = true
 					if is_global:
 						declared_globals[m.get_string(1)] = true
-					if val_str.contains("("):
+					if not _is_quoted_literal(val_str) and val_str.contains("("):
 						var method_name: String = _method_name_of(val_str)
 						_check_method_call(val_str, method_name, null, known_methods, errors, i)
 			continue
@@ -463,7 +487,7 @@ func check_errors(source: String) -> Array[Array]:
 					if declared_vars.has(m.get_string(1)):
 						errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
 					declared_vars[m.get_string(1)] = true
-					if val_str.contains("("):
+					if not _is_quoted_literal(val_str) and val_str.contains("("):
 						var method_name: String = _method_name_of(val_str)
 						_check_method_call(val_str, method_name, null, known_methods, errors, i)
 			continue
@@ -555,14 +579,18 @@ func check_errors(source: String) -> Array[Array]:
 					var var_name: String = value_str.substr(1)
 					if _is_undefined_var(var_name, declared_vars):
 						errors.append(["Undefined variable '$%s'" % var_name, i])
-				elif value_str.contains("("):
+				elif not _is_quoted_literal(value_str) and value_str.contains("("):
 					var method_name: String = _method_name_of(value_str)
 					if method_name == "calc":
 						_check_calc_value(value_str, declared_vars, errors, i)
 					else:
 						_check_method_call(value_str, method_name, null, known_methods, errors, i)
 		else:
-			errors.append(["Stray token '%s': expected a property or block" % stripped, i])
+			var stray_ctx: String = selector_stack.back() if not selector_stack.is_empty() else ""
+			if stray_ctx.is_empty():
+				errors.append(["Stray token '%s': expected a property or block" % stripped, i])
+			else:
+				errors.append(["Stray token '%s' in '%s': expected a property or block" % [stripped, stray_ctx], i])
 
 	for line: int in brace_open_lines:
 		errors.append(["Unclosed brace '{'", line])
@@ -808,7 +836,7 @@ func _collect_imports(source: String) -> Array:
 		var stripped: String = _strip_line_comment(lines[i].strip_edges())
 		var m: RegExMatch = _re_import.search(stripped)
 		if m != null:
-			result.append({"path": m.get_string(1), "line": i})
+			result.append({"path": m.get_string(2), "line": i})
 	return result
 
 
@@ -821,7 +849,7 @@ func _resolve_import_path(path: String, base_dir: String) -> String:
 func _gather_import_sources(source: String, base_dir: String, seen: Dictionary) -> PackedStringArray:
 	var result: PackedStringArray = []
 	for entry: Dictionary in _collect_imports(source):
-		var resolved: String = _resolve_import_path(entry["path"], base_dir)
+		var resolved: String = _resolve_import_path(entry["path"], base_dir).simplify_path()
 		if resolved.is_empty() or seen.has(resolved) or not FileAccess.file_exists(resolved):
 			continue
 		seen[resolved] = true

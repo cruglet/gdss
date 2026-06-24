@@ -91,6 +91,9 @@ var ref: Node:
 			return _ref_node_rt if is_instance_valid(_ref_node_rt) else null
 	set(v):
 		_gdss_node = null
+		var old: Node = _ref_node if Engine.is_editor_hint() else _ref_node_rt
+		if old != null and old != v:
+			_disconnect_ref_signals(old)
 		if v == null:
 			_ref_node = null
 			_ref_node_rt = null
@@ -159,6 +162,23 @@ func _connect_ref_signals(v: Node) -> void:
 			v.connect("tree_entered", _on_ref_tree_entered_rt)
 		if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
+
+
+func _disconnect_ref_signals(v: Node) -> void:
+	if not is_instance_valid(v):
+		return
+	if Engine.is_editor_hint():
+		if v.is_connected("renamed", _on_ref_renamed):
+			v.disconnect("renamed", _on_ref_renamed)
+		if v.is_connected("tree_entered", _on_ref_tree_entered):
+			v.disconnect("tree_entered", _on_ref_tree_entered)
+		if v.is_connected("tree_exiting", _on_ref_tree_exiting):
+			v.disconnect("tree_exiting", _on_ref_tree_exiting)
+	else:
+		if v.is_connected("tree_entered", _on_ref_tree_entered_rt):
+			v.disconnect("tree_entered", _on_ref_tree_entered_rt)
+		if v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
+			v.disconnect("tree_exiting", _on_ref_tree_exiting_rt)
 
 
 func _apply_dynamic_nonstyle(gdss_node: GdssNode, entry: Dictionary, state: String) -> void:
@@ -525,7 +545,7 @@ func _sync_active_state() -> void:
 func _start_transition(from_state: String, to_state: String, timing_state: String = "", on_finished: Callable = Callable()) -> void:
 	# timing_state selects which block supplies transition_time/func/type (defaults to
 	# to_state; on_show/on_hide events pass their own key). on_finished fires after the
-	# tween completes (or immediately if there's nothing to tween) — used to hide on on_hide.
+	# tween completes (or immediately if there's nothing to tween) - used to hide on on_hide.
 	var ts: String = timing_state if not timing_state.is_empty() else to_state
 	var transition_time: float = _get_parsed_val("transition_time", ts, 0.0)
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
@@ -688,6 +708,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 		_tween.kill()
 	_tween = pending_tween
 	_tween.finished.connect(func() -> void:
+		_tween = null
 		_tweened_values.clear()
 		_apply_overrides()
 		_safe_redraw()

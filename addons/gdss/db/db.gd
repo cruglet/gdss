@@ -18,7 +18,7 @@ extends Resource
 
 ## Public rebuild entry point. GDSS.get_db() builds via [method build_code]; this stays
 ## for any caller that wants to force a rebuild (there are no db resources to scan/save).
-func repopulate(_new: bool = false) -> void:
+func repopulate() -> void:
 	build_code()
 	for node: GdssNode in node_list.values():
 		node.invalidate_props_cache()
