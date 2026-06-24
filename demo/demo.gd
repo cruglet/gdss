@@ -17,7 +17,7 @@ extends Control
 @onready var menu_btn: Button = $App/AppMargin/AppCol/Showcase/FeatureRow/MenuBtn
 
 var _dark: bool = true
-var _menu: PopupMenu
+var _menu_panel: PanelContainer
 
 
 func _ready() -> void:
@@ -30,20 +30,37 @@ func _ready() -> void:
 	_build_menu()
 
 
-# A GDSS-styled PopupMenu (Window-derived) opened from the showcase row.
+# A Control-based glass dropdown (PanelContainer + GlassMenu class). Being a Control it
+# refracts the app behind it via liquid_blur and pops in/out with the on_show/on_hide
+# transition — unlike a Window PopupMenu, whose embedded subwindow can't sample the backdrop.
 func _build_menu() -> void:
-	_menu = PopupMenu.new()
-	_menu.add_item("Profile")
-	_menu.add_item("Settings")
-	_menu.add_separator()
-	_menu.add_item("Sign out")
-	menu_btn.add_child(_menu)
+	_menu_panel = PanelContainer.new()
+	_menu_panel.set_meta(GDSS.CLASSES_META, PackedStringArray(["GlassMenu"]))
+	_menu_panel.visible = false
+	var margin: MarginContainer = MarginContainer.new()
+	for side: String in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 8)
+	var col: VBoxContainer = VBoxContainer.new()
+	col.add_theme_constant_override("separation", 2)
+	for item: String in ["Profile", "Settings", "Sign out"]:
+		var row: Button = Button.new()
+		row.text = item
+		row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		row.set_meta(GDSS.CLASSES_META, PackedStringArray(["MenuItem"]))
+		row.pressed.connect(func() -> void: GDSS.hide(_menu_panel))
+		col.add_child(row)
+	margin.add_child(col)
+	_menu_panel.add_child(margin)
+	add_child(_menu_panel) # added last -> draws above the rest of the UI
 
 
 func _on_menu_pressed() -> void:
-	_menu.reset_size()
-	_menu.position = Vector2i(menu_btn.get_screen_position()) + Vector2i(0, int(menu_btn.size.y) + 4)
-	_menu.popup()
+	if _menu_panel.visible:
+		GDSS.hide(_menu_panel)
+		return
+	_menu_panel.reset_size()
+	_menu_panel.global_position = menu_btn.global_position + Vector2(0, menu_btn.size.y + 6)
+	GDSS.show(_menu_panel)
 
 
 # Plays the AnimCard's on_show()/on_hide() one-shot transition.

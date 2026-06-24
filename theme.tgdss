@@ -65,14 +65,30 @@ Button {
 		expand: 0 0 0 0
 	}
 
-	# Godot 4.7 offset_transform: lifts and scales up on hover. It's visual_only by
-	# default, so it never reflows the layout; the Button transition tweens it.
+	# Godot 4.7 transform (offset_transform): lifts and scales up on hover. It's
+	# visual_only by default, so it never reflows the layout; the Button transition tweens it.
 	LiftButton {
-		offset_transform_enabled: true
+		transform_enabled: true
 
 		:hover {
-			offset_transform_scale: 1.06 1.06
-			offset_transform_position: 0 -4
+			transform_scale: 1.06 1.06
+			transform_position: 0 -4
+		}
+	}
+
+	# Flat menu rows for the GlassMenu dropdown.
+	MenuItem {
+		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
+		font_color: $text
+		corner_radius: 8 8 8 8
+		padding: 12 12 7 7
+
+		:hover {
+			bg_color: alpha($text, 0.1)
+		}
+
+		:pressed {
+			bg_color: alpha($text, 0.16)
 		}
 	}
 
@@ -164,22 +180,46 @@ PanelContainer {
 	# toggling `visible`) plays these one-shot transitions; offset_transform keeps
 	# it visual-only so nothing reflows while it animates.
 	AnimCard {
-		bg_color: $surface_2
-		border_color: $accent
-		border: 2 2 2 2
-		corner_radius: 18 18 18 18
-		offset_transform_enabled: true
+		bg_color: liquid_blur(3.0, "#ffffff", 0.07, 1.2, 0.4)
+		border_color: alpha("#ffffff", 0.5)
+		border: 1 1 1 1
+		corner_radius: 22 22 22 22
+		transform_enabled: true
 
 		on_show() {
-			offset_transform_scale: 0.6 0.6
+			transform_scale: 0.6 0.6
 			transition_time: 0.3
 			transition_func: BACK
 			transition_type: EASE_OUT
 		}
 
 		on_hide() {
-			offset_transform_scale: 0.7 0.7
+			transform_scale: 0.7 0.7
 			transition_time: 0.16
+			transition_func: QUAD
+			transition_type: EASE_IN
+		}
+	}
+
+	# A Control-based glass dropdown menu. Being a Control, it refracts the app behind it
+	# (unlike a Window PopupMenu) and animates in/out with transform_scale.
+	GlassMenu {
+		bg_color: liquid_blur(3.0, "#ffffff", 0.06, 1.3, 0.4)
+		border_color: alpha("#ffffff", 0.45)
+		border: 1 1 1 1
+		corner_radius: 16 16 16 16
+		transform_enabled: true
+
+		on_show() {
+			transform_scale: 0.85 0.85
+			transition_time: 0.2
+			transition_func: BACK
+			transition_type: EASE_OUT
+		}
+
+		on_hide() {
+			transform_scale: 0.9 0.9
+			transition_time: 0.12
 			transition_func: QUAD
 			transition_type: EASE_IN
 		}
@@ -187,13 +227,15 @@ PanelContainer {
 }
 
 # @chunk Popups
-# PopupMenu is a Window-derived node (not a Control); GDSS styles its panel with
-# the same GPU pipeline when subwindows are embedded.
+# PopupMenu is a Window-derived node (not a Control). GDSS styles its panel, but a
+# blur/liquid_blur backdrop can't refract here: an embedded subwindow doesn't expose the
+# app behind it to the shader. So this gets a clean translucent surface; for an actual
+# glass popup use a Control (see the GlassMenu PanelContainer class below).
 PopupMenu {
-	bg_color: $surface_2
-	border_color: $border
+	bg_color: alpha($surface, 0.96)
+	border_color: alpha($text, 0.12)
 	border: 1 1 1 1
-	corner_radius: 12 12 12 12
+	corner_radius: 14 14 14 14
 	font_color: $text
 }
 

@@ -52,7 +52,6 @@ theme_override_constants/separation = 8
 [node name="Switch" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=531596294]
 layout_mode = 2
 mouse_default_cursor_shape = 2
-theme_override_font_sizes/font_size = 14
 text = "Switch to light"
 
 [node name="Randomize" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=1576448512]
@@ -95,7 +94,6 @@ theme_override_constants/separation = 8
 [node name="Button" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1052176415]
 layout_mode = 2
 mouse_default_cursor_shape = 2
-theme_override_font_sizes/font_size = 14
 text = "Button"
 
 [node name="GhostButton" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1174941247]
@@ -104,42 +102,43 @@ mouse_default_cursor_shape = 2
 text = "Ghost Button"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
-[node name="Showcase" type="VBoxContainer" parent="App/AppMargin/AppCol"]
+[node name="Showcase" type="VBoxContainer" parent="App/AppMargin/AppCol" unique_id=2102579630]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="ShowcaseTitle" type="Label" parent="App/AppMargin/AppCol/Showcase"]
+[node name="ShowcaseTitle" type="Label" parent="App/AppMargin/AppCol/Showcase" unique_id=1884438524]
 layout_mode = 2
+theme_override_font_sizes/font_size = 13
 text = "0.6 feature showcase"
 metadata/gdss_classes = PackedStringArray("SubtitleLabel")
 
-[node name="VariationLabel" type="Label" parent="App/AppMargin/AppCol/Showcase"]
+[node name="VariationLabel" type="Label" parent="App/AppMargin/AppCol/Showcase" unique_id=739063342]
 layout_mode = 2
 theme_type_variation = &"TooltipLabel"
+theme_override_font_sizes/font_size = 13
 text = "This line is styled via the \"TooltipLabel\" theme-type variation."
 
-[node name="FeatureRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Showcase"]
+[node name="FeatureRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Showcase" unique_id=84050427]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="LiftBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow"]
+[node name="LiftBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow" unique_id=1596019980]
 layout_mode = 2
+offset_transform_enabled = true
+tooltip_text = "HELLO WORLD!"
 mouse_default_cursor_shape = 2
-theme_override_font_sizes/font_size = 14
-text = "Hover me — I lift"
+text = "Hover me, I lift"
 metadata/gdss_classes = PackedStringArray("LiftButton")
 
-[node name="MenuBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow"]
+[node name="MenuBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow" unique_id=2014115717]
 layout_mode = 2
 mouse_default_cursor_shape = 2
-theme_override_font_sizes/font_size = 14
 text = "Open menu ▾"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
-[node name="ToggleBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow"]
+[node name="ToggleBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow" unique_id=1042949312]
 layout_mode = 2
 mouse_default_cursor_shape = 2
-theme_override_font_sizes/font_size = 14
 text = "Toggle card"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
@@ -240,10 +239,10 @@ horizontal_alignment = 2
 
 [node name="Frosted" type="Button" parent="." unique_id=1779138023]
 layout_mode = 0
-offset_left = 170.0
-offset_top = 250.0
-offset_right = 470.0
-offset_bottom = 470.0
+offset_left = 441.0
+offset_top = 244.0
+offset_right = 741.0
+offset_bottom = 464.0
 mouse_default_cursor_shape = 13
 script = ExtResource("3_drag")
 metadata/gdss_classes = PackedStringArray("FrostedButton")
@@ -312,7 +311,7 @@ text = "refracting glass"
 horizontal_alignment = 1
 metadata/gdss_classes = PackedStringArray("Caption")
 
-[node name="AnimCard" type="PanelContainer" parent="."]
+[node name="AnimCard" type="PanelContainer" parent="." unique_id=1221126606]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -326,33 +325,35 @@ offset_right = 190.0
 offset_bottom = 72.0
 grow_horizontal = 2
 grow_vertical = 2
+offset_transform_enabled = true
 metadata/gdss_classes = PackedStringArray("AnimCard")
 
-[node name="ACMargin" type="MarginContainer" parent="AnimCard"]
+[node name="ACMargin" type="MarginContainer" parent="AnimCard" unique_id=1958565163]
 layout_mode = 2
 theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 18
 
-[node name="ACCol" type="VBoxContainer" parent="AnimCard/ACMargin"]
+[node name="ACCol" type="VBoxContainer" parent="AnimCard/ACMargin" unique_id=1105724491]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="ACTitle" type="Label" parent="AnimCard/ACMargin/ACCol"]
+[node name="ACTitle" type="Label" parent="AnimCard/ACMargin/ACCol" unique_id=1766576370]
 layout_mode = 2
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
 text = "on_show() / on_hide()"
 
-[node name="ACBody" type="Label" parent="AnimCard/ACMargin/ACCol"]
+[node name="ACBody" type="Label" parent="AnimCard/ACMargin/ACCol" unique_id=1548629589]
 layout_mode = 2
-autowrap_mode = 2
+theme_override_font_sizes/font_size = 13
 text = "Pops in with BACK easing and shrinks away on hide — driven by GDSS.show() / GDSS.hide()."
+autowrap_mode = 2
 metadata/gdss_classes = PackedStringArray("SubtitleLabel")
 
 [connection signal="pressed" from="App/AppMargin/AppCol/Controls/Switch" to="." method="_on_switch_pressed"]
 [connection signal="pressed" from="App/AppMargin/AppCol/Controls/Randomize" to="." method="_on_randomize_pressed"]
-[connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/StrengthSlider" to="." method="_on_strength_slider_value_changed"]
-[connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/RefractionSlider" to="." method="_on_refraction_slider_value_changed"]
 [connection signal="pressed" from="App/AppMargin/AppCol/Showcase/FeatureRow/MenuBtn" to="." method="_on_menu_pressed"]
 [connection signal="pressed" from="App/AppMargin/AppCol/Showcase/FeatureRow/ToggleBtn" to="." method="_on_toggle_card_pressed"]
+[connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/StrengthSlider" to="." method="_on_strength_slider_value_changed"]
+[connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/RefractionSlider" to="." method="_on_refraction_slider_value_changed"]

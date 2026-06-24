@@ -595,11 +595,14 @@ static func _flush_global_refresh() -> void:
 	_global_flush_scheduled = false
 	var found_dead: bool = false
 	for handler: GdssPropHandler in GdssNodeHandler.get_all_handlers():
-		var item: CanvasItem = handler.ref
+		var item: Node = handler.ref
 		if item == null:
 			found_dead = true
 			continue
-		item.queue_redraw()
+		if item is CanvasItem:
+			(item as CanvasItem).queue_redraw()
+		else:
+			handler.emit_changed() # Window-derived nodes repaint via theme-changed notify
 	if found_dead:
 		GdssNodeHandler.mark_dirty()
 	_emit_globals_changed()

@@ -174,22 +174,23 @@ func unbind_canvas_item(canvas_item: Node) -> void:
 			canvas_item.disconnect(event, _update_state)
 
 
-# Godot 4.7 Control offset-transform properties, exposed to GDSS as animatable
-# node properties. Defaults match Godot's so a node that styles none of them keeps
-# an identity transform. Set offset_transform_enabled: true to activate.
+# Godot 4.7 Control offset-transform properties, exposed to GDSS as animatable node
+# properties under the shorter "transform_" prefix. _apply_theme_prop maps them back to
+# Godot's "offset_transform_*" Control properties. Defaults match Godot's, so a node that
+# styles none of them keeps an identity transform. Set transform_enabled: true to activate.
 static var _transform_props: Array[GdssProp] = []
 static func _get_transform_props() -> Array[GdssProp]:
 	if not _transform_props.is_empty():
 		return _transform_props
 	_transform_props = [
-		GdssProp.create("offset_transform_enabled", GDSS.Type.BOOLEAN, false, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("offset_transform_position", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("offset_transform_position_ratio", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("offset_transform_scale", GDSS.Type.VECTOR2, Vector2.ONE, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("offset_transform_rotation", GDSS.Type.FLOAT, 0.0, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("offset_transform_pivot", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("offset_transform_pivot_ratio", GDSS.Type.VECTOR2, Vector2(0.5, 0.5), GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("offset_transform_visual_only", GDSS.Type.BOOLEAN, true, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_enabled", GDSS.Type.BOOLEAN, false, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_position", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_position_ratio", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_scale", GDSS.Type.VECTOR2, Vector2.ONE, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_rotation", GDSS.Type.FLOAT, 0.0, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_pivot", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_pivot_ratio", GDSS.Type.VECTOR2, Vector2(0.5, 0.5), GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("transform_visual_only", GDSS.Type.BOOLEAN, true, GdssProp.Category.NODE_PROPERTY),
 	]
 	return _transform_props
 

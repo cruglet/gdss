@@ -384,8 +384,12 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 		GdssProp.Category.NODE_PROPERTY:
 			if prop.type == GDSS.Type.CURSOR:
 				control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
-			elif control.get(prop.name) != val:
-				control.set(prop.name, val)
+				return
+			# GDSS exposes the 4.7 Control transforms as "transform_*"; the real node
+			# property is "offset_transform_*".
+			var node_prop: String = "offset_" + prop.name if prop.name.begins_with("transform_") else prop.name
+			if control.get(node_prop) != val:
+				control.set(node_prop, val)
 
 
 func _override_color_if_custom(control: Variant, gdss_node: GdssNode, key: String, val: Color) -> void:

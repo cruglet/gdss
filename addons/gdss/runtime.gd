@@ -98,11 +98,12 @@ func _reload_parsed() -> void:
 
 func _refresh_all_handlers() -> void:
 	for handler: GdssPropHandler in GdssNodeHandler.get_all_handlers():
-		var item: CanvasItem = handler.ref
+		var item: Node = handler.ref
 		if item == null:
 			continue
-		handler.reapply()
-		item.queue_redraw()
+		handler.reapply() # reapply() emits changed, which repaints Window-derived nodes
+		if item is CanvasItem:
+			(item as CanvasItem).queue_redraw()
 
 
 func _ensure_parsed() -> void:
