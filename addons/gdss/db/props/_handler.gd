@@ -389,6 +389,13 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 			if prop.type == GDSS.Type.CURSOR:
 				control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
 				return
+			if prop.name == "opacity":
+				var mod: Color = control.modulate
+				var alpha: float = float(val)
+				if not is_equal_approx(mod.a, alpha):
+					mod.a = alpha
+					control.modulate = mod
+				return
 			# GDSS exposes the 4.7 Control transforms as "transform_*"; the real node
 			# property is "offset_transform_*".
 			var node_prop: String = "offset_" + prop.name if prop.name.begins_with("transform_") else prop.name
@@ -721,14 +728,26 @@ func _on_node_visibility_changed() -> void:
 
 # Snap to the on_show() values, then animate to the resting state.
 func _play_show() -> void:
+	_play_event("on_show")
+
+
+func _play_event(event_key: String) -> void:
 	var node: Node = ref
 	if node == null:
 		return
 	var gdss_node: GdssNode = _resolve_gdss_node()
-	if gdss_node == null or not _resolve_entry().has("on_show"):
+	if gdss_node == null or not _resolve_entry().has(event_key):
 		return
-	_start_transition("on_show", _resting_state(gdss_node, node), "on_show")
-	_apply_overrides(false) # apply the snapped (on_show) node-property values immediately
+	_start_transition(event_key, _resting_state(gdss_node, node), event_key)
+	_apply_overrides(false)
+
+
+func _ev_pressed() -> void: _play_event("on_pressed")
+func _ev_focus() -> void: _play_event("on_focus")
+func _ev_blur() -> void: _play_event("on_blur")
+func _ev_mouse_entered() -> void: _play_event("on_mouse_entered")
+func _ev_mouse_exited() -> void: _play_event("on_mouse_exited")
+func _ev_toggled(_on: bool) -> void: _play_event("on_toggled")
 
 
 # Re-show the node so the exit animation can play, animate resting -> on_hide() values,

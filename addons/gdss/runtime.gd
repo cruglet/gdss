@@ -169,6 +169,33 @@ func _try_bind(canvas_item: Node) -> void:
 			var primary: GdssPropHandler = GdssNodeHandler.get_primary_handler(canvas_item)
 			if primary != null:
 				primary._last_visible = canvas_item.visible
+	_connect_event_signals(canvas_item)
+
+
+const _EVENT_SIGNALS: Dictionary = {
+	"pressed": ["on_pressed", "_ev_pressed"],
+	"focus_entered": ["on_focus", "_ev_focus"],
+	"focus_exited": ["on_blur", "_ev_blur"],
+	"mouse_entered": ["on_mouse_entered", "_ev_mouse_entered"],
+	"mouse_exited": ["on_mouse_exited", "_ev_mouse_exited"],
+	"toggled": ["on_toggled", "_ev_toggled"],
+}
+
+
+func _connect_event_signals(canvas_item: Node) -> void:
+	var primary: GdssPropHandler = GdssNodeHandler.get_primary_handler(canvas_item)
+	if primary == null:
+		return
+	var entry: Dictionary = primary._resolve_entry()
+	if entry.is_empty():
+		return
+	for sig: String in _EVENT_SIGNALS:
+		var info: Array = _EVENT_SIGNALS[sig]
+		if not entry.has(info[0]) or not canvas_item.has_signal(sig):
+			continue
+		var cb: Callable = Callable(primary, info[1])
+		if not canvas_item.is_connected(sig, cb):
+			canvas_item.connect(sig, cb)
 
 
 # Runtime teardown counterpart to _on_node_added: a styled node that leaves the

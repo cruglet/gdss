@@ -195,6 +195,18 @@ static func _get_transform_props() -> Array[GdssProp]:
 	return _transform_props
 
 
+static var _visual_props: Array[GdssProp] = []
+static func _get_visual_props() -> Array[GdssProp]:
+	if not _visual_props.is_empty():
+		return _visual_props
+	_visual_props = [
+		GdssProp.create("modulate", GDSS.Type.COLOR, Color.WHITE, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("self_modulate", GDSS.Type.COLOR, Color.WHITE, GdssProp.Category.NODE_PROPERTY),
+		GdssProp.create("opacity", GDSS.Type.FLOAT, 1.0, GdssProp.Category.NODE_PROPERTY),
+	]
+	return _visual_props
+
+
 func get_enabled_props() -> Array[GdssProp]:
 	if not _props_dirty:
 		return _props_cache
@@ -212,6 +224,7 @@ func get_enabled_props() -> Array[GdssProp]:
 	props.append_array(unique_properties)
 	if base_type == &"Control" or ClassDB.is_parent_class(base_type, &"Control"):
 		props.append_array(_get_transform_props())
+		props.append_array(_get_visual_props())
 	for item_name: String in _constants:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
