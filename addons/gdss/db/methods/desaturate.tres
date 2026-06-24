@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_Desaturate" format=3]
-
-[ext_resource type="Script" path="res://addons/gdss/db/methods/desaturate.gd" id="1_desat"]
-
-[resource]
-script = ExtResource("1_desat")
-method_name = "desaturate"
-supported_prop_types = Array[int]([3])
-returns_texture = false

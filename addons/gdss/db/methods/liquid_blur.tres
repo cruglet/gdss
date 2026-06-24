@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_LiquidBlur" format=3]
-
-[ext_resource type="Script" path="res://addons/gdss/db/methods/liquid_blur.gd" id="1_glass"]
-
-[resource]
-script = ExtResource("1_glass")
-method_name = "liquid_blur"
-supported_prop_types = Array[int]([3])
-returns_texture = false

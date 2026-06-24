@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_Saturate" format=3]
-
-[ext_resource type="Script" path="res://addons/gdss/db/methods/saturate.gd" id="1_sat"]
-
-[resource]
-script = ExtResource("1_sat")
-method_name = "saturate"
-supported_prop_types = Array[int]([3])
-returns_texture = false

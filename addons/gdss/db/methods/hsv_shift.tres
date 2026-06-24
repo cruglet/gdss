@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_HsvShift" format=3]
-
-[ext_resource type="Script" path="res://addons/gdss/db/methods/hsv_shift.gd" id="1_hsvs"]
-
-[resource]
-script = ExtResource("1_hsvs")
-method_name = "hsv_shift"
-supported_prop_types = Array[int]([3])
-returns_texture = false

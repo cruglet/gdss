@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_Hsv" format=3 uid="uid://bxhe0trxoy761"]
-
-[ext_resource type="Script" uid="uid://dyr1b78cp8yip" path="res://addons/gdss/db/methods/hsv.gd" id="1_y1b4k"]
-
-[resource]
-script = ExtResource("1_y1b4k")
-method_name = "hsv"
-supported_prop_types = Array[int]([3])
-metadata/_custom_type_script = "uid://dyr1b78cp8yip"

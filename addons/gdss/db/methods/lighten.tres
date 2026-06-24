@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_Lighten" format=3]
-
-[ext_resource type="Script" path="res://addons/gdss/db/methods/lighten.gd" id="1_lgt"]
-
-[resource]
-script = ExtResource("1_lgt")
-method_name = "lighten"
-supported_prop_types = Array[int]([3])
-returns_texture = false

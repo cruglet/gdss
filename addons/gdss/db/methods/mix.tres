@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_Mix" format=3 uid="uid://5dkveqhu4tfo"]
-
-[ext_resource type="Script" uid="uid://tdk3sd8vx4pj" path="res://addons/gdss/db/methods/mix.gd" id="1_c66wc"]
-
-[resource]
-script = ExtResource("1_c66wc")
-method_name = "mix"
-supported_prop_types = Array[int]([3, 1])
-metadata/_custom_type_script = "uid://tdk3sd8vx4pj"

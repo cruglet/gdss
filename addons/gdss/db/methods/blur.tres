@@ -1,8 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_Blur" format=3 uid="uid://ewd1h1707ebr"]
-
-[ext_resource type="Script" uid="uid://bg8hs8a5ycus1" path="res://addons/gdss/db/methods/blur.gd" id="1_blur"]
-
-[resource]
-script = ExtResource("1_blur")
-method_name = "blur"
-supported_prop_types = Array[int]([3])

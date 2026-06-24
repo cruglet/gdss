@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="GdssMethod_Clamp" format=3 uid="uid://bvvowubwvk21u"]
-
-[ext_resource type="Script" uid="uid://pkp5busxteur" path="res://addons/gdss/db/methods/clamp.gd" id="1_tnyya"]
-
-[resource]
-script = ExtResource("1_tnyya")
-method_name = "clamp"
-supported_prop_types = Array[int]([1, 0])
-metadata/_custom_type_script = "uid://pkp5busxteur"

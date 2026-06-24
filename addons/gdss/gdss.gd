@@ -616,9 +616,8 @@ static func _get_gdss_methods() -> Dictionary[String, GdssMethod]:
 static func get_db() -> GdssDB:
 	if _db != null and not _db.node_list.is_empty():
 		return _db
-	var db: GdssDB = load("res://addons/gdss/db/db.tres")
-	if db != null:
-		_db = db
-	if _db == null:
-		_db = GdssDB.new()
+	# Built entirely in code (props/components/methods + ThemeDB-derived nodes), so the
+	# plugin ships no db resources to load, keep in sync, or repopulate. Cached for the run.
+	_db = GdssDB.new()
+	_db.build_code()
 	return _db
