@@ -665,7 +665,10 @@ func _matches(candidate: String, word: String) -> bool:
 
 
 func _get_icon(icon_name: StringName) -> Texture2D:
-	return EditorInterface.get_editor_theme().get_icon(icon_name, &"EditorIcons")
+	var theme: Theme = EditorInterface.get_editor_theme()
+	if not theme.has_icon(icon_name, &"EditorIcons"):
+		icon_name = &"Node"
+	return theme.get_icon(icon_name, &"EditorIcons")
 
 
 func _first_separator(s: String) -> int:
