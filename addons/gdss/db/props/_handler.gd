@@ -101,16 +101,23 @@ var ref: Node:
 			return
 		if Engine.is_editor_hint():
 			_ref_node = v
+			if v.is_inside_tree():
+				_ref_path = v.get_path()
 		else:
 			_ref_node_rt = v
-		if v.is_inside_tree():
-			_ref_path = v.get_path()
 		_connect_ref_signals(v)
 
 
+# When _seeding, the setter just records the state (direct backing write, no transition
+# or apply) so bind() can target a state inside its own bulk; reads stay direct field
+# access (no getter), keeping the per-frame _draw / _get_state path fast.
+var _seeding: bool = false
 var current_state: String = "":
 	set(s):
 		if s == current_state:
+			return
+		if _seeding:
+			current_state = s
 			return
 		var previous: String = current_state
 		if not previous.is_empty():
@@ -159,8 +166,8 @@ func _connect_ref_signals(v: Node) -> void:
 		if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
 			interp.parsed_changed.connect(_on_parsed_changed)
 	else:
-		if not v.is_connected("tree_entered", _on_ref_tree_entered_rt):
-			v.connect("tree_entered", _on_ref_tree_entered_rt)
+		# Only tree_exiting matters at runtime (frees the GPU child item for reparent);
+		# the entered hook only refreshed the editor-only _ref_path, so it isn't connected.
 		if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 
@@ -176,8 +183,6 @@ func _disconnect_ref_signals(v: Node) -> void:
 		if v.is_connected("tree_exiting", _on_ref_tree_exiting):
 			v.disconnect("tree_exiting", _on_ref_tree_exiting)
 	else:
-		if v.is_connected("tree_entered", _on_ref_tree_entered_rt):
-			v.disconnect("tree_entered", _on_ref_tree_entered_rt)
 		if v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 			v.disconnect("tree_exiting", _on_ref_tree_exiting_rt)
 
@@ -235,20 +240,13 @@ func _on_ref_tree_exiting() -> void:
 		_ref_path = _ref_node.get_path()
 
 
-func _on_ref_tree_entered_rt() -> void:
-	if is_instance_valid(_ref_node_rt):
-		_ref_path = _ref_node_rt.get_path()
-
-
 func _on_ref_tree_exiting_rt() -> void:
-	# Reparent-safe: free the GPU child item (re-created on the next draw under the
-	# new canvas parent) and refresh the cached path, but KEEP _ref_node_rt so the
-	# handler still resolves while detached and dead-handler pruning works. Authoritative
-	# teardown (registry slot, per-node caches, instance vars) happens via the runtime's
-	# tree_exited hook -> GdssNodeHandler.purge once the node is truly gone.
+	# Reparent-safe: free the GPU child item (re-created on the next draw under the new
+	# canvas parent), but KEEP _ref_node_rt so the handler still resolves while detached
+	# and dead-handler pruning works. Authoritative teardown (registry slot, per-node
+	# caches, instance vars) happens via the runtime's tree_exited hook ->
+	# GdssNodeHandler.purge once the node is truly gone.
 	_free_gpu_ci()
-	if is_instance_valid(_ref_node_rt) and _ref_node_rt.is_inside_tree():
-		_ref_path = _ref_node_rt.get_path()
 
 
 func _invalidate_entry_cache() -> void:
@@ -329,12 +327,22 @@ func _apply_overrides(clear: bool = true) -> void:
 		return
 	if not GDSS.resolve_mode(node):
 		return
-	_applying = true
 	var control: Variant = node
 	# Batch every add/remove theme-override into a single theme-changed notification
 	# per node, instead of one propagation per override. Big win when many nodes bind
 	# at once (scene instantiate / re-enter), where per-override propagation is O(depth).
 	control.begin_bulk_theme_override()
+	_apply_overrides_unwrapped(gdss_node, control, clear)
+	control.end_bulk_theme_override()
+
+
+# Core override application without the bulk wrapper, so bind() can fold the stylebox
+# adds and the value overrides for a node into one shared bulk (one theme-changed
+# notification per fresh bind). Callers guarantee ref / gdss_node / enabled mode.
+func _apply_overrides_unwrapped(gdss_node: GdssNode, control: Variant, clear: bool) -> void:
+	if _applying:
+		return
+	_applying = true
 	if clear:
 		_clear_overrides()
 	var entry: Dictionary = _resolve_entry()

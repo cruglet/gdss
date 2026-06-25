@@ -199,9 +199,9 @@ static func bind(canvas_item: Node, apply: bool = true, gdss_node: GdssNode = nu
 	if not (canvas_item is Control or canvas_item is Window):
 		return
 	var control: Variant = canvas_item
-	# Batch every stylebox-override add into one theme-changed notification (a Button
-	# binds the same handler to ~9 state slots - 9 propagations become 1). The
-	# value overrides are applied after, each in its own bulk inside _apply_overrides.
+	# One bulk-override region wraps the stylebox adds (a Button binds the same handler to
+	# ~9 state slots) and, for stateful nodes, the value overrides too - so a fresh bind
+	# costs a single theme-changed notification instead of one per override group.
 	control.begin_bulk_theme_override()
 	var handlers: Array[GdssPropHandler] = []
 	if gdss_node.is_static:
@@ -217,11 +217,23 @@ static func bind(canvas_item: Node, apply: bool = true, gdss_node: GdssNode = nu
 		var first_slot: String = states[0] if not states.is_empty() else ""
 		var handler: GdssPropHandler = _obtain(canvas_item, control, "", first_slot)
 		for state: String in states:
-			if control.get_theme_stylebox(state) != handler:
+			if not control.has_theme_stylebox_override(state) or control.get_theme_stylebox(state) != handler:
 				control.add_theme_stylebox_override(state, handler)
 		handlers.append(handler)
+		# Seed the resting interaction state (without firing the setter) and apply in this
+		# same bulk. The caller's follow-up update_state then no-ops; a reparent, where the
+		# state is unchanged and the overrides are intact, skips the re-apply entirely.
+		if apply and canvas_item is CanvasItem:
+			var active: String = gdss_node.get_active_state(canvas_item as CanvasItem)
+			if handler.current_state != active:
+				var clear: bool = not handler.current_state.is_empty()
+				handler._seeding = true
+				handler.current_state = active
+				handler._seeding = false
+				handler._apply_overrides_unwrapped(gdss_node, control, clear)
+				(canvas_item as CanvasItem).queue_redraw()
 	control.end_bulk_theme_override()
-	if apply:
+	if apply and gdss_node.is_static:
 		for handler: GdssPropHandler in handlers:
 			handler._apply_overrides(false)
 	gdss_node.bind_canvas_item(canvas_item)
@@ -240,7 +252,7 @@ static func _obtain(canvas_item: Node, control: Variant, state: String, slot: St
 		_all_dirty = true
 	slots[state] = handler
 	handler.ref = canvas_item
-	if not slot.is_empty() and control.get_theme_stylebox(slot) != handler:
+	if not slot.is_empty() and (not control.has_theme_stylebox_override(slot) or control.get_theme_stylebox(slot) != handler):
 		control.add_theme_stylebox_override(slot, handler)
 	_connect_editor(handler)
 	return handler
