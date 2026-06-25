@@ -28,4 +28,5 @@ func call_method(args: Array[Variant], node_id: int = -1, state_key: String = ""
 	glass.refraction = maxf(float(args[3]), 0.0) if args.size() > 3 and args[3] != null else 1.0
 	glass.highlight = maxf(float(args[4]), 0.0) if args.size() > 4 and args[4] != null else 0.3
 	glass.saturation = 1.2
+	glass.strength_end = glass.strength
 	return glass

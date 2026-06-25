@@ -23,4 +23,5 @@ func call_method(args: Array[Variant], node_id: int = -1, state_key: String = ""
 	blur.refraction = 0.0
 	blur.highlight = 0.0
 	blur.saturation = 1.0
+	blur.strength_end = blur.strength
 	return blur

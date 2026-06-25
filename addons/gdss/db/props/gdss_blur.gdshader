@@ -30,6 +30,8 @@ uniform sampler2D u_tex : source_color, hint_default_white;
 uniform sampler2D u_screen : hint_screen_texture, filter_linear_mipmap;
 uniform vec4 u_fill_glass = vec4(4.0, 0.0, 0.0, 1.0);
 uniform vec4 u_border_glass = vec4(4.0, 0.0, 0.0, 1.0);
+uniform vec4 u_fill_glass2 = vec4(0.0, 0.0, 0.0, 1.0);
+uniform vec4 u_border_glass2 = vec4(0.0, 0.0, 0.0, 1.0);
 
 // Lens falloff f(x) = 1 - b * (c * e)^(-d*x - a), raised to u_lens_power. Tuned
 // to OverShifted/LiquidGlass defaults: small near the rim, ~1 in the centre.
@@ -137,6 +139,14 @@ void fragment() {
 		fill_col = texture(u_tex, UV);
 	} else if (u_fill_mode == 4) {
 		fill_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_fill_a, u_fill_glass, SCREEN_PIXEL_SIZE);
+	} else if (u_fill_mode == 5) {
+		vec2 dir = u_grad_p1 - u_grad_p0;
+		float denom = max(dot(dir, dir), EPS);
+		float t = clamp(dot(UV - u_grad_p0, dir) / denom, 0.0, 1.0);
+		float span = max(u_grad_offsets.y - u_grad_offsets.x, EPS);
+		float k = clamp((t - u_grad_offsets.x) / span, 0.0, 1.0);
+		vec4 g = vec4(mix(u_fill_glass.x, u_fill_glass2.x, k), u_fill_glass.yzw);
+		fill_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_fill_a, g, SCREEN_PIXEL_SIZE);
 	} else {
 		fill_col = u_fill_a;
 	}
@@ -149,6 +159,12 @@ void fragment() {
 		border_col = mix(u_border_a, u_border_b, t);
 	} else if (u_border_mode == 2) {
 		border_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_border_a, u_border_glass, SCREEN_PIXEL_SIZE);
+	} else if (u_border_mode == 3) {
+		vec2 dir = u_border_p1 - u_border_p0;
+		float denom = max(dot(dir, dir), EPS);
+		float t = clamp(dot(UV - u_border_p0, dir) / denom, 0.0, 1.0);
+		vec4 g = vec4(mix(u_border_glass.x, u_border_glass2.x, t), u_border_glass.yzw);
+		border_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_border_a, g, SCREEN_PIXEL_SIZE);
 	} else {
 		border_col = u_border_a;
 	}

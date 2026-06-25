@@ -98,7 +98,8 @@ func _build_methods_code() -> void:
 		GdssMethod_Complement.new(), GdssMethod_Contrast.new(), GdssMethod_Darken.new(),
 		GdssMethod_Desaturate.new(), GdssMethod_Grayscale.new(), GdssMethod_Hsv.new(),
 		GdssMethod_HsvShift.new(), GdssMethod_Invert.new(), GdssMethod_Lighten.new(),
-		GdssMethod_LinearGradient.new(), GdssMethod_LiquidBlur.new(), GdssMethod_Mix.new(),
+		GdssMethod_LinearBlurGradient.new(), GdssMethod_LinearGradient.new(),
+		GdssMethod_LiquidBlur.new(), GdssMethod_Mix.new(),
 		GdssMethod_RadialGradient.new(), GdssMethod_Rgba.new(), GdssMethod_Saturate.new(),
 		GdssMethod_Texture.new(),
 	]

@@ -1404,9 +1404,16 @@ func _push_fill(bg: Variant, pad_frac: Vector2) -> void:
 		_set_param(&"u_fill_mode", grad.mode)
 	elif bg is GdssBlur:
 		var blur: GdssBlur = bg as GdssBlur
-		_set_param(&"u_fill_mode", 4)
 		_set_param(&"u_fill_a", blur.tint)
 		_set_param(&"u_fill_glass", Vector4(blur.strength, blur.refraction, blur.highlight, blur.saturation))
+		if blur.strength_end != blur.strength:
+			_set_param(&"u_fill_mode", 5)
+			_set_param(&"u_fill_glass2", Vector4(blur.strength_end, blur.refraction, blur.highlight, blur.saturation))
+			_set_param(&"u_grad_offsets", blur.grad_offsets)
+			_set_param(&"u_grad_p0", _remap_uv(blur.grad_p0, pad_frac))
+			_set_param(&"u_grad_p1", _remap_uv(blur.grad_p1, pad_frac))
+		else:
+			_set_param(&"u_fill_mode", 4)
 	elif bg is Texture2D:
 		_set_param(&"u_fill_mode", 3)
 		_set_param(&"u_tex", bg as Texture2D)
@@ -1428,9 +1435,15 @@ func _push_border(border_src: Variant, pad_frac: Vector2) -> void:
 		_set_param(&"u_border_p1", _remap_uv(grad.p1, pad_frac))
 	elif border_src is GdssBlur:
 		var blur: GdssBlur = border_src as GdssBlur
-		_set_param(&"u_border_mode", 2)
 		_set_param(&"u_border_a", blur.tint)
 		_set_param(&"u_border_glass", Vector4(blur.strength, blur.refraction, blur.highlight, blur.saturation))
+		if blur.strength_end != blur.strength:
+			_set_param(&"u_border_mode", 3)
+			_set_param(&"u_border_glass2", Vector4(blur.strength_end, blur.refraction, blur.highlight, blur.saturation))
+			_set_param(&"u_border_p0", _remap_uv(blur.grad_p0, pad_frac))
+			_set_param(&"u_border_p1", _remap_uv(blur.grad_p1, pad_frac))
+		else:
+			_set_param(&"u_border_mode", 2)
 	elif border_src is Color:
 		_set_param(&"u_border_mode", 0)
 		_set_param(&"u_border_a", border_src as Color)
