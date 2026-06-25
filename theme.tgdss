@@ -5,7 +5,7 @@
 	description: "GDSS showcase: schemes, methods, glass, calc(), opacity, and events."
 	default_scheme: dark
 	author: "Cruglet"
-	version: "0.7.0"
+	version: "0.7.1"
 }
 
 # @chunk Palette
@@ -214,6 +214,10 @@ PanelContainer {
 			transition_func: QUAD
 			transition_type: EASE_IN
 		}
+	}
+
+	GradientCard {
+		bg_color: linear_blur_gradient()
 	}
 
 	# A Control-based glass dropdown menu. Being a Control, it refracts the app behind it
