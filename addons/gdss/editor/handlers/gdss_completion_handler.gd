@@ -148,6 +148,9 @@ func _update_code_hint(_word: String) -> void:
 		return
 	var before_paren: String = line.substr(0, paren_pos).strip_edges()
 	var method_name: String = before_paren.split(" ")[-1].split(":")[-1].strip_edges()
+	if method_name == "calc":
+		_show_hint("calc( expression )  —  + - * /, numbers, $variables")
+		return
 	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
 	if method == null:
 		_hide_hint()
@@ -366,6 +369,10 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 				_completion_color,
 				_get_icon(&"MemberMethod")
 			)
+
+	if effective_type == GDSS.Type.INT or effective_type == GDSS.Type.FLOAT or effective_type == GDSS.Type.COMPOSITE4:
+		if _matches("calc", word):
+			editor.add_code_completion_option(CodeEdit.KIND_FUNCTION, "calc(…)", "calc(", _completion_color, _get_icon(&"MemberMethod"))
 
 	if prop_def == null:
 		return
@@ -609,6 +616,8 @@ func _word_at(line: int, column: int) -> String:
 func _hover_doc(word: String) -> String:
 	if word.is_empty():
 		return ""
+	if word == "calc":
+		return "calc( expression )  —  arithmetic with + - * / and $variables"
 	var method: GdssMethod = GDSS._get_gdss_methods().get(word)
 	if method != null:
 		return method.get_code_hint()

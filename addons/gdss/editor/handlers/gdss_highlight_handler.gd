@@ -76,6 +76,8 @@ func _build_from_objects() -> void:
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if not _value_functions.has(method.method_name):
 			_value_functions.append(method.method_name)
+	if not _value_functions.has("calc"):
+		_value_functions.append("calc")
 
 
 func _setup_highlighter() -> void:
@@ -311,6 +313,11 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 
 			if c == ";":
 				result[i] = {"color": col_default}
+				i += 1
+				continue
+
+			if c == "+" or c == "*" or c == "/":
+				result[i] = {"color": col_symbol}
 				i += 1
 				continue
 
