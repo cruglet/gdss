@@ -124,6 +124,26 @@ static func refresh(canvas_item: Node) -> void:
 		(canvas_item as CanvasItem).queue_redraw()
 
 
+## Lightweight refresh for an instance-variable change: re-applies only the node's
+## dynamic non-style overrides (same work the coalesced global-var flush does) and
+## queues a redraw so style props re-resolve, instead of a full invalidate + reapply.
+static func refresh_vars(canvas_item: Node) -> void:
+	if canvas_item == null:
+		return
+	var slots: Dictionary = get_slots(canvas_item)
+	for state: String in slots:
+		var handler: GdssPropHandler = slots[state]
+		if handler != null:
+			handler.refresh_globals()
+	if canvas_item is CanvasItem:
+		(canvas_item as CanvasItem).queue_redraw()
+	else:
+		for state: String in slots:
+			var handler: GdssPropHandler = slots[state]
+			if handler != null:
+				handler.emit_changed()
+
+
 static func rebind_tree(node: Node) -> void:
 	if node == null:
 		return

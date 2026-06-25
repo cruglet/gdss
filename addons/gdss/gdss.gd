@@ -339,7 +339,7 @@ static func set_instance_var(node: Node, name: String, value: Variant) -> void:
 		GdssInterpreter._instance_vars[id] = {}
 	GdssInterpreter._instance_vars[id][name] = value
 	if node is CanvasItem:
-		GdssNodeHandler.refresh(node as CanvasItem)
+		GdssNodeHandler.refresh_vars(node as CanvasItem)
 
 
 ## Retrieves the value of a variable for a [b]specific Node instance[/b].
@@ -389,14 +389,14 @@ static func clear_instance_var(node: Node, name: String) -> void:
 		if overrides.is_empty():
 			GdssInterpreter._instance_vars.erase(id)
 	if node is CanvasItem:
-		GdssNodeHandler.refresh(node as CanvasItem)
+		GdssNodeHandler.refresh_vars(node as CanvasItem)
 
 
 ## Clears all GDSS instance variables from a specific node and reapplies its style.
 static func clear_instance_vars(node: Node) -> void:
 	GdssInterpreter._instance_vars.erase(node.get_instance_id())
 	if node is CanvasItem:
-		GdssNodeHandler.refresh(node as CanvasItem)
+		GdssNodeHandler.refresh_vars(node as CanvasItem)
 
 
 ## Forces [param node] to re-evaluate its GDSS styling immediately.
