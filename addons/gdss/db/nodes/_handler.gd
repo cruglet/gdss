@@ -205,10 +205,13 @@ static func bind(canvas_item: Node, apply: bool = true, gdss_node: GdssNode = nu
 	control.begin_bulk_theme_override()
 	var handlers: Array[GdssPropHandler] = []
 	if gdss_node.is_static:
-		for state: String in gdss_node.states:
-			var handler: GdssPropHandler = _obtain(canvas_item, control, state, state)
-			handler._slot_state = state
-			handlers.append(handler)
+		if gdss_node.states.is_empty():
+			handlers.append(_obtain(canvas_item, control, "", ""))
+		else:
+			for state: String in gdss_node.states:
+				var handler: GdssPropHandler = _obtain(canvas_item, control, state, state)
+				handler._slot_state = state
+				handlers.append(handler)
 	else:
 		var states: PackedStringArray = gdss_node.states
 		var first_slot: String = states[0] if not states.is_empty() else ""
