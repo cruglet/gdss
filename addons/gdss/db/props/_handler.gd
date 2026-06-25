@@ -360,11 +360,24 @@ func _apply_overrides_unwrapped(gdss_node: GdssNode, control: Variant, clear: bo
 			continue
 		if not styled.has(prop.name):
 			continue
+		# The parser fills every enabled prop with its default (for transitions/completion),
+		# so the styled set is mostly injected defaults the stylesheet never wrote. Applying
+		# one is always a no-op - either there's no override to set, or a state change already
+		# cleared the old one - so skip it without resolving. Tweened props are exempt (their
+		# live value is in _tweened_values, not the entry). The typeof guard keeps the equality
+		# safe: a user value can be a method/sentinel (Dictionary/String) while the default is
+		# a value type, and == across those types is a runtime error.
+		if not _tweened_values.has(prop.name):
+			var raw: Variant = _raw_entry_val(entry, state, prop.name)
+			if raw == null:
+				continue
+			var def: Variant = prop.get_default_value()
+			if typeof(raw) == typeof(def) and raw == def:
+				continue
 		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		if val == null:
 			val = prop.get_default_value()
 		_apply_theme_prop(prop, control, gdss_node, val)
-	control.end_bulk_theme_override()
 	_applying = false
 
 
