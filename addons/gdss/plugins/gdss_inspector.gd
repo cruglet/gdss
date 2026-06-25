@@ -13,6 +13,8 @@ class GdssModeProperty extends EditorProperty:
 		_option.add_item("Inherit", GDSS.GdssMode.INHERIT)
 		_option.add_item("Enable", GDSS.GdssMode.ENABLE)
 		_option.add_item("Disable", GDSS.GdssMode.DISABLE)
+		_option.add_item("Enable (Self)", GDSS.GdssMode.ENABLE_SELF)
+		_option.add_item("Disable (Self)", GDSS.GdssMode.DISABLE_SELF)
 		add_child(_option)
 		add_focusable(_option)
 		_option.item_selected.connect(_on_selected)
@@ -48,6 +50,8 @@ class GdssModeProperty extends EditorProperty:
 				var mode: int = int(current.get_meta(GDSS.MODE_META))
 				if mode == GDSS.GdssMode.ENABLE or mode == GDSS.GdssMode.DISABLE:
 					return "" if current == node else "  (from %s)" % current.name
+				if current == node and (mode == GDSS.GdssMode.ENABLE_SELF or mode == GDSS.GdssMode.DISABLE_SELF):
+					return ""
 			current = current.get_parent()
 		return "  (project default)"
 

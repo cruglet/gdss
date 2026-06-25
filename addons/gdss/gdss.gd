@@ -13,6 +13,8 @@ enum GdssMode {
 	INHERIT,
 	ENABLE,
 	DISABLE,
+	DISABLE_SELF = 3,
+	ENABLE_SELF = 4,
 }
 
 enum Type {
@@ -529,6 +531,9 @@ static func is_gdss_enabled(node: Node) -> bool:
 ## parent. With nothing set anywhere, the project's root default applies (disabled
 ## by default, so GDSS stays opt-in). A node carried over from an older project
 ## (in the legacy "gdss" group with no explicit mode) counts as enabled.
+## [br][br]
+## [code]ENABLE_SELF[/code]/[code]DISABLE_SELF[/code] apply only to the node they
+## are set on; descendants ignore them and keep resolving from further up the tree.
 static func resolve_mode(node: Node) -> bool:
 	if node == null:
 		return false
@@ -542,6 +547,11 @@ static func resolve_mode(node: Node) -> bool:
 				return true
 			if mode == GdssMode.DISABLE:
 				return false
+			if current == node:
+				if mode == GdssMode.ENABLE_SELF:
+					return true
+				if mode == GdssMode.DISABLE_SELF:
+					return false
 		current = current.get_parent()
 	return _root_default_enabled()
 
@@ -579,6 +589,24 @@ static func enable_gdss(node: Node) -> void:
 ## [/codeblock]
 static func disable_gdss(node: Node) -> void:
 	set_gdss_mode(node, GdssMode.DISABLE)
+
+
+## Disables GDSS styling on [param node] itself only, leaving its descendants
+## unaffected (sets its mode to [code]DISABLE_SELF[/code]).
+## [codeblock]
+## GDSS.disable_gdss_self(my_panel)
+## [/codeblock]
+static func disable_gdss_self(node: Node) -> void:
+	set_gdss_mode(node, GdssMode.DISABLE_SELF)
+
+
+## Enables GDSS styling on [param node] itself only, without forcing it onto its
+## descendants (sets its mode to [code]ENABLE_SELF[/code]).
+## [codeblock]
+## GDSS.enable_gdss_self(my_panel)
+## [/codeblock]
+static func enable_gdss_self(node: Node) -> void:
+	set_gdss_mode(node, GdssMode.ENABLE_SELF)
 
 
 static func gpu_panels_enabled() -> bool:
