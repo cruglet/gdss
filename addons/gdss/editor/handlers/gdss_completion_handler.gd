@@ -37,6 +37,12 @@ const BUILTIN_COLORS: Array[String] = [
 func _ready() -> void:
 	gdss_editor = get_parent() as GdssEditor
 	_completion_color = EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/completion_font_color")
+	# CodeEdit keeps its own string/comment delimiters (separate from the syntax highlighter)
+	# to drive in-string detection for completion and auto-brace. Without registering "#",
+	# an apostrophe or quote inside a comment (e.g. "It's") opens a phantom string, so every
+	# following line reads as in-string and CodeEdit wraps completion candidates in quotes.
+	if not editor.has_comment_delimiter("#"):
+		editor.add_comment_delimiter("#", "")
 	_build_from_objects()
 	editor.code_completion_requested.connect(_on_completion_requested)
 	editor.text_changed.connect(_on_text_changed)
