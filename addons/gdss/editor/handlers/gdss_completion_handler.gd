@@ -494,6 +494,22 @@ func _get_context() -> Dictionary:
 			})
 			continue
 
+		# Event blocks (on_show() { … }) use the call form, so they match neither selector
+		# regex above. Track them as a frame inheriting the enclosing style; otherwise the
+		# block's closing brace pops the parent selector and desyncs every following subclass,
+		# whose style then fails to resolve and falls back to a merged/top-level completion.
+		if line.ends_with("{"):
+			var head: String = line.substr(0, line.length() - 1).strip_edges()
+			var paren: int = head.find("(")
+			if paren > 0 and head.ends_with(")") and head.substr(0, paren).is_valid_identifier():
+				var top: Dictionary = stack.back() if stack.size() > 0 else {}
+				stack.push_back({
+					"style": top.get("style", ""),
+					"variant": head.substr(0, paren),
+					"in_variant": true
+				})
+				continue
+
 		if "}" in line:
 			if stack.size() > 0:
 				stack.pop_back()
