@@ -11,6 +11,8 @@ var _rebuilding: bool = false
 var _rebuild_queued: bool = false
 var _state_icon: Texture2D
 var _fallback_icon: Texture2D
+var _event_icon: Texture2D
+var _scheme_icon: Texture2D
 var _white_icon_cache: Dictionary = {}
 
 
@@ -40,7 +42,9 @@ func _ready() -> void:
 
 func _load_icons() -> void:
 	_state_icon = _get_icon(&"Signal")
-	_fallback_icon = _get_icon(&"StyleBoxFlat")
+	_fallback_icon = _get_icon(&"Theme")
+	_event_icon = _get_icon(&"Slot")
+	_scheme_icon = _get_icon(&"BlitMaterial")
 
 
 func _queue_rebuild() -> void:
@@ -79,6 +83,12 @@ func _rebuild() -> void:
 func _decorate(item: TreeItem, label: String, depth: int, base_selector: String) -> void:
 	if label.begins_with(":"):
 		item.set_icon(0, _state_icon)
+		return
+	if label.contains("("):
+		item.set_icon(0, _event_icon)
+		return
+	if label.begins_with("@scheme"):
+		item.set_icon(0, _scheme_icon)
 		return
 	if depth <= 1:
 		item.set_icon(0, _selector_icon(label))
