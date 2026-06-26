@@ -14,6 +14,7 @@ var _property_meta: Dictionary = {}
 var _user_variables: Array[String] = []
 var _variable_lines: Dictionary = {}
 var _methods: Array[GdssMethod] = []
+var _events: Dictionary = {}
 var _last_hover_word: String = ""
 
 var _completion_color: Color
@@ -32,6 +33,15 @@ const BUILTIN_COLORS: Array[String] = [
 	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
 ]
+
+# Event blocks (on_show() { … }) map to the node signal that drives them at runtime
+# (see runtime.gd _EVENT_SIGNALS). Only the visibility events are completed: interaction
+# events (hover/press/focus/…) are expressed as state selectors (:hover, :pressed, :focus)
+# instead. Gated per-node on the signal, so it's skipped where unavailable (e.g. Windows).
+const _EVENT_SIGNALS: Dictionary = {
+	"on_show": "visibility_changed",
+	"on_hide": "visibility_changed",
+}
 
 
 func _ready() -> void:
@@ -62,6 +72,7 @@ func _build_from_objects() -> void:
 	_states.clear()
 	_property_meta.clear()
 	_methods.clear()
+	_events.clear()
 
 	var prefixes: Array[String] = ["@", ":", "\t", "$"]
 	
@@ -76,6 +87,12 @@ func _build_from_objects() -> void:
 		_properties[style_name] = props_dict.keys()
 		_states[style_name] = obj.states
 
+		var events: Array[String] = []
+		for event_name: String in _EVENT_SIGNALS:
+			if ClassDB.class_has_signal(obj.base_type, _EVENT_SIGNALS[event_name]):
+				events.append(event_name)
+		_events[style_name] = events
+
 		if style_name.length() > 0 and not prefixes.has(style_name[0]):
 			prefixes.append(style_name[0])
 
@@ -84,6 +101,12 @@ func _build_from_objects() -> void:
 				var pre: String = key.substr(0, l)
 				if not prefixes.has(pre):
 					prefixes.append(pre)
+
+	for event_name: String in _EVENT_SIGNALS:
+		for l: int in range(1, min(4, event_name.length()) + 1):
+			var pre: String = event_name.substr(0, l)
+			if not prefixes.has(pre):
+				prefixes.append(pre)
 
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		_methods.append(method)
@@ -249,6 +272,7 @@ func _update_completions(word: String) -> void:
 				_complete_states(word.trim_prefix(":"), context.get("style", ""))
 			else:
 				_complete_properties(word, context.get("style", ""))
+				_complete_events(word, context.get("style", ""))
 		"variant_decl":
 			_complete_states(word.trim_prefix(":"), context.get("style", ""))
 		"property_value", "property_value_filled":
@@ -306,6 +330,13 @@ func _complete_properties(word: String, style_name: String) -> void:
 			var sub: String = prop_def.composite_of[idx]
 			if _matches(sub, word):
 				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, _get_icon(&"int"))
+
+
+func _complete_events(word: String, style_name: String) -> void:
+	var events: Array = _events.get(style_name, [])
+	for event_name: String in events:
+		if _matches(event_name, word):
+			editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, event_name + "()", event_name + "() ", _completion_color, _get_icon(&"Signal"))
 
 
 func _complete_states(word: String, style_name: String) -> void:

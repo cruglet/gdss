@@ -112,6 +112,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var value_functions: Array[String] = []
 	var col_variable: Color
 	var col_function: Color
+	var col_event: Color
 	var global_variables: Array[String] = []
 	var local_variables: Array[String] = []
 	var instance_variables: Array[String] = []
@@ -157,6 +158,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		col_default = s.get_setting("text_editor/theme/highlighting/text_color")
 		col_function = s.get_setting("text_editor/theme/highlighting/gdscript/global_function_color")
 		col_variable = s.get_setting("text_editor/theme/highlighting/function_color")
+		col_event = s.get_setting("text_editor/theme/highlighting/function_color")
 		col_global = s.get_setting("text_editor/theme/highlighting/string_placeholder_color")
 		col_instance = s.get_setting("text_editor/theme/highlighting/string_placeholder_color")
 		col_critical = _get_marker_color(s, "critical_color")
@@ -369,6 +371,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					result[start] = {"color": col_control_flow if valid else col_default}
 				elif nodes.has(word):
 					result[start] = {"color": col_type}
+				elif after.begins_with("(") and after.rfind("{") > after.rfind(")"):
+					result[start] = {"color": col_event}
 				elif is_before_brace:
 					result[start] = {"color": col_user_type}
 				elif in_value:
