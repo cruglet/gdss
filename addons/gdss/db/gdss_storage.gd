@@ -147,13 +147,8 @@ static func load_data(path: String = "") -> Dictionary:
 	return result
 
 
-static func write_compiled(source: String, data: Dictionary, source_modified: int) -> void:
-	var file: FileAccess = FileAccess.open(get_compiled_path(), FileAccess.WRITE)
-	if file == null:
-		printerr("[GDSS] Failed to write compiled theme: ", get_compiled_path())
-		return
-	file.store_var({"source": source, "data": data, "source_modified": source_modified})
-	file.close()
+static func compiled_bytes(source: String, data: Dictionary, source_modified: int) -> PackedByteArray:
+	return var_to_bytes({"source": source, "data": data, "source_modified": source_modified})
 
 
 static func load_compiled() -> Dictionary:
@@ -163,6 +158,7 @@ static func load_compiled() -> Dictionary:
 	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return {}
-	var result: Variant = file.get_var()
+	var raw: PackedByteArray = file.get_buffer(file.get_length())
 	file.close()
+	var result: Variant = bytes_to_var(raw)
 	return result if result is Dictionary else {}

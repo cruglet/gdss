@@ -644,7 +644,6 @@ func save_current(source: String) -> void:
 	parsed = interpret(source)
 	GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
-	GdssStorage.write_compiled(source, _build_bundle(), _last_modified)
 	saved.emit()
 	parsed_changed.emit()
 	if Engine.is_editor_hint():
@@ -681,28 +680,7 @@ func _load_from_file() -> void:
 	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
 	source_loaded.emit(source)
 	parsed = interpret(source)
-	_ensure_compiled_fresh(source)
 	parsed_changed.emit()
-
-
-func _build_bundle() -> Dictionary:
-	return {
-		"parsed": parsed,
-		"global_defaults": _global_defaults,
-		"instance_defaults": _instance_defaults,
-		"local_vars": _local_vars,
-		"schemes": schemes,
-		"meta": meta,
-	}
-
-
-func _ensure_compiled_fresh(source: String) -> void:
-	if not Engine.is_editor_hint():
-		return
-	var compiled: Dictionary = GdssStorage.load_compiled()
-	if not compiled.is_empty() and compiled.get("source_modified", -1) == _last_modified:
-		return
-	GdssStorage.write_compiled(source, _build_bundle(), _last_modified)
 
 
 func replace_meta_block(source: String, new_block: String) -> Dictionary:
@@ -747,10 +725,10 @@ func strip_meta_blocks(source: String) -> String:
 	return "\n".join(out)
 
 
-static func compile_for_export() -> void:
+static func compile_for_export() -> PackedByteArray:
 	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
 	if source.is_empty():
-		return
+		return PackedByteArray()
 	var snapshot: Dictionary = {
 		"globals": globals.duplicate(true),
 		"global_defaults": _global_defaults.duplicate(true),
@@ -772,9 +750,10 @@ static func compile_for_export() -> void:
 		"schemes": schemes.duplicate(true),
 		"meta": meta.duplicate(true),
 	}
-	GdssStorage.write_compiled(source, bundle, FileAccess.get_modified_time(GdssStorage.get_save_path()))
+	var bytes: PackedByteArray = GdssStorage.compiled_bytes(source, bundle, FileAccess.get_modified_time(GdssStorage.get_save_path()))
 	worker.free()
 	_restore_statics(snapshot)
+	return bytes
 
 
 static func _restore_statics(snapshot: Dictionary) -> void:
