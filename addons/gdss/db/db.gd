@@ -96,7 +96,8 @@ func _build_methods_code() -> void:
 	var methods: Array[GdssMethod] = [
 		GdssMethod_Alpha.new(), GdssMethod_Blur.new(), GdssMethod_Clamp.new(),
 		GdssMethod_Complement.new(), GdssMethod_Contrast.new(), GdssMethod_Darken.new(),
-		GdssMethod_Desaturate.new(), GdssMethod_Grayscale.new(), GdssMethod_Hsv.new(),
+		GdssMethod_Desaturate.new(), GdssMethod_Font.new(),
+		GdssMethod_Grayscale.new(), GdssMethod_Hsv.new(),
 		GdssMethod_HsvShift.new(), GdssMethod_Invert.new(), GdssMethod_Lighten.new(),
 		GdssMethod_LinearBlurGradient.new(), GdssMethod_LinearGradient.new(),
 		GdssMethod_LiquidBlur.new(), GdssMethod_Mix.new(),
