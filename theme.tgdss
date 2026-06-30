@@ -5,7 +5,7 @@
 	description: "GDSS showcase: schemes, methods, glass, calc(), opacity, and events."
 	default_scheme: dark
 	author: "Cruglet"
-	version: "0.7.1"
+	version: "0.7.3"
 }
 
 # @chunk Palette
