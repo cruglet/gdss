@@ -1227,7 +1227,7 @@ func _ensure_selector(result: Dictionary, selector: String, _known_states: Packe
 	result[selector] = {"all": {}, "_classes": {}}
 
 
-func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray) -> int:
+func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray, owner_is_base_type: bool = false) -> int:
 	while pos < tokens.size():
 		var token: String = tokens[pos]
 		if token == "}":
@@ -1253,9 +1253,9 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 				else:
 					var child_container: Dictionary = _get_child_container(result, parent_selector)
 					_ensure_selector(child_container, raw_selector, known_states)
-					if not parent_selector.is_empty():
+					if not parent_selector.is_empty() and not owner_is_base_type:
 						_inherit(child_container, raw_selector, result[parent_selector])
-					_parse_block(block_tokens, 0, child_container, raw_selector, known_states)
+					_parse_block(block_tokens, 0, child_container, raw_selector, known_states, parent_selector.is_empty())
 			pos = block_end
 			continue
 
@@ -1297,9 +1297,9 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 			var child_name: String = token.substr(1) if is_variation else token
 			var child_container: Dictionary = _get_variation_container(result, parent_selector) if is_variation else _get_child_container(result, parent_selector)
 			_ensure_selector(child_container, child_name, known_states)
-			if not parent_selector.is_empty():
+			if not parent_selector.is_empty() and not owner_is_base_type:
 				_inherit(child_container, child_name, result[parent_selector])
-			pos = _parse_block(tokens, pos + 2, child_container, child_name, known_states)
+			pos = _parse_block(tokens, pos + 2, child_container, child_name, known_states, parent_selector.is_empty())
 			continue
 
 		if next == ":":
@@ -1409,6 +1409,8 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 				return _parse_method_call(tokens, pos)
 			break
 		if lookahead == "{":
+			break
+		if lookahead == ",":
 			break
 		if lookahead == ":" and (lookahead2 == "{" or known_states.has(lookahead2.to_lower())):
 			parts.append(t)
