@@ -524,14 +524,20 @@ func check_errors(source: String) -> Array[Array]:
 			var base_part: String = selector_part.substr(0, colon_pos if colon_pos != -1 else selector_part.length()).strip_edges()
 			var state_part: String = selector_part.substr(colon_pos + 1).strip_edges().to_lower() if colon_pos != -1 else ""
 
+			var frame_selector: String = ""
+			var has_selector: bool = false
 			for sel: String in base_part.split(","):
 				var s: String = sel.strip_edges()
 				if s.is_empty():
 					continue
-				if brace_depth == 1:
-					if not known_selectors.has(s):
-						errors.append(["Unknown selector '%s'" % s, i])
-				selector_stack.append(s)
+				if brace_depth == 1 and not known_selectors.has(s):
+					errors.append(["Unknown selector '%s'" % s, i])
+				frame_selector = s
+				has_selector = true
+			if has_selector:
+				selector_stack.append(frame_selector)
+			else:
+				selector_stack.append(selector_stack.back() if not selector_stack.is_empty() else "")
 
 			for raw_state: String in state_part.split(",", false):
 				var state_name: String = raw_state.strip_edges().trim_prefix(":").strip_edges()
