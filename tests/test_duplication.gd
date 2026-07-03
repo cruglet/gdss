@@ -58,3 +58,26 @@ func run(t: TC) -> void:
 		if label_slots.get(state) == clone_slots.get(state):
 			shared = true
 	t.check(not shared, "static clone shares no handler slot with its source")
+	label.free()
+	label_clone.free()
+	await _detach_foreign(t)
+
+
+func _detach_foreign(t: TC) -> void:
+	var source: Button = t.make_styled_button()
+	var source_handler: GdssPropHandler = GdssNodeHandler.get_primary_handler(source)
+	t.check(source_handler != null, "detach: source binds")
+	source_handler.draw(source.get_canvas_item(), Rect2(0, 0, 100, 30))
+	var pending: Button = Button.new()
+	pending.add_theme_stylebox_override("normal", source_handler)
+	pending.add_theme_stylebox_override("hover", source_handler)
+	t.check(pending.get_theme_stylebox("normal") == source_handler, "detach: clone starts with the foreign handler")
+	GdssNodeHandler.detach_foreign_handlers(pending)
+	t.check(not pending.has_theme_stylebox_override("normal"), "detach: foreign handler dropped from clone")
+	t.check(not pending.has_theme_stylebox_override("hover"), "detach: foreign handler dropped from every state")
+	if GDSS.gpu_panels_enabled():
+		t.check(source_handler._gpu_parent == source.get_canvas_item(), "detach: source keeps its own GPU item")
+	GdssNodeHandler.detach_foreign_handlers(source)
+	t.check(source.get_theme_stylebox("normal") == source_handler, "detach: a node keeps a handler bound to itself")
+	pending.free()
+	source.free()

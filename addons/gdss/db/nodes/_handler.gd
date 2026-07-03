@@ -175,6 +175,31 @@ static func apply_mode(canvas_item: Node) -> void:
 		unbind(canvas_item)
 
 
+static func detach_foreign_handlers(node: Node, gdss_node: GdssNode = null) -> void:
+	if not (node is Control or node is Window):
+		return
+	if gdss_node == null:
+		gdss_node = GDSS._get_gdss_nodes().get(node.get_class())
+	if gdss_node == null or gdss_node.states.is_empty():
+		return
+	var control: Variant = node
+	var removed: bool = false
+	for state: String in gdss_node.states:
+		if not control.has_theme_stylebox_override(state):
+			continue
+		var sb: StyleBox = control.get_theme_stylebox(state)
+		if not sb is GdssPropHandler:
+			continue
+		var owner_node: Node = (sb as GdssPropHandler).ref
+		if owner_node != null and owner_node != node:
+			if not removed:
+				control.begin_bulk_theme_override()
+				removed = true
+			control.remove_theme_stylebox_override(state)
+	if removed:
+		control.end_bulk_theme_override()
+
+
 static func set_mode_state(node: Node, mode: GDSS.GdssMode, in_legacy_group: bool) -> void:
 	if mode == GDSS.GdssMode.INHERIT:
 		if node.has_meta(GDSS.MODE_META):

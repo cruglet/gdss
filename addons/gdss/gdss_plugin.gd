@@ -160,6 +160,7 @@ func _on_editor_node_added(node: Node) -> void:
 		return
 	if node != scene_root and not scene_root.is_ancestor_of(node):
 		return
+	GdssNodeHandler.detach_foreign_handlers(node)
 	GdssNodeHandler.apply_mode.call_deferred(node as CanvasItem)
 
 
