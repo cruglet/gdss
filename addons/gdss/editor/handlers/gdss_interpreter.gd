@@ -18,8 +18,8 @@ static var meta: Dictionary = {}
 static var current_scheme: String = ""
 var _last_modified: int = 0
 var _saving: bool = false
-var _cached_states: PackedStringArray = []
-var _composite_map_cache: Dictionary = {}
+static var _cached_states: PackedStringArray = []
+static var _composite_map: Dictionary = {}
 static var _inst: GdssInterpreter
 
 static var _re_global: RegEx = RegEx.create_from_string(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
@@ -29,9 +29,6 @@ static var _re_bad_annotation: RegEx = RegEx.create_from_string(r"^@(\w+)")
 static var _re_scheme: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
 static var _re_meta: RegEx = RegEx.create_from_string(r"^@meta\b")
 static var _re_import: RegEx = RegEx.create_from_string(r"^@import\s+([\"'])(.+?)\1")
-
-var _defaults: Dictionary[String, Dictionary] = {}
-
 
 static func get_instance() -> GdssInterpreter:
 	return _inst
@@ -60,7 +57,6 @@ func _ready() -> void:
 
 
 func initialize() -> void:
-	_build_defaults()
 	_load_from_file()
 	if Engine.is_editor_hint() and OS.is_debug_build() and Engine.has_singleton(&"EditorInterface"):
 		var fs: Object = Engine.get_singleton(&"EditorInterface").call(&"get_resource_filesystem")
@@ -78,14 +74,14 @@ func _notification(what: int) -> void:
 		_force_viewport_redraw()
 
 
-func _get_known_states() -> PackedStringArray:
+static func _get_known_states() -> PackedStringArray:
 	if not _cached_states.is_empty():
 		return _cached_states
 	_cached_states = _collect_states()
 	return _cached_states
 
 
-func _collect_states() -> PackedStringArray:
+static func _collect_states() -> PackedStringArray:
 	var states: PackedStringArray = []
 	for node: GdssNode in GDSS._get_gdss_nodes().values():
 		for variant: String in node.states:
@@ -106,7 +102,7 @@ func _on_editor_file_saved() -> void:
 		_force_viewport_redraw()
 
 
-func _strip_line_comment(s: String) -> String:
+static func _strip_line_comment(s: String) -> String:
 	var in_quote: bool = false
 	var quote_char: String = ""
 	var i: int = 0
@@ -125,7 +121,7 @@ func _strip_line_comment(s: String) -> String:
 
 
 # Splits a line into statements on unquoted semicolons, treating ";" like a newline.
-func _split_statements(line: String) -> PackedStringArray:
+static func _split_statements(line: String) -> PackedStringArray:
 	var result: PackedStringArray = []
 	var current: String = ""
 	var in_quote: bool = false
@@ -436,6 +432,8 @@ func check_errors(source: String) -> Array[Array]:
 	var brace_depth: int = 0
 	var brace_open_lines: Array[int] = []
 	var selector_stack: Array[String] = []
+	var type_stack: Array[String] = []
+	var event_stack: Array[bool] = []
 	var declared_vars: Dictionary = {}
 	var declared_globals: Dictionary = {}
 	var declared_instances: Dictionary = {}
@@ -512,6 +510,10 @@ func check_errors(source: String) -> Array[Array]:
 						brace_open_lines.pop_back()
 					if not selector_stack.is_empty():
 						selector_stack.pop_back()
+					if not type_stack.is_empty():
+						type_stack.pop_back()
+					if not event_stack.is_empty():
+						event_stack.pop_back()
 
 		if stripped.ends_with("{"):
 			var selector_part: String = stripped.trim_suffix("{").strip_edges()
@@ -534,10 +536,18 @@ func check_errors(source: String) -> Array[Array]:
 					errors.append(["Unknown selector '%s'" % s, i])
 				frame_selector = s
 				has_selector = true
+			var enclosing_type: String = type_stack.back() if not type_stack.is_empty() else ""
 			if has_selector:
 				selector_stack.append(frame_selector)
+				if brace_depth == 1 and known_selectors.has(frame_selector):
+					type_stack.append(frame_selector)
+				else:
+					type_stack.append(enclosing_type)
+				event_stack.append(frame_selector.ends_with("()"))
 			else:
 				selector_stack.append(selector_stack.back() if not selector_stack.is_empty() else "")
+				type_stack.append(enclosing_type)
+				event_stack.append(event_stack.back() if not event_stack.is_empty() else false)
 
 			for raw_state: String in state_part.split(",", false):
 				var state_name: String = raw_state.strip_edges().trim_prefix(":").strip_edges()
@@ -566,7 +576,9 @@ func check_errors(source: String) -> Array[Array]:
 				continue
 
 			var current_selector: String = selector_stack.back() if not selector_stack.is_empty() else ""
-			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(current_selector) if not current_selector.is_empty() else null
+			var current_type: String = type_stack.back() if not type_stack.is_empty() else ""
+			var in_event: bool = event_stack.back() if not event_stack.is_empty() else false
+			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(current_type) if not current_type.is_empty() else null
 
 			if gdss_node != null:
 				var all_props: Array[GdssProp] = gdss_node.get_enabled_props()
@@ -575,6 +587,9 @@ func check_errors(source: String) -> Array[Array]:
 					if p.name == prop_name or p.composite_of.has(prop_name) or p.category_subproperties.has(prop_name):
 						matched_prop = p
 						break
+
+				if matched_prop == null and in_event and prop_name.begins_with("transition_"):
+					matched_prop = GDSS.get_db().property_list.get(prop_name)
 
 				if matched_prop == null:
 					errors.append(["Unknown property '%s' for selector '%s'" % [prop_name, current_selector], i])
@@ -648,7 +663,8 @@ func save_current(source: String) -> void:
 	_saving = true
 	GdssStorage.write_source(GdssStorage.get_save_path(), source)
 	parsed = interpret(source)
-	GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta)
+	if check_errors(source).is_empty():
+		GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	saved.emit()
 	parsed_changed.emit()
@@ -681,7 +697,6 @@ func _load_from_file() -> void:
 	if Engine.is_editor_hint():
 		GdssStorage.sync_save_path()
 	_cached_states.clear()
-	_composite_map_cache.clear()
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
 	source_loaded.emit(source)
@@ -735,6 +750,13 @@ static func compile_for_export() -> PackedByteArray:
 	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
 	if source.is_empty():
 		return PackedByteArray()
+	var checker: GdssInterpreter = GdssInterpreter.new()
+	var errors: Array[Array] = checker.check_errors(source)
+	checker.free()
+	if not errors.is_empty():
+		var first: Array = errors.front()
+		push_error("[GDSS] Stylesheet has %d validation error(s); export aborted. First: line %d: %s" % [errors.size(), int(first.back()) + 1, str(first.front())])
+		return PackedByteArray()
 	var snapshot: Dictionary = {
 		"globals": globals.duplicate(true),
 		"global_defaults": _global_defaults.duplicate(true),
@@ -745,9 +767,7 @@ static func compile_for_export() -> PackedByteArray:
 		"parsed": parsed.duplicate(true),
 		"current_scheme": current_scheme,
 	}
-	var worker: GdssInterpreter = GdssInterpreter.new()
-	worker._build_defaults()
-	var compiled_parsed: Dictionary = worker.interpret(source)
+	var compiled_parsed: Dictionary = interpret(source)
 	var bundle: Dictionary = {
 		"parsed": compiled_parsed,
 		"global_defaults": _global_defaults.duplicate(true),
@@ -757,7 +777,6 @@ static func compile_for_export() -> PackedByteArray:
 		"meta": meta.duplicate(true),
 	}
 	var bytes: PackedByteArray = GdssStorage.compiled_bytes(source, bundle, FileAccess.get_modified_time(GdssStorage.get_save_path()))
-	worker.free()
 	_restore_statics(snapshot)
 	return bytes
 
@@ -777,44 +796,23 @@ static func _restore_statics(snapshot: Dictionary) -> void:
 		schemes[key] = snapshot["schemes"][key]
 
 
-func _build_defaults() -> void:
-	_composite_map_cache.clear()
-	_cached_states.clear()
-	var db: GdssDB = GDSS.get_db()
-	if db.node_list.is_empty():
-		db.repopulate()
-	var known_states: PackedStringArray = _collect_states()
-	_cached_states = known_states
-	for selector: String in GDSS._get_gdss_nodes():
-		var node: GdssNode = GDSS._get_gdss_nodes().get(selector)
-		_ensure_selector(_defaults, selector, known_states)
-		if node.base_type != StringName("") and node.base_type != StringName(selector):
-			_defaults[selector]["base"] = String(node.base_type)
-		for prop: GdssProp in node.get_enabled_props():
-			_defaults[selector]["all"][prop.name] = prop.get_default_value()
+static func _get_composite_map() -> Dictionary:
+	if not _composite_map.is_empty():
+		return _composite_map
+	for prop: GdssProp in GDSS.get_db().property_list.values():
+		if not prop.is_composite():
+			continue
+		for i: int in prop.composite_of.size():
+			_composite_map[prop.composite_of[i]] = {"prop": prop.name, "index": i}
+	return _composite_map
 
 
-func _build_composite_map(selector: String) -> Dictionary:
-	if _composite_map_cache.has(selector):
-		return _composite_map_cache[selector]
-	var map: Dictionary = {}
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(selector)
-	if gdss_node != null:
-		for prop: GdssProp in gdss_node.get_enabled_props():
-			if not prop.is_composite():
-				continue
-			for i: int in prop.composite_of.size():
-				map[prop.composite_of[i]] = {"prop": prop.name, "index": i}
-	_composite_map_cache[selector] = map
-	return map
-
-
-func interpret(source: String) -> Dictionary[String, Dictionary]:
+static func interpret(source: String) -> Dictionary[String, Dictionary]:
 	var seen: Dictionary = {}
 	return interpret_all(_gather_import_sources(source, GdssStorage.get_save_path().get_base_dir(), seen))
 
 
-func _collect_imports(source: String) -> Array:
+static func _collect_imports(source: String) -> Array:
 	var result: Array = []
 	var lines: PackedStringArray = source.split("\n")
 	for i: int in lines.size():
@@ -825,13 +823,13 @@ func _collect_imports(source: String) -> Array:
 	return result
 
 
-func _resolve_import_path(path: String, base_dir: String) -> String:
+static func _resolve_import_path(path: String, base_dir: String) -> String:
 	if path.begins_with("res://") or path.begins_with("user://") or path.is_absolute_path():
 		return path
 	return base_dir.path_join(path)
 
 
-func _gather_import_sources(source: String, base_dir: String, seen: Dictionary) -> PackedStringArray:
+static func _gather_import_sources(source: String, base_dir: String, seen: Dictionary) -> PackedStringArray:
 	var result: PackedStringArray = []
 	for entry: Dictionary in _collect_imports(source):
 		var resolved: String = _resolve_import_path(entry["path"], base_dir).simplify_path()
@@ -844,7 +842,7 @@ func _gather_import_sources(source: String, base_dir: String, seen: Dictionary) 
 	return result
 
 
-func _replace_eq_separators(line: String) -> String:
+static func _replace_eq_separators(line: String) -> String:
 	var result: String = ""
 	var in_quote: bool = false
 	var quote_char: String = ""
@@ -875,7 +873,7 @@ func _replace_eq_separators(line: String) -> String:
 	return result
 
 
-func _normalize_separators(source: String) -> String:
+static func _normalize_separators(source: String) -> String:
 	var out: PackedStringArray = []
 	for line: String in source.split("\n"):
 		out.append(_replace_eq_separators(line))
@@ -920,7 +918,7 @@ func _check_separator_mix(source: String, errors: Array[Array]) -> void:
 		errors.append(["This file mixes ':' and '=' separators. Use one or the other.", maxi(mix_line, 0)])
 
 
-func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]:
+static func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]:
 	globals.clear()
 	_global_defaults.clear()
 	_instance_defaults.clear()
@@ -940,13 +938,6 @@ func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]
 			local_vars[key] = file_locals[key]
 	_instance_scheme_base = _instance_defaults.duplicate(true)
 	var result: Dictionary[String, Dictionary] = {}
-	for selector: String in _defaults:
-		result[selector] = {}
-		for state: String in _defaults[selector]:
-			if _defaults[selector][state] is Dictionary:
-				result[selector][state] = _defaults[selector][state].duplicate()
-			else:
-				result[selector][state] = _defaults[selector][state]
 	for source: String in cleaned_sources:
 		var tokens: Array[String] = _tokenize(source)
 		tokens = _substitute_globals(tokens, local_vars)
@@ -954,7 +945,7 @@ func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]
 	return result
 
 
-func _accumulate_globals(source: String) -> Dictionary:
+static func _accumulate_globals(source: String) -> Dictionary:
 	var local_vars: Dictionary = {}
 	var known_states: PackedStringArray = _get_known_states()
 	for line: String in source.split("\n"):
@@ -1008,7 +999,7 @@ static func scheme_keys() -> PackedStringArray:
 	return PackedStringArray(keys.keys())
 
 
-func _strip_annotation_blocks(source: String) -> Dictionary:
+static func _strip_annotation_blocks(source: String) -> Dictionary:
 	var lines: PackedStringArray = source.split("\n")
 	var out_lines: PackedStringArray = []
 	var blocks: Array[Dictionary] = []
@@ -1060,7 +1051,7 @@ func _strip_annotation_blocks(source: String) -> Dictionary:
 	return {"cleaned": "\n".join(out_lines), "blocks": blocks}
 
 
-func _extract_block_entry(content: String, line: int) -> Dictionary:
+static func _extract_block_entry(content: String, line: int) -> Dictionary:
 	var clean: String = content.trim_prefix("{").trim_suffix("}").strip_edges()
 	var colon: int = clean.find(":")
 	if colon <= 0:
@@ -1072,7 +1063,7 @@ func _extract_block_entry(content: String, line: int) -> Dictionary:
 	}
 
 
-func _brace_delta(s: String) -> int:
+static func _brace_delta(s: String) -> int:
 	var depth: int = 0
 	var in_quote: bool = false
 	var quote_char: String = ""
@@ -1090,7 +1081,7 @@ func _brace_delta(s: String) -> int:
 	return depth
 
 
-func _accumulate_blocks(blocks: Array, known_states: PackedStringArray) -> void:
+static func _accumulate_blocks(blocks: Array, known_states: PackedStringArray) -> void:
 	for block: Dictionary in blocks:
 		if block["malformed"]:
 			continue
@@ -1110,11 +1101,11 @@ func _accumulate_blocks(blocks: Array, known_states: PackedStringArray) -> void:
 				meta[entry["key"]] = _parse_meta_value(entry["value_str"])
 
 
-func _parse_meta_value(value_str: String) -> String:
+static func _parse_meta_value(value_str: String) -> String:
 	return value_str.trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 
 
-func _tokenize_value(raw: String) -> Array[String]:
+static func _tokenize_value(raw: String) -> Array[String]:
 	var tokens: Array[String] = []
 	var current: String = ""
 	var in_quote: bool = false
@@ -1146,7 +1137,7 @@ func _tokenize_value(raw: String) -> Array[String]:
 	return tokens
 
 
-func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array[String]:
+static func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array[String]:
 	var result: Array[String] = []
 	for token: String in tokens:
 		if token.begins_with("$"):
@@ -1168,7 +1159,7 @@ func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -> Array
 	return result
 
 
-func _collect_selector_group(tokens: Array[String], pos: int, known_states: PackedStringArray) -> Array:
+static func _collect_selector_group(tokens: Array[String], pos: int, known_states: PackedStringArray) -> Array:
 	var selectors: Array[String] = []
 	while pos < tokens.size():
 		var token: String = tokens[pos]
@@ -1187,7 +1178,7 @@ func _collect_selector_group(tokens: Array[String], pos: int, known_states: Pack
 	return [selectors, pos]
 
 
-func _tokenize(source: String) -> Array[String]:
+static func _tokenize(source: String) -> Array[String]:
 	var tokens: Array[String] = []
 	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
@@ -1224,7 +1215,7 @@ func _tokenize(source: String) -> Array[String]:
 	return tokens
 
 
-func _ensure_selector(result: Dictionary, selector: String, _known_states: PackedStringArray) -> void:
+static func _ensure_selector(result: Dictionary, selector: String, _known_states: PackedStringArray) -> void:
 	# States are created lazily by _set_prop / _inherit as they're actually styled, so an
 	# entry no longer carries ~70 empty state dicts (smaller parsed data + far cheaper
 	# entry scans, e.g. the styled-prop set). Unstyled states resolve via "all"/default.
@@ -1233,7 +1224,7 @@ func _ensure_selector(result: Dictionary, selector: String, _known_states: Packe
 	result[selector] = {"all": {}, "_classes": {}}
 
 
-func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray, owner_is_base_type: bool = false) -> int:
+static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray, owner_is_base_type: bool = false) -> int:
 	while pos < tokens.size():
 		var token: String = tokens[pos]
 		if token == "}":
@@ -1323,7 +1314,7 @@ func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_se
 	return pos
 
 
-func _get_child_container(result: Dictionary, parent_selector: String) -> Dictionary:
+static func _get_child_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
 	if not result[parent_selector].has("_classes"):
@@ -1334,7 +1325,7 @@ func _get_child_container(result: Dictionary, parent_selector: String) -> Dictio
 # Container for theme-type-variation blocks ("/FlatButton { }"), kept separate
 # from "_classes" so variations are auto-applied from a node's theme_type_variation
 # rather than from explicit gdss_classes.
-func _get_variation_container(result: Dictionary, parent_selector: String) -> Dictionary:
+static func _get_variation_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
 	if not result[parent_selector].has("_variations"):
@@ -1342,7 +1333,7 @@ func _get_variation_container(result: Dictionary, parent_selector: String) -> Di
 	return result[parent_selector]["_variations"]
 
 
-func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
+static func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
 	var i: int = pos
 	while i < tokens.size():
 		if tokens[i] == "{":
@@ -1361,7 +1352,7 @@ func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
 	return false
 
 
-func _find_block_end(tokens: Array[String], pos: int) -> int:
+static func _find_block_end(tokens: Array[String], pos: int) -> int:
 	var depth: int = 1
 	while pos < tokens.size():
 		if tokens[pos] == "{":
@@ -1374,7 +1365,7 @@ func _find_block_end(tokens: Array[String], pos: int) -> int:
 	return pos
 
 
-func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, selector: String, state: String, known_states: PackedStringArray) -> int:
+static func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, selector: String, state: String, known_states: PackedStringArray) -> int:
 	while pos < tokens.size():
 		var token: String = tokens[pos]
 		if token == "}":
@@ -1397,7 +1388,7 @@ func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, sele
 	return pos
 
 
-func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringArray) -> Array:
+static func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringArray) -> Array:
 	var parts: Array[String] = []
 	while pos < tokens.size():
 		var t: String = tokens[pos]
@@ -1429,7 +1420,7 @@ func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringA
 	return [_parse_value(parts), pos]
 
 
-func _parse_method_call(tokens: Array[String], pos: int) -> Array:
+static func _parse_method_call(tokens: Array[String], pos: int) -> Array:
 	var method_name: String = tokens[pos]
 	pos += 2
 	var args: Array = []
@@ -1458,7 +1449,7 @@ func _parse_method_call(tokens: Array[String], pos: int) -> Array:
 	return [{"__gdss_method__": method_name, "args": args}, pos]
 
 
-func _parse_calc(tokens: Array[String], pos: int) -> Array:
+static func _parse_calc(tokens: Array[String], pos: int) -> Array:
 	var depth: int = 0
 	var close: int = pos + 1
 	while close < tokens.size():
@@ -1476,7 +1467,7 @@ func _parse_calc(tokens: Array[String], pos: int) -> Array:
 	return [{"__gdss_calc__": ast}, close + 1]
 
 
-func _calc_lex(raw: String) -> Array[String]:
+static func _calc_lex(raw: String) -> Array[String]:
 	var out: Array[String] = []
 	var i: int = 0
 	var n: int = raw.length()
@@ -1499,17 +1490,17 @@ func _calc_lex(raw: String) -> Array[String]:
 	return out
 
 
-func _calc_peek(state: Dictionary) -> String:
+static func _calc_peek(state: Dictionary) -> String:
 	return state["toks"][state["i"]] if state["i"] < (state["toks"] as Array).size() else ""
 
 
-func _calc_advance(state: Dictionary) -> String:
+static func _calc_advance(state: Dictionary) -> String:
 	var t: String = _calc_peek(state)
 	state["i"] = state["i"] + 1
 	return t
 
 
-func _calc_expr(state: Dictionary) -> Variant:
+static func _calc_expr(state: Dictionary) -> Variant:
 	var node: Variant = _calc_term(state)
 	while _calc_peek(state) == "+" or _calc_peek(state) == "-":
 		var op: String = _calc_advance(state)
@@ -1517,7 +1508,7 @@ func _calc_expr(state: Dictionary) -> Variant:
 	return node
 
 
-func _calc_term(state: Dictionary) -> Variant:
+static func _calc_term(state: Dictionary) -> Variant:
 	var node: Variant = _calc_factor(state)
 	while _calc_peek(state) == "*" or _calc_peek(state) == "/":
 		var op: String = _calc_advance(state)
@@ -1525,7 +1516,7 @@ func _calc_term(state: Dictionary) -> Variant:
 	return node
 
 
-func _calc_factor(state: Dictionary) -> Variant:
+static func _calc_factor(state: Dictionary) -> Variant:
 	var t: String = _calc_peek(state)
 	if t == "-":
 		_calc_advance(state)
@@ -1542,7 +1533,7 @@ func _calc_factor(state: Dictionary) -> Variant:
 	return {"calc_ref": t}
 
 
-func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> void:
+static func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> void:
 	for state: String in parent_data:
 		if state == "_classes" or state == "_variations":
 			continue
@@ -1557,7 +1548,7 @@ func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> voi
 				result[child][state][prop] = parent_data[state][prop]
 
 
-func _parse_value(parts: Array[String]) -> Variant:
+static func _parse_value(parts: Array[String]) -> Variant:
 	if parts.is_empty():
 		return ""
 	if parts.size() == 4:
@@ -1590,28 +1581,45 @@ func _parse_value(parts: Array[String]) -> Variant:
 	return " ".join(parts)
 
 
-func _set_prop(result: Dictionary, selector: String, state: String, prop: String, value: Variant) -> void:
+static func _set_prop(result: Dictionary, selector: String, state: String, prop: String, value: Variant) -> void:
 	if not result.has(selector):
 		return
 	if not result[selector].has(state):
 		result[selector][state] = {}
-	var composite_map: Dictionary = _build_composite_map(selector)
+	var composite_map: Dictionary = _get_composite_map()
 	if composite_map.has(prop):
 		var info: Dictionary = composite_map[prop]
-		var parent_prop: String = info["prop"]
-		var index: int = info["index"]
-		if not result[selector][state].has(parent_prop):
-			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(selector)
-			for p: GdssProp in gdss_node.get_enabled_props():
-				if p.name == parent_prop:
-					result[selector][state][parent_prop] = p.get_default_value()
-					break
-		var vec: Vector4i = result[selector][state][parent_prop]
-		match index:
-			0: vec.x = int(value)
-			1: vec.y = int(value)
-			2: vec.z = int(value)
-			3: vec.w = int(value)
-		result[selector][state][parent_prop] = vec
+		_fold_composite_component(result[selector][state], info["prop"], info["index"], value)
 		return
+	var registered: GdssProp = GDSS.get_db().property_list.get(prop)
+	if registered != null and value is String and not (value as String).begins_with("__gdss_"):
+		match registered.type:
+			GDSS.Type.CURSOR, GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
+				value = (value as String).to_upper()
 	result[selector][state][prop] = value
+
+
+static func _fold_composite_component(container: Dictionary, parent_prop: String, index: int, value: Variant) -> void:
+	var existing: Variant = container.get(parent_prop)
+	if existing == null:
+		var parent: GdssProp = GDSS.get_db().property_list.get(parent_prop)
+		existing = parent.get_default_value() if parent != null else Vector4i.ZERO
+	var is_ref: bool = value is String and (value as String).begins_with("__gdss_")
+	if existing is Dictionary and (existing as Dictionary).has("__gdss_composite4__"):
+		var parts: Array = (existing as Dictionary)["__gdss_composite4__"]
+		if index < parts.size():
+			parts[index] = String(value) if is_ref else str(int(value))
+		container[parent_prop] = existing
+		return
+	var vec: Vector4i = existing if existing is Vector4i else Vector4i.ZERO
+	if is_ref:
+		var parts: Array = [str(vec.x), str(vec.y), str(vec.z), str(vec.w)]
+		parts[index] = value
+		container[parent_prop] = {"__gdss_composite4__": parts}
+		return
+	match index:
+		0: vec.x = int(value)
+		1: vec.y = int(value)
+		2: vec.z = int(value)
+		3: vec.w = int(value)
+	container[parent_prop] = vec

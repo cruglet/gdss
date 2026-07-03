@@ -47,7 +47,32 @@ func _load_bundle() -> Dictionary:
 		var compiled_modified: int = compiled.get("source_modified", 0)
 		if source_modified == 0 or compiled_modified >= source_modified:
 			return compiled["data"]
-	return GdssStorage.load_data()
+	var data: Dictionary = GdssStorage.load_data()
+	if data.get("parsed") is Dictionary and not (data.get("parsed") as Dictionary).is_empty():
+		return data
+	return _parse_sources()
+
+
+func _parse_sources() -> Dictionary:
+	var sources: PackedStringArray = GdssStorage.load_sources()
+	var has_content: bool = false
+	for source: String in sources:
+		if not source.strip_edges().is_empty():
+			has_content = true
+			break
+	if not has_content:
+		return {}
+	var parsed_data: Dictionary = GdssInterpreter.interpret_all(sources)
+	if OS.is_debug_build() and not Engine.is_editor_hint():
+		GdssStorage.write_cache(parsed_data, GdssInterpreter._global_defaults, GdssInterpreter._instance_defaults, GdssInterpreter._local_vars, GdssInterpreter.schemes, GdssInterpreter.meta)
+	return {
+		"parsed": parsed_data,
+		"global_defaults": GdssInterpreter._global_defaults.duplicate(true),
+		"instance_defaults": GdssInterpreter._instance_defaults.duplicate(true),
+		"local_vars": GdssInterpreter._local_vars.duplicate(true),
+		"schemes": GdssInterpreter.schemes.duplicate(true),
+		"meta": GdssInterpreter.meta.duplicate(true),
+	}
 
 
 func _apply_scheme_meta(data: Dictionary) -> void:

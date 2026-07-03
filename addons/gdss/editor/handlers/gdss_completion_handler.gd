@@ -172,30 +172,52 @@ func _update_code_hint(_word: String) -> void:
 	var line: String = editor.get_line(editor.get_caret_line())
 	var col: int = mini(editor.get_caret_column(), line.length())
 	var paren_pos: int = line.rfind("(", col)
-	if paren_pos == -1:
-		_hide_hint()
+	if paren_pos != -1:
+		var before_paren: String = line.substr(0, paren_pos).strip_edges()
+		var method_name: String = before_paren.split(" ")[-1].split(":")[-1].strip_edges()
+		if method_name == "calc":
+			_show_hint("calc( expression )  —  + - * /, numbers, $variables")
+			return
+		var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
+		if method != null:
+			var inside: String = line.substr(paren_pos + 1, col - paren_pos - 1)
+			var depth: int = 0
+			var active_param: int = 0
+			for i: int in inside.length():
+				var c: String = inside[i]
+				if c == "(":
+					depth += 1
+				elif c == ")":
+					depth -= 1
+				elif c == "," and depth == 0:
+					active_param += 1
+			_show_hint(method.get_code_hint(active_param))
+			return
+	if _show_composite_hint(line, col):
 		return
-	var before_paren: String = line.substr(0, paren_pos).strip_edges()
-	var method_name: String = before_paren.split(" ")[-1].split(":")[-1].strip_edges()
-	if method_name == "calc":
-		_show_hint("calc( expression )  —  + - * /, numbers, $variables")
-		return
-	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
-	if method == null:
-		_hide_hint()
-		return
-	var inside: String = line.substr(paren_pos + 1, col - paren_pos - 1)
-	var depth: int = 0
-	var active_param: int = 0
-	for i: int in inside.length():
-		var c: String = inside[i]
-		if c == "(":
-			depth += 1
-		elif c == ")":
-			depth -= 1
-		elif c == "," and depth == 0:
-			active_param += 1
-	_show_hint(method.get_code_hint(active_param))
+	_hide_hint()
+
+
+func _show_composite_hint(line: String, col: int) -> bool:
+	var colon: int = line.find(":")
+	if colon == -1 or col <= colon:
+		return false
+	var prop_name: String = line.substr(0, colon).strip_edges()
+	var prop_def: GdssProp = GDSS.get_db().property_list.get(prop_name)
+	if prop_def == null or prop_def.type != GDSS.Type.COMPOSITE4:
+		return false
+	var value_before: String = line.substr(colon + 1, col - colon - 1)
+	var tokens: PackedStringArray = value_before.strip_edges().split(" ", false)
+	var active: int = tokens.size()
+	if not tokens.is_empty() and not value_before.ends_with(" ") and not value_before.ends_with("\t"):
+		active -= 1
+	active = clampi(active, 0, prop_def.composite_of.size() - 1)
+	var parts: PackedStringArray = []
+	for i: int in prop_def.composite_of.size():
+		var side: String = prop_def.composite_of[i].trim_prefix(prop_def.name + "_")
+		parts.append("[" + side + "]" if i == active else side)
+	_show_hint(prop_def.name + ": " + "  ".join(parts))
+	return true
 
 
 func _ensure_hint_panel() -> void:

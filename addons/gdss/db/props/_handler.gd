@@ -26,6 +26,26 @@ static func tween_ease(type_enum: GDSS.TransitionType) -> Tween.EaseType:
 	return _EASE_TYPES.get(GDSS.TransitionType.keys()[type_enum], Tween.EASE_IN_OUT)
 
 
+static func _resolve_trans_val(raw: Variant) -> Tween.TransitionType:
+	if raw is int or raw is float:
+		var keys: Array = GDSS.TransitionFunc.keys()
+		var index: int = int(raw)
+		if index >= 0 and index < keys.size():
+			return _TRANSITION_FUNCS.get(keys[index], Tween.TRANS_LINEAR)
+		return Tween.TRANS_LINEAR
+	return _TRANSITION_FUNCS.get(raw, Tween.TRANS_LINEAR)
+
+
+static func _resolve_ease_val(raw: Variant) -> Tween.EaseType:
+	if raw is int or raw is float:
+		var keys: Array = GDSS.TransitionType.keys()
+		var index: int = int(raw)
+		if index >= 0 and index < keys.size():
+			return _EASE_TYPES.get(keys[index], Tween.EASE_OUT)
+		return Tween.EASE_OUT
+	return _EASE_TYPES.get(raw, Tween.EASE_OUT)
+
+
 var _slot_state: String = ""
 
 var _ref_path: NodePath = NodePath()
@@ -119,6 +139,11 @@ var current_state: String = "":
 		if _seeding:
 			current_state = s
 			return
+		if _applying:
+			if not _state_sync_queued:
+				_state_sync_queued = true
+				_sync_active_state.call_deferred()
+			return
 		var previous: String = current_state
 		if not previous.is_empty():
 			_start_transition(previous, s)
@@ -131,6 +156,7 @@ var current_state: String = "":
 var _tweened_values: Dictionary[String, Variant] = {}
 var _tween: Tween = null
 var _state_sync_queued: bool = false
+var _applied_node_props: Dictionary = {}
 
 # on_show()/on_hide() event state. _self_toggle swallows the visibility_changed our
 # own visible= writes fire (so re-showing to play an exit anim can't recurse).
@@ -141,6 +167,9 @@ var _last_visible: bool = true
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
+		if _tween != null:
+			_tween.kill()
+			_tween = null
 		if _gpu_ci.is_valid():
 			RenderingServer.free_rid(_gpu_ci)
 			_gpu_ci = RID()
@@ -314,8 +343,24 @@ func _clear_overrides() -> void:
 				control.remove_theme_constant_override(prop.name)
 			GdssProp.Category.FONT_SIZE:
 				control.remove_theme_font_size_override(prop.name)
+			GdssProp.Category.FONT:
+				control.remove_theme_font_override(prop.name)
 			GdssProp.Category.ICON:
 				control.remove_theme_icon_override(prop.name)
+	_reset_node_props(gdss_node, control, true)
+
+
+func _reset_node_props(gdss_node: GdssNode, control: Variant, skip_tweened: bool) -> void:
+	if _applied_node_props.is_empty():
+		return
+	var props_by_name: Dictionary = gdss_node.get_props_by_name()
+	for prop_name: String in _applied_node_props.keys():
+		if skip_tweened and _tweened_values.has(prop_name):
+			continue
+		var prop: GdssProp = props_by_name.get(prop_name)
+		if prop != null:
+			_apply_theme_prop(prop, control, gdss_node, prop.get_default_value())
+		_applied_node_props.erase(prop_name)
 
 
 func _apply_overrides(clear: bool = true) -> void:
@@ -360,20 +405,6 @@ func _apply_overrides_unwrapped(gdss_node: GdssNode, control: Variant, clear: bo
 			continue
 		if not styled.has(prop.name):
 			continue
-		# The parser fills every enabled prop with its default (for transitions/completion),
-		# so the styled set is mostly injected defaults the stylesheet never wrote. Applying
-		# one is always a no-op - either there's no override to set, or a state change already
-		# cleared the old one - so skip it without resolving. Tweened props are exempt (their
-		# live value is in _tweened_values, not the entry). The typeof guard keeps the equality
-		# safe: a user value can be a method/sentinel (Dictionary/String) while the default is
-		# a value type, and == across those types is a runtime error.
-		if not _tweened_values.has(prop.name):
-			var raw: Variant = _raw_entry_val(entry, state, prop.name)
-			if raw == null:
-				continue
-			var def: Variant = prop.get_default_value()
-			if typeof(raw) == typeof(def) and raw == def:
-				continue
 		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		if val == null:
 			val = prop.get_default_value()
@@ -427,6 +458,9 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 					return
 				control.add_theme_icon_override(prop.name, val)
 		GdssProp.Category.NODE_PROPERTY:
+			var def: Variant = prop.get_default_value()
+			if not (typeof(val) == typeof(def) and val == def):
+				_applied_node_props[prop.name] = true
 			if prop.type == GDSS.Type.CURSOR:
 				control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
 				return
@@ -467,8 +501,15 @@ func _apply_single_override(prop: GdssProp, val: Variant) -> void:
 	_apply_theme_prop(prop, node, gdss_node, val)
 
 
-func reapply() -> void:
+func _kill_tween() -> void:
+	if _tween != null:
+		_tween.kill()
+		_tween = null
 	_tweened_values.clear()
+
+
+func reapply() -> void:
+	_kill_tween()
 	_invalidate_entry_cache()
 	_apply_overrides()
 	emit_changed()
@@ -579,8 +620,8 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	var default_state: String = gdss_node.states[0] if gdss_node and not gdss_node.states.is_empty() else "all"
 	var resolved_from: String = from_state if not from_state.is_empty() else default_state
 
-	var trans: Tween.TransitionType = _TRANSITION_FUNCS.get(_get_parsed_val("transition_func", ts, "LINEAR"), Tween.TRANS_LINEAR)
-	var ease: Tween.EaseType = _EASE_TYPES.get(_get_parsed_val("transition_type", ts, "EASE_IN_OUT"), Tween.EASE_IN_OUT)
+	var trans: Tween.TransitionType = _resolve_trans_val(_get_parsed_val("transition_func", ts, "LINEAR"))
+	var ease: Tween.EaseType = _resolve_ease_val(_get_parsed_val("transition_type", ts, "EASE_OUT"))
 
 	var tweener_count: int = 0
 	var pending_tween: Tween = (Engine.get_main_loop() as SceneTree).create_tween()
@@ -731,8 +772,9 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	_tween.finished.connect(func() -> void:
 		_tween = null
 		_tweened_values.clear()
-		_apply_overrides()
-		_safe_redraw()
+		if ref != null:
+			_apply_overrides()
+			_safe_redraw()
 		if on_finished.is_valid():
 			on_finished.call()
 	)

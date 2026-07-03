@@ -2,6 +2,12 @@
 class_name GdssStorage
 extends RefCounted
 
+const FORMAT_VERSION: int = 2
+
+
+static func is_current_format(raw: Variant) -> bool:
+	return raw is Dictionary and int((raw as Dictionary).get("format", 0)) == FORMAT_VERSION
+
 
 static func get_save_path() -> String:
 	return ProjectSettings.get_setting("gdss/storage/save_path", "res://theme.tgdss")
@@ -104,23 +110,7 @@ static func write_cache(parsed: Dictionary, global_defaults: Dictionary, instanc
 	if cache_file == null:
 		printerr("[GDSS] Failed to open cache file for writing: ", get_cache_path())
 		return
-	cache_file.store_var({"parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": schemes, "meta": meta})
-	cache_file.close()
-
-
-static func save(source: String, parsed: Dictionary, global_defaults: Dictionary = {}, instance_defaults: Dictionary = {}, local_vars: Dictionary = {}, path: String = "") -> void:
-	var target: String = path if not path.is_empty() else get_save_path()
-	var file: FileAccess = FileAccess.open(target, FileAccess.WRITE)
-	if file == null:
-		printerr("[GDSS] Failed to open file for writing: ", target)
-		return
-	file.store_string(source)
-	file.close()
-	var cache_file: FileAccess = FileAccess.open(get_cache_path(), FileAccess.WRITE)
-	if cache_file == null:
-		printerr("[GDSS] Failed to open cache file for writing: ", get_cache_path())
-		return
-	cache_file.store_var({"parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": {}, "meta": {}})
+	cache_file.store_var({"format": FORMAT_VERSION, "parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": schemes, "meta": meta})
 	cache_file.close()
 
 
@@ -141,14 +131,14 @@ static func load_data(path: String = "") -> Dictionary:
 		return result
 	var cache: Variant = cache_file.get_var()
 	cache_file.close()
-	if cache is Dictionary:
+	if is_current_format(cache):
 		for key: String in (cache as Dictionary):
 			result[key] = (cache as Dictionary)[key]
 	return result
 
 
 static func compiled_bytes(source: String, data: Dictionary, source_modified: int) -> PackedByteArray:
-	return var_to_bytes({"source": source, "data": data, "source_modified": source_modified})
+	return var_to_bytes({"format": FORMAT_VERSION, "source": source, "data": data, "source_modified": source_modified})
 
 
 static func load_compiled() -> Dictionary:
@@ -161,4 +151,4 @@ static func load_compiled() -> Dictionary:
 	var raw: PackedByteArray = file.get_buffer(file.get_length())
 	file.close()
 	var result: Variant = bytes_to_var(raw)
-	return result if result is Dictionary else {}
+	return result if is_current_format(result) else {}
