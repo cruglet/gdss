@@ -77,7 +77,7 @@ func _on_toggle_card_pressed() -> void:
 func _on_switch_pressed() -> void:
 	_dark = not _dark
 	switch_button.text = "Switch to light" if _dark else "Switch to dark"
-	GDSS.set_scheme("dark" if _dark else "light", 0.25)
+	GDSS.set_scheme("dark" if _dark else "light2", 0.25)
 
 
 func _on_randomize_pressed() -> void:

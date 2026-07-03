@@ -1,11 +1,11 @@
 # @chunk main
-# Simple GDSS 0.7.0 showcase theme.
+# Simple GDSS 0.8.0 showcase theme.
 @meta {
 	name: "GDSS Demo"
 	description: "GDSS showcase: schemes, methods, gradients, glass, fonts, calc(), per-side keys, per-node overrides, and events."
 	default_scheme: dark
 	author: "Cruglet"
-	version: "0.7.4"
+	version: "0.8.0"
 }
 
 # @chunk Palette
@@ -32,6 +32,9 @@
 	text: "#0f111a"
 	text_dim: "#4c5470"
 	border: "#00000038"
+}
+
+@scheme light2 extends light {
 }
 
 # Per-node knobs so the sliders can retune the glass live.
@@ -308,7 +311,6 @@ Panel, PanelContainer {
 		}
 	}
 }
-
 # @chunk Popups
 # PopupMenu is a Window-derived node (not a Control). GDSS styles its panel, but a
 # blur/liquid_blur backdrop can't refract here: an embedded subwindow doesn't expose the
@@ -321,7 +323,6 @@ PopupMenu {
 	corner_radius: 14 14 14 14
 	font_color: $text
 }
-
 # @chunk Labels
 Label {
 	font_color: $text
