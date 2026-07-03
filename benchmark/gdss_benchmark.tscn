@@ -1,37 +1,42 @@
-[gd_scene load_steps=2 format=3 uid="uid://b8gdssbench01"]
+[gd_scene format=3 uid="uid://b8gdssbench01"]
 
-[ext_resource type="Script" path="res://benchmark/gdss_benchmark.gd" id="1"]
+[ext_resource type="Script" uid="uid://ct10a1olwlg7c" path="res://benchmark/gdss_benchmark.gd" id="1"]
 
-[node name="GdssBenchmark" type="Control" node_paths=PackedStringArray("output")]
+[node name="GdssBenchmark" type="Control" unique_id=1254764672 node_paths=PackedStringArray("output")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 script = ExtResource("1")
 output = NodePath("Margin/Output")
 
-[node name="Bg" type="ColorRect" parent="."]
+[node name="Bg" type="ColorRect" parent="." unique_id=627518573]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 color = Color(0.051, 0.051, 0.078, 1)
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Margin" type="MarginContainer" parent="." unique_id=1308486980]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="Output" type="RichTextLabel" parent="Margin"]
+[node name="Output" type="RichTextLabel" parent="Margin" unique_id=236331430]
 layout_mode = 2
 mouse_filter = 2
 bbcode_enabled = true
 scroll_following = true
-fit_content = false

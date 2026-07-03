@@ -2,7 +2,6 @@
 class_name GdssPropHandler
 extends StyleBox
 
-static var _texture_cache: Dictionary = {}
 static var _corner_start_angles: Array[float] = [PI, PI * 1.5, 0.0, PI * 0.5]
 const _DEFAULT_SHADOW_COLOR: Color = Color(0, 0, 0, 0.4)
 
@@ -90,6 +89,11 @@ var _gpu_emitted: bool = false
 var _style_vals_cache: Dictionary = {}
 var _style_dynamic: Array[GdssProp] = []
 var _style_vals_state: String = "￿"
+var _style_vals_tween: Dictionary = {}
+var _style_dynamic_tween: Array[GdssProp] = []
+var _style_tween_state: String = "￿"
+var _style_tween_session: int = -1
+var _tween_session: int = 0
 var _nonstyle_dynamic: Array[GdssProp] = []
 var _nonstyle_state: String = "￿"
 
@@ -289,6 +293,10 @@ func _invalidate_entry_cache() -> void:
 	_style_vals_state = "￿"
 	_style_vals_cache.clear()
 	_style_dynamic.clear()
+	_style_tween_state = "￿"
+	_style_tween_session = -1
+	_style_vals_tween.clear()
+	_style_dynamic_tween.clear()
 	_nonstyle_state = "￿"
 	_nonstyle_dynamic.clear()
 
@@ -499,7 +507,10 @@ func _apply_single_override(prop: GdssProp, val: Variant) -> void:
 		return
 	if val == null:
 		val = prop.get_default_value()
+	var was_applying: bool = _applying
+	_applying = true
 	_apply_theme_prop(prop, node, gdss_node, val)
+	_applying = was_applying
 
 
 func _kill_tween() -> void:
@@ -770,6 +781,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	if _tween:
 		_tween.kill()
 	_tween = pending_tween
+	_tween_session += 1
 	_tween.finished.connect(func() -> void:
 		_tween = null
 		_tweened_values.clear()
@@ -937,6 +949,8 @@ func _entry_styled_props(entry: Dictionary) -> Dictionary:
 func _resolve_entry() -> Dictionary:
 	if ref == null:
 		return {}
+	if not _entry_cache_dirty and not Engine.is_editor_hint():
+		return _entry_cache
 	var current_classes: PackedStringArray = ref.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray
 	var variation: String = String((ref as Control).theme_type_variation) if ref is Control else ""
 	var override_meta: Variant = ref.get_meta(GDSS.OVERRIDES_META) if ref.has_meta(GDSS.OVERRIDES_META) else null
@@ -1284,20 +1298,24 @@ func _get_raw_parsed_val(key: String, state: String) -> Variant:
 
 func _build_style_vals(gdss_node: GdssNode, entry: Dictionary, state: String) -> Dictionary:
 	if not _tweened_values.is_empty():
-		if _style_vals_state != state or _style_vals_cache.is_empty():
-			var fresh: Dictionary = {}
+		if _style_tween_state != state or _style_tween_session != _tween_session:
+			_style_tween_state = state
+			_style_tween_session = _tween_session
+			_style_vals_tween.clear()
+			_style_dynamic_tween.clear()
 			for prop: GdssProp in gdss_node.get_style_props():
 				var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-				fresh[prop.name] = fv if fv != null else prop.get_default_value()
-			return fresh
-		var out: Dictionary = _style_vals_cache.duplicate()
-		for prop: GdssProp in _style_dynamic:
+				_style_vals_tween[prop.name] = fv if fv != null else prop.get_default_value()
+				if _is_dynamic_raw(_raw_entry_val(entry, state, prop.name)):
+					_style_dynamic_tween.append(prop)
+			return _style_vals_tween
+		for prop: GdssProp in _style_dynamic_tween:
 			var dv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-			out[prop.name] = dv if dv != null else prop.get_default_value()
-		for prop: GdssProp in gdss_node.get_style_props():
-			if _tweened_values.has(prop.name):
-				out[prop.name] = _tweened_values[prop.name]
-		return out
+			_style_vals_tween[prop.name] = dv if dv != null else prop.get_default_value()
+		for key: String in _tweened_values:
+			if _style_vals_tween.has(key):
+				_style_vals_tween[key] = _tweened_values[key]
+		return _style_vals_tween
 	if _style_vals_state != state:
 		_style_vals_cache.clear()
 		_style_dynamic.clear()
@@ -1775,7 +1793,15 @@ func _triangulate_ring(inner_size: int, outer_size: int) -> PackedInt32Array:
 
 
 func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 8) -> PackedVector2Array:
-	var key: String = "%.2f,%.2f,%.2f,%.2f|%.2f,%.2f,%.2f,%.2f|%d" % [rect.position.x, rect.position.y, rect.size.x, rect.size.y, corner_radii.x, corner_radii.y, corner_radii.z, corner_radii.w, detail]
+	var key: int = int(rect.position.x * 100.0)
+	key = key * 92821 + int(rect.position.y * 100.0)
+	key = key * 92821 + int(rect.size.x * 100.0)
+	key = key * 92821 + int(rect.size.y * 100.0)
+	key = key * 92821 + int(corner_radii.x * 100.0)
+	key = key * 92821 + int(corner_radii.y * 100.0)
+	key = key * 92821 + int(corner_radii.z * 100.0)
+	key = key * 92821 + int(corner_radii.w * 100.0)
+	key = key * 92821 + detail
 	if _rr_cache.has(key):
 		return _rr_cache[key]
 	var corner_centers: Array[Vector2] = [

@@ -5,16 +5,24 @@ const TIMING_RUNS: int = 5
 const FRAME_SAMPLES: int = 120
 const RENDER_PANELS: int = 80
 const ANIM_NODES: int = 600
+const LEAK_CYCLES: int = 5
+const LEAK_NODES: int = 200
+const OVERRIDE_TEXT: String = "bg_color: \"#8844ff\"\ncorner_radius: 16 16 16 16"
+const PER_SIDE_TEXT: String = "corner_radius_top_left: 24"
 
 @export var output: RichTextLabel
 
 var _accent: Color = Color("#3b82f6")
 var _vanilla_theme: Theme
 var _buf: PackedStringArray = []
+var _auto_quit: bool = false
 
 
 func _ready() -> void:
-	get_window().warp_mouse(Vector2(-4000, -4000))
+	for arg: String in OS.get_cmdline_user_args() + OS.get_cmdline_args():
+		if arg == "--auto-quit":
+			_auto_quit = true
+	_warp_mouse_away()
 	Engine.max_fps = 0
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
 	if output != null:
@@ -26,6 +34,7 @@ func _ready() -> void:
 		output.add_theme_font_size_override("normal_font_size", 13)
 		output.add_theme_color_override("default_color", Color("#d7dae3"))
 	_vanilla_theme = _build_vanilla_theme()
+	_inject_bench_classes()
 	await get_tree().process_frame
 	await get_tree().process_frame
 	await _run()
@@ -35,71 +44,177 @@ func _run() -> void:
 	_header()
 	for count: int in COUNTS:
 		await _suite(count)
+	await _stability_section()
 	await _render_section()
 	_emit("\n[i]* GDSS-exclusive benchmark (no vanilla Theme runtime equivalent).")
-	_emit("Lower ms / higher FPS is better; timings are best-of-%d.[/i]" % TIMING_RUNS)
-	_flush()
+	_emit("Lower ms / higher FPS is better. Timings show best-of-%d after a discarded" % TIMING_RUNS)
+	_emit("warmup run, with the mean and standard deviation across runs.[/i]")
+	if _auto_quit:
+		await _wait(4)
+		get_tree().quit()
 
 
 func _suite(n: int) -> void:
 	_emit("\n[b]====== %d nodes ======[/b]" % n)
-	
 	var inst: Dictionary = await _bench_instantiate(n)
-	_row("Instantiate (create nodes)", "%.2f ms (%.4f/node)" % [inst.get("gdss_inst"), inst.get("gdss_inst") / n], "%.2f ms (%.4f/node)" % [inst.get("van_inst"), inst.get("van_inst") / n], "%.1fx (%s)" % [inst.get("gdss_inst") / maxf(inst.get("van_inst"), 0.0001), _pct(inst.get("gdss_inst"), inst.get("van_inst"))])
-	_row("Bind (enter tree)", "%.2f ms (%.4f/node)" % [inst.get("gdss_bind"), inst.get("gdss_bind") / n], "%.2f ms (%.4f/node)" % [inst.get("van_bind"), inst.get("van_bind") / n], "%.1fx (%s)" % [inst.get("gdss_bind") / maxf(inst.get("van_bind"), 0.0001), _pct(inst.get("gdss_bind"), inst.get("van_bind"))])
-	
+	_row("Instantiate (create nodes)", _cell(inst.get("gdss_inst"), n), _cell(inst.get("van_inst"), n), _ratio(inst.get("gdss_inst"), inst.get("van_inst")))
+	_row("Bind (enter tree)", _cell(inst.get("gdss_bind"), n), _cell(inst.get("van_bind"), n), _ratio(inst.get("gdss_bind"), inst.get("van_bind")))
+	_row("First frame after bind", _cell(inst.get("gdss_frame"), n), _cell(inst.get("van_frame"), n), _ratio(inst.get("gdss_frame"), inst.get("van_frame")))
+	var dup: Dictionary = await _bench_duplicate(n)
+	_row("Duplicate + bind", _cell(dup.get("gdss"), n), _cell(dup.get("vanilla"), n), _ratio(dup.get("gdss"), dup.get("vanilla")))
 	var mem: Dictionary = await _bench_memory(n)
 	_row("Memory: objects added", "%d (%.2f/node)" % [mem.get("gdss_obj"), float(mem.get("gdss_obj")) / n], "%d (%.2f/node)" % [mem.get("van_obj"), float(mem.get("van_obj")) / n], "%+d (%s)" % [mem.get("gdss_obj") - mem.get("van_obj"), _pct(mem.get("gdss_obj"), mem.get("van_obj"))])
 	_row("Memory: static KiB", "%.0f (%.3f/node)" % [mem.get("gdss_kb"), mem.get("gdss_kb") / n], "%.0f (%.3f/node)" % [mem.get("van_kb"), mem.get("van_kb") / n], "%+.0f KiB (%s)" % [mem.get("gdss_kb") - mem.get("van_kb"), _pct(mem.get("gdss_kb"), mem.get("van_kb"))])
-	
 	var draw: Dictionary = await _bench_draw(n)
 	_row("Steady-state FPS (visible)", "%.0f fps (%.3f ms)" % [draw.get("gdss_fps"), draw.get("gdss_ms")], "%.0f fps (%.3f ms)" % [draw.get("van_fps"), draw.get("van_ms")], "%+.3f ms (%s)" % [draw.get("gdss_ms") - draw.get("van_ms"), _pct(draw.get("gdss_ms"), draw.get("van_ms"))])
-	
 	var st: Dictionary = await _bench_state_restyle(n)
-	_row("State change (disable all)", "%.2f ms (%.4f/node)" % [st.get("gdss"), st.get("gdss") / n], "%.2f ms (%.4f/node)" % [st.get("vanilla"), st.get("vanilla") / n], "%.1fx (%s)" % [st.get("gdss") / maxf(st.get("vanilla"), 0.0001), _pct(st.get("gdss"), st.get("vanilla"))])
-	
+	_row("State change (disable all)", _cell(st.get("gdss"), n), _cell(st.get("vanilla"), n), _ratio(st.get("gdss"), st.get("vanilla")))
 	var reparent: Dictionary = await _bench_reparent(n)
-	_row("Reparent all", "%.2f ms (%.4f/node)" % [reparent.get("gdss"), reparent.get("gdss") / n], "%.2f ms (%.4f/node)" % [reparent.get("vanilla"), reparent.get("vanilla") / n], "%.1fx (%s)" % [reparent.get("gdss") / maxf(reparent.get("vanilla"), 0.0001), _pct(reparent.get("gdss"), reparent.get("vanilla"))])
-	
+	_row("Reparent all", _cell(reparent.get("gdss"), n), _cell(reparent.get("vanilla"), n), _ratio(reparent.get("gdss"), reparent.get("vanilla")))
 	var teardown: Dictionary = await _bench_teardown(n)
-	_row("Teardown (free all)", "%.2f ms" % teardown.get("gdss"), "%.2f ms" % teardown.get("vanilla"), "%s | orphans left: %d" % [_pct(teardown.get("gdss"), teardown.get("vanilla")), teardown.get("orphans")])
-	
-	var scheme: float = await _bench_scheme(n)
-	_row("Scheme switch (light/dark) *", "%.2f ms (%.4f/node)" % [scheme, scheme / n], "n/a", "")
-	var gvar: float = await _bench_global_var(n)
-	_row("Global var refresh (accent) *", "%.2f ms (%.4f/node)" % [gvar, gvar / n], "n/a", "")
-	var ivar: float = await _bench_instance_var(n)
-	_row("Per-instance var set *", "%.2f ms (%.4f/node)" % [ivar, ivar / n], "n/a", "")
-	var refr: float = await _bench_refresh(n)
-	_row("Refresh / reapply all *", "%.2f ms (%.4f/node)" % [refr, refr / n], "n/a", "")
-	var addcls: float = await _bench_add_class(n)
-	_row("Add class (restyle all) *", "%.2f ms (%.4f/node)" % [addcls, addcls / n], "n/a", "")
+	_row("Teardown (free all)", _plain_cell(teardown.get("gdss")), _plain_cell(teardown.get("vanilla")), "%s | orphans left: %d" % [_pct((teardown.get("gdss") as Dictionary).get("best"), (teardown.get("vanilla") as Dictionary).get("best")), teardown.get("orphans")])
+	var scheme: Dictionary = await _bench_scheme(n)
+	_row("Scheme switch (light/dark) *", _cell(scheme, n), "n/a", "")
+	var gvar: Dictionary = await _bench_global_var(n)
+	_row("Global var refresh (accent) *", _cell(gvar, n), "n/a", "")
+	var ivar: Dictionary = await _bench_instance_var(n)
+	_row("Per-instance var set *", _cell(ivar, n), "n/a", "")
+	var refr: Dictionary = await _bench_refresh(n)
+	_row("Refresh / reapply all *", _cell(refr, n), "n/a", "")
+	var addcls: Dictionary = await _bench_add_class(n)
+	_row("Add class (restyle all) *", _cell(addcls, n), "n/a", "")
+	var modflip: Dictionary = await _bench_modulate_flip(n)
+	_row("Modulate state flip *", _cell(modflip, n), "n/a", "")
+	var override_stats: Dictionary = await _bench_override(n, OVERRIDE_TEXT)
+	_row("Per-node override apply *", _cell(override_stats, n), "n/a", "")
+	var per_side: Dictionary = await _bench_override(n, PER_SIDE_TEXT)
+	_row("Per-side composite patch *", _cell(per_side, n), "n/a", "")
+
+
+func _stability_section() -> void:
+	_emit("\n[b]====== Stability: %d bind/free cycles of %d styled nodes ======[/b]" % [LEAK_CYCLES, LEAK_NODES])
+	await _wait(10)
+	var objects_before: int = int(Performance.get_monitor(Performance.OBJECT_COUNT))
+	var orphans_before: int = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	for cycle: int in LEAK_CYCLES:
+		var root: Node = _build_gdss(LEAK_NODES, false)
+		get_tree().root.add_child(root)
+		await _wait(4)
+		root.free()
+		await _wait(4)
+	await _wait(10)
+	var object_delta: int = int(Performance.get_monitor(Performance.OBJECT_COUNT)) - objects_before
+	var orphan_delta: int = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) - orphans_before
+	_emit("  Object count delta       %+d    (0 = nothing leaked)" % object_delta)
+	_emit("  Orphan node delta        %+d    (0 = clean teardown)" % orphan_delta)
+
+
+func _stats(samples: PackedFloat64Array) -> Dictionary:
+	var best: float = INF
+	var total: float = 0.0
+	for value: float in samples:
+		best = minf(best, value)
+		total += value
+	var mean: float = total / maxf(samples.size(), 1.0)
+	var variance: float = 0.0
+	for value: float in samples:
+		variance += (value - mean) * (value - mean)
+	variance /= maxf(samples.size(), 1.0)
+	return {"best": best, "mean": mean, "std": sqrt(variance)}
+
+
+func _cell(s: Dictionary, n: int) -> String:
+	return "%.2f ms (%.4f/node) σ%.2f" % [s.get("best"), s.get("best") / n, s.get("std")]
+
+
+func _plain_cell(s: Dictionary) -> String:
+	return "%.2f ms σ%.2f" % [s.get("best"), s.get("std")]
+
+
+func _ratio(gdss: Dictionary, vanilla: Dictionary) -> String:
+	var g: float = gdss.get("best")
+	var v: float = vanilla.get("best")
+	return "%.1fx (%s)" % [g / maxf(v, 0.0001), _pct(g, v)]
 
 
 func _bench_instantiate(n: int) -> Dictionary:
-	var gi: float = INF
-	var gb: float = INF
-	for r: int in TIMING_RUNS:
+	var gi: PackedFloat64Array = []
+	var gb: PackedFloat64Array = []
+	var gf: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
 		var t0: int = Time.get_ticks_usec()
 		var root: Node = _build_gdss(n, false)
-		gi = minf(gi, (Time.get_ticks_usec() - t0) / 1000.0)
+		var inst_ms: float = (Time.get_ticks_usec() - t0) / 1000.0
 		var t1: int = Time.get_ticks_usec()
 		get_tree().root.add_child(root)
-		gb = minf(gb, (Time.get_ticks_usec() - t1) / 1000.0)
+		var bind_ms: float = (Time.get_ticks_usec() - t1) / 1000.0
+		var t2: int = Time.get_ticks_usec()
+		await get_tree().process_frame
+		var frame_ms: float = (Time.get_ticks_usec() - t2) / 1000.0
+		if r > 0:
+			gi.append(inst_ms)
+			gb.append(bind_ms)
+			gf.append(frame_ms)
 		root.queue_free()
 		await _wait(6)
-	var vi: float = INF
-	var vb: float = INF
-	for r: int in TIMING_RUNS:
+	var vi: PackedFloat64Array = []
+	var vb: PackedFloat64Array = []
+	var vf: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
 		var t0: int = Time.get_ticks_usec()
 		var root: Node = _build_vanilla(n, false)
-		vi = minf(vi, (Time.get_ticks_usec() - t0) / 1000.0)
+		var inst_ms: float = (Time.get_ticks_usec() - t0) / 1000.0
 		var t1: int = Time.get_ticks_usec()
 		get_tree().root.add_child(root)
-		vb = minf(vb, (Time.get_ticks_usec() - t1) / 1000.0)
+		var bind_ms: float = (Time.get_ticks_usec() - t1) / 1000.0
+		var t2: int = Time.get_ticks_usec()
+		await get_tree().process_frame
+		var frame_ms: float = (Time.get_ticks_usec() - t2) / 1000.0
+		if r > 0:
+			vi.append(inst_ms)
+			vb.append(bind_ms)
+			vf.append(frame_ms)
 		root.queue_free()
 		await _wait(6)
-	return {"gdss_inst": gi, "gdss_bind": gb, "van_inst": vi, "van_bind": vb}
+	return {"gdss_inst": _stats(gi), "gdss_bind": _stats(gb), "gdss_frame": _stats(gf), "van_inst": _stats(vi), "van_bind": _stats(vb), "van_frame": _stats(vf)}
+
+
+func _bench_duplicate(n: int) -> Dictionary:
+	var g: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var root: Control = Control.new()
+		root.set_meta(GDSS.MODE_META, GDSS.GdssMode.ENABLE)
+		get_tree().root.add_child(root)
+		var source: Button = Button.new()
+		source.text = "source"
+		root.add_child(source)
+		await _wait(2)
+		var t0: int = Time.get_ticks_usec()
+		for i: int in n:
+			root.add_child(source.duplicate())
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			g.append(ms)
+		root.queue_free()
+		await _wait(6)
+	var v: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var root: Control = Control.new()
+		root.theme = _vanilla_theme
+		get_tree().root.add_child(root)
+		var source: Button = Button.new()
+		source.text = "source"
+		root.add_child(source)
+		await _wait(2)
+		var t0: int = Time.get_ticks_usec()
+		for i: int in n:
+			root.add_child(source.duplicate())
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			v.append(ms)
+		root.queue_free()
+		await _wait(6)
+	return {"gdss": _stats(g), "vanilla": _stats(v)}
 
 
 func _bench_memory(n: int) -> Dictionary:
@@ -126,6 +241,7 @@ func _bench_memory(n: int) -> Dictionary:
 
 
 func _bench_draw(n: int) -> Dictionary:
+	_warp_mouse_away()
 	var groot: Node = _build_gdss(n, true)
 	add_child(groot)
 	await _wait(20)
@@ -142,74 +258,97 @@ func _bench_draw(n: int) -> Dictionary:
 
 
 func _bench_state_restyle(n: int) -> Dictionary:
-	var gms: float = await _disable_all_ms(_build_gdss(n, false))
-	var vms: float = await _disable_all_ms(_build_vanilla(n, false))
-	return {"gdss": gms, "vanilla": vms}
+	var g: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var root: Node = _build_gdss(n, false)
+		var ms: float = await _disable_all_ms(root)
+		if r > 0:
+			g.append(ms)
+	var v: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var root: Node = _build_vanilla(n, false)
+		var ms: float = await _disable_all_ms(root)
+		if r > 0:
+			v.append(ms)
+	return {"gdss": _stats(g), "vanilla": _stats(v)}
 
 
 func _disable_all_ms(root: Node) -> float:
 	get_tree().root.add_child(root)
-	await _wait(8)
+	await _wait(6)
 	var t0: int = Time.get_ticks_usec()
 	for b: Node in root.get_children():
 		(b as Button).disabled = true
 	var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
 	root.queue_free()
-	await _wait(8)
+	await _wait(6)
 	return ms
 
 
-func _bench_scheme(n: int) -> float:
+func _bench_scheme(n: int) -> Dictionary:
 	var root: Node = _build_gdss(n, false)
 	get_tree().root.add_child(root)
 	await _wait(8)
-	var best: float = INF
-	for r: int in TIMING_RUNS:
+	var samples: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
 		var target: String = "light" if r % 2 == 0 else "dark"
 		var t0: int = Time.get_ticks_usec()
 		GDSS.set_scheme(target)
-		best = minf(best, (Time.get_ticks_usec() - t0) / 1000.0)
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			samples.append(ms)
 		await _wait(2)
 	GDSS.set_scheme("dark")
 	root.queue_free()
 	await _wait(8)
-	return best
+	return _stats(samples)
 
 
-func _bench_global_var(n: int) -> float:
+func _bench_global_var(n: int) -> Dictionary:
 	var root: Node = _build_gdss(n, false)
 	get_tree().root.add_child(root)
 	await _wait(8)
-	var best: float = INF
-	for r: int in TIMING_RUNS:
+	var samples: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
 		var t0: int = Time.get_ticks_usec()
 		GDSS.set_global_var("accent", Color(randf(), randf(), randf()))
-		best = minf(best, (Time.get_ticks_usec() - t0) / 1000.0)
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			samples.append(ms)
 		await _wait(2)
 	GDSS.set_global_var("accent", _accent)
 	root.queue_free()
 	await _wait(8)
-	return best
+	return _stats(samples)
 
 
 func _bench_teardown(n: int) -> Dictionary:
-	var groot: Node = _build_gdss(n, false)
-	get_tree().root.add_child(groot)
-	await _wait(8)
-	var orphan0: int = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
-	var t0: int = Time.get_ticks_usec()
-	groot.free()
-	var gms: float = (Time.get_ticks_usec() - t0) / 1000.0
-	await _wait(8)
-	var orphans: int = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) - orphan0
-	var vroot: Node = _build_vanilla(n, false)
-	get_tree().root.add_child(vroot)
-	await _wait(8)
-	t0 = Time.get_ticks_usec()
-	vroot.free()
-	var vms: float = (Time.get_ticks_usec() - t0) / 1000.0
-	await _wait(8)
-	return {"gdss": gms, "vanilla": vms, "orphans": orphans}
+	var g: PackedFloat64Array = []
+	var orphans: int = 0
+	for r: int in TIMING_RUNS + 1:
+		var groot: Node = _build_gdss(n, false)
+		get_tree().root.add_child(groot)
+		await _wait(6)
+		var orphan0: int = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+		var t0: int = Time.get_ticks_usec()
+		groot.free()
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		await _wait(6)
+		if r > 0:
+			g.append(ms)
+			orphans = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) - orphan0
+	var v: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var vroot: Node = _build_vanilla(n, false)
+		get_tree().root.add_child(vroot)
+		await _wait(6)
+		var t0: int = Time.get_ticks_usec()
+		vroot.free()
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		await _wait(6)
+		if r > 0:
+			v.append(ms)
+	return {"gdss": _stats(g), "vanilla": _stats(v), "orphans": orphans}
 
 
 func _render_section() -> void:
@@ -234,7 +373,6 @@ func _render_section() -> void:
 
 func _bench_rendering() -> Dictionary:
 	var icon: Texture2D = load("res://meta/icon.png") as Texture2D
-	_inject_gradient_class()
 	var have_blur: bool = _has_button_class("FrostedButton")
 	var have_liquid: bool = _has_button_class("LiquidButton")
 	var solid: float = await _render_fps("", icon)
@@ -251,6 +389,7 @@ func _bench_rendering() -> Dictionary:
 
 
 func _render_fps(button_class: String, backdrop: Texture2D) -> float:
+	_warp_mouse_away()
 	var root: Control = Control.new()
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.set_meta(GDSS.MODE_META, GDSS.GdssMode.ENABLE)
@@ -288,9 +427,17 @@ func _has_button_class(name: String) -> bool:
 
 
 func _bench_reparent(n: int) -> Dictionary:
-	var g: float = await _reparent_ms(_build_gdss(n, false), true)
-	var v: float = await _reparent_ms(_build_vanilla(n, false), false)
-	return {"gdss": g, "vanilla": v}
+	var g: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var ms: float = await _reparent_ms(_build_gdss(n, false), true)
+		if r > 0:
+			g.append(ms)
+	var v: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var ms: float = await _reparent_ms(_build_vanilla(n, false), false)
+		if r > 0:
+			v.append(ms)
+	return {"gdss": _stats(g), "vanilla": _stats(v)}
 
 
 func _reparent_ms(root: Node, gdss_dest: bool) -> float:
@@ -301,7 +448,7 @@ func _reparent_ms(root: Node, gdss_dest: bool) -> float:
 	else:
 		dest.theme = _vanilla_theme
 	get_tree().root.add_child(dest)
-	await _wait(8)
+	await _wait(6)
 	var kids: Array[Node] = root.get_children()
 	var t0: int = Time.get_ticks_usec()
 	for b: Node in kids:
@@ -310,58 +457,117 @@ func _reparent_ms(root: Node, gdss_dest: bool) -> float:
 	var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
 	root.queue_free()
 	dest.queue_free()
-	await _wait(10)
+	await _wait(8)
 	return ms
 
 
-func _bench_instance_var(n: int) -> float:
+func _bench_instance_var(n: int) -> Dictionary:
 	var root: Node = _build_gdss(n, false)
 	get_tree().root.add_child(root)
 	await _wait(8)
 	var kids: Array[Node] = root.get_children()
-	var best: float = INF
-	for r: int in TIMING_RUNS:
+	var samples: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
 		var t0: int = Time.get_ticks_usec()
 		for b: Node in kids:
 			GDSS.set_instance_var(b, "glass_strength", float(r + 1))
-		best = minf(best, (Time.get_ticks_usec() - t0) / 1000.0)
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			samples.append(ms)
 		await _wait(2)
 	root.queue_free()
 	await _wait(8)
-	return best
+	return _stats(samples)
 
 
-func _bench_refresh(n: int) -> float:
+func _bench_refresh(n: int) -> Dictionary:
 	var root: Node = _build_gdss(n, false)
 	get_tree().root.add_child(root)
 	await _wait(8)
 	var kids: Array[Node] = root.get_children()
-	var best: float = INF
-	for r: int in TIMING_RUNS:
+	var samples: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
 		var t0: int = Time.get_ticks_usec()
 		for b: Node in kids:
 			GDSS.refresh(b)
-		best = minf(best, (Time.get_ticks_usec() - t0) / 1000.0)
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			samples.append(ms)
 		await _wait(2)
 	root.queue_free()
 	await _wait(8)
-	return best
+	return _stats(samples)
 
 
-func _bench_add_class(n: int) -> float:
+func _bench_add_class(n: int) -> Dictionary:
 	var root: Node = _build_gdss(n, false)
 	get_tree().root.add_child(root)
 	await _wait(8)
-	var t0: int = Time.get_ticks_usec()
-	for b: Node in root.get_children():
-		GDSS.add_class(b, "GhostButton")
-	var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+	var kids: Array[Node] = root.get_children()
+	var samples: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var t0: int = Time.get_ticks_usec()
+		for b: Node in kids:
+			GDSS.add_class(b, "GhostButton")
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			samples.append(ms)
+		await _wait(2)
+		for b: Node in kids:
+			GDSS.remove_class(b, "GhostButton")
+		await _wait(2)
 	root.queue_free()
 	await _wait(8)
-	return ms
+	return _stats(samples)
+
+
+func _bench_modulate_flip(n: int) -> Dictionary:
+	var root: Node = _build_gdss(n, false)
+	get_tree().root.add_child(root)
+	var kids: Array[Node] = root.get_children()
+	for b: Node in kids:
+		GDSS.add_class(b, "BenchModulate")
+	await _wait(8)
+	var samples: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var target: bool = r % 2 == 0
+		var t0: int = Time.get_ticks_usec()
+		for b: Node in kids:
+			(b as Button).disabled = target
+			GDSS.refresh(b)
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			samples.append(ms)
+		await _wait(2)
+	root.queue_free()
+	await _wait(8)
+	return _stats(samples)
+
+
+func _bench_override(n: int, text: String) -> Dictionary:
+	var root: Node = _build_gdss(n, false)
+	get_tree().root.add_child(root)
+	await _wait(8)
+	var kids: Array[Node] = root.get_children()
+	var samples: PackedFloat64Array = []
+	for r: int in TIMING_RUNS + 1:
+		var t0: int = Time.get_ticks_usec()
+		for b: Node in kids:
+			GDSS.set_override_text(b, text)
+		var ms: float = (Time.get_ticks_usec() - t0) / 1000.0
+		if r > 0:
+			samples.append(ms)
+		await _wait(2)
+		for b: Node in kids:
+			GDSS.set_override_text(b, "")
+		await _wait(2)
+	root.queue_free()
+	await _wait(8)
+	return _stats(samples)
 
 
 func _bench_animating(count: int) -> Dictionary:
+	_warp_mouse_away()
 	var root: Node = _build_gdss(count, true)
 	add_child(root)
 	await _wait(20)
@@ -374,12 +580,14 @@ func _bench_animating(count: int) -> Dictionary:
 	return {"idle": 1000.0 / maxf(idle_ms, 0.0001), "anim": 1000.0 / maxf(anim_ms, 0.0001)}
 
 
-func _inject_gradient_class() -> void:
+func _inject_bench_classes() -> void:
 	var btn: Dictionary = GdssInterpreter.parsed.get("Button", {})
 	if btn.is_empty():
 		return
 	var classes: Dictionary = btn.get("_classes", {})
 	classes["BenchGradient"] = {"all": {"bg_color": {"__gdss_method__": "linear_gradient", "args": ["RED", "BLUE", "90"]}}, "_classes": {}}
+	classes["BenchModulate"] = {"all": {}, "disabled": {"modulate": Color(1, 0.4, 0.4, 1), "opacity": 0.6}, "_classes": {}}
+	btn["_classes"] = classes
 
 
 func _build_gdss(n: int, visible_grid: bool) -> Node:
@@ -446,17 +654,22 @@ func _wait(frames: int) -> void:
 		await get_tree().process_frame
 
 
+func _warp_mouse_away() -> void:
+	get_window().warp_mouse(Vector2(-4000, -4000))
+
+
 func _header() -> void:
 	var v: Dictionary = Engine.get_version_info()
 	_emit("[b]=======================================================[/b]")
 	_emit("[b]  GDSS Benchmark[/b]  |  Godot %s  |  %s  |  %s" % [v.get("string"), OS.get_name(), RenderingServer.get_video_adapter_name()])
 	_emit("[b]=======================================================[/b]")
 	_emit("[i]Same Button nodes styled by GDSS (theme.tgdss) vs a shared vanilla Theme")
-	_emit("with matching styleboxes. Timings are best-of-%d; FPS is averaged over %d" % [TIMING_RUNS, FRAME_SAMPLES])
-	_emit("frames with vsync off. Columns: GDSS | Vanilla | Delta.[/i]")
+	_emit("with matching styleboxes. Timings: best-of-%d after a discarded warmup," % TIMING_RUNS)
+	_emit("with per-run standard deviation. FPS: averaged over %d frames, vsync off," % FRAME_SAMPLES)
+	_emit("mouse warped away before every visible section. Columns: GDSS | Vanilla | Delta.[/i]")
 	_emit("")
-	_emit("%-30s %-26s %-26s %s" % ["Metric", "GDSS", "Vanilla Theme", "Delta"])
-	_emit("%s" % "-".repeat(95))
+	_emit("%-30s %-30s %-30s %s" % ["Metric", "GDSS", "Vanilla Theme", "Delta"])
+	_emit("%s" % "-".repeat(104))
 
 
 func _pct(gdss: float, vanilla: float) -> String:
@@ -466,7 +679,7 @@ func _pct(gdss: float, vanilla: float) -> String:
 
 
 func _row(metric: String, gdss: String, vanilla: String, delta: String) -> void:
-	_emit("%-30s %-26s %-26s %s" % [metric, gdss, vanilla, delta])
+	_emit("%-30s %-30s %-30s %s" % [metric, gdss, vanilla, delta])
 
 
 func _emit(line: String) -> void:
@@ -474,10 +687,6 @@ func _emit(line: String) -> void:
 	print(_strip_bbcode(line))
 	if output != null:
 		output.append_text(line + "\n")
-
-
-func _flush() -> void:
-	pass
 
 
 func _strip_bbcode(s: String) -> String:

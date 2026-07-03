@@ -180,13 +180,13 @@ func _on_node_added(node: Node) -> void:
 
 
 func _try_bind(canvas_item: Node) -> void:
+	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
+	if not gdss_node:
+		return
 	if not GDSS.resolve_mode(canvas_item):
 		if GdssNodeHandler.is_bound(canvas_item):
 			_disconnect_node_signals(canvas_item)
 			GdssNodeHandler.unbind(canvas_item)
-		return
-	var gdss_node: GdssNode = GDSS._get_gdss_nodes().get(canvas_item.get_class())
-	if not gdss_node:
 		return
 	GdssNodeHandler.bind(canvas_item, true, gdss_node)
 	gdss_node.update_state(canvas_item)
