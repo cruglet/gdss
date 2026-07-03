@@ -2,10 +2,10 @@
 # Simple GDSS 0.7.0 showcase theme.
 @meta {
 	name: "GDSS Demo"
-	description: "GDSS showcase: schemes, methods, glass, calc(), opacity, and events."
+	description: "GDSS showcase: schemes, methods, gradients, glass, fonts, calc(), per-side keys, per-node overrides, and events."
 	default_scheme: dark
 	author: "Cruglet"
-	version: "0.7.3"
+	version: "0.7.4"
 }
 
 # @chunk Palette
@@ -109,10 +109,17 @@ Button {
 		border_color: $accent
 		border: 1 1 1 1
 		font_color: $accent
-	
+
 		:hover {
 			bg_color: alpha($accent, 0.14)
 			font_color: $text
+		}
+	}
+
+	# modulate tints the whole node (children included) and resets when the state exits.
+	ModulateButton {
+		:hover {
+			modulate: "#ffd9a0"
 		}
 	}
 	
@@ -168,7 +175,7 @@ Button {
 }
 
 # @chunk Panels
-PanelContainer {
+Panel, PanelContainer {
 	bg_color: $bg
 	border: 0 0 0 0
 	corner_radius: 0 0 0 0
@@ -218,6 +225,63 @@ PanelContainer {
 
 	GradientCard {
 		bg_color: linear_blur_gradient()
+		corner_radius: 12 12 12 12
+	}
+
+	LinearGradientCard {
+		bg_color: linear_gradient($accent, $accent_dark, 135)
+		corner_radius: 12 12 12 12
+	}
+
+	RadialGradientCard {
+		bg_color: radial_gradient(lighten($accent, 0.25), $accent_dark)
+		corner_radius: 12 12 12 12
+	}
+
+	# texture() fills the panel with an image, clipped to the rounded rect.
+	TextureCard {
+		bg_color: texture("res://meta/icon.png")
+		corner_radius: 12 12 12 12
+	}
+
+	# Per-side keys set one component of a composite: corners and the bottom border here.
+	PerSideCard {
+		bg_color: $surface_2
+		border_color: $accent
+		border_bottom: 3
+		corner_radius_top_left: 26
+		corner_radius_bottom_right: 26
+	}
+
+	# One swatch per color method, all derived from the live $accent global.
+	SwatchMix {
+		bg_color: mix($accent, "#ffffff", 0.5)
+		corner_radius: 8 8 8 8
+	}
+
+	SwatchSaturate {
+		bg_color: saturate($accent, 0.3)
+		corner_radius: 8 8 8 8
+	}
+
+	SwatchDesaturate {
+		bg_color: desaturate($accent, 0.4)
+		corner_radius: 8 8 8 8
+	}
+
+	SwatchInvert {
+		bg_color: invert($accent)
+		corner_radius: 8 8 8 8
+	}
+
+	SwatchComplement {
+		bg_color: complement($accent)
+		corner_radius: 8 8 8 8
+	}
+
+	SwatchHsvShift {
+		bg_color: hsv_shift($accent, 0.33)
+		corner_radius: 8 8 8 8
 	}
 
 	# A Control-based glass dropdown menu. Being a Control, it refracts the app behind it
@@ -271,6 +335,13 @@ Label {
 	CalcLabel {
 		font_size: calc($unit * 2)
 		font_color: $text
+	}
+
+	# font() loads a Font resource, so typography lives in the stylesheet too.
+	MonoLabel {
+		font: font("res://_local/jetbrains_mono.ttf")
+		font_size: 13
+		font_color: $text_dim
 	}
 	
 	SubtitleLabel {

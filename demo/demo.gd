@@ -1,9 +1,13 @@
 extends Control
 
-# 0.5.x showcase. A small fake GDSS-themed app sits in the background so the two
+# GDSS showcase. A small fake GDSS-themed app sits in the background so the two
 # draggable glass buttons have real UI to frost (blur) and refract (liquid_blur)
 # as you move them. The top bar swaps the light/dark @scheme and animates the
-# @global accent; the sliders retune both glass buttons through @instance vars.
+# @global accent (which retunes every gradient card and color-method swatch live);
+# the sliders retune both glass buttons through @instance vars. The right column
+# shows gradients, texture fills, per-side composite keys, and per-node overrides;
+# the left column shows fonts, calc(), variations, transforms, modulate, and both
+# popup styles (Window PopupMenu vs Control glass menu).
 
 @export var frosted: Button
 @export var liquid: Button
@@ -12,9 +16,8 @@ extends Control
 @export var refraction_slider: HSlider
 @export var strength_value: Label
 @export var refraction_value: Label
-
-@onready var anim_card: PanelContainer = $AnimCard
-@onready var menu_btn: Button = $App/AppMargin/AppCol/Showcase/FeatureRow/MenuBtn
+@export var anim_card: PanelContainer
+@export var menu_btn: Button
 
 var _dark: bool = true
 var _menu_panel: PanelContainer

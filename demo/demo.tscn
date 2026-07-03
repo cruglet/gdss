@@ -4,7 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://brsvagw6ydiae" path="res://meta/icon.png" id="2_dar0o"]
 [ext_resource type="Script" uid="uid://bf00wqmhix504" path="res://demo/glass_drag.gd" id="3_drag"]
 
-[node name="Demo" type="Control" unique_id=1205877970 node_paths=PackedStringArray("frosted", "liquid", "switch_button", "strength_slider", "refraction_slider", "strength_value", "refraction_value")]
+[node name="Demo" type="Control" node_paths=PackedStringArray("frosted", "liquid", "switch_button", "strength_slider", "refraction_slider", "strength_value", "refraction_value", "anim_card", "menu_btn")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -19,9 +19,11 @@ strength_slider = NodePath("BottomBar/ControlBar/CBM/Grid/StrengthSlider")
 refraction_slider = NodePath("BottomBar/ControlBar/CBM/Grid/RefractionSlider")
 strength_value = NodePath("BottomBar/ControlBar/CBM/Grid/StrengthValue")
 refraction_value = NodePath("BottomBar/ControlBar/CBM/Grid/RefractionValue")
+anim_card = NodePath("AnimCard")
+menu_btn = NodePath("App/AppMargin/AppCol/Columns/LeftCol/FeatureRow/MenuBtn")
 metadata/gdss_mode = 1
 
-[node name="App" type="PanelContainer" parent="." unique_id=703050771]
+[node name="App" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,151 +31,321 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="AppMargin" type="MarginContainer" parent="App" unique_id=763748051]
+[node name="AppMargin" type="MarginContainer" parent="App"]
 layout_mode = 2
 theme_override_constants/margin_left = 28
 theme_override_constants/margin_top = 28
 theme_override_constants/margin_right = 28
 theme_override_constants/margin_bottom = 28
 
-[node name="AppCol" type="VBoxContainer" parent="App/AppMargin" unique_id=197270421]
+[node name="AppCol" type="VBoxContainer" parent="App/AppMargin"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="Title" type="Label" parent="App/AppMargin/AppCol" unique_id=139173359]
+[node name="Title" type="Label" parent="App/AppMargin/AppCol"]
 layout_mode = 2
 text = "GDSS Demo"
 metadata/gdss_classes = PackedStringArray("Heading")
 
-[node name="Controls" type="HBoxContainer" parent="App/AppMargin/AppCol" unique_id=201497893]
+[node name="Controls" type="HBoxContainer" parent="App/AppMargin/AppCol"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Switch" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=531596294]
+[node name="Switch" type="Button" parent="App/AppMargin/AppCol/Controls"]
 layout_mode = 2
 mouse_default_cursor_shape = 2
 text = "Switch to light"
 
-[node name="Randomize" type="Button" parent="App/AppMargin/AppCol/Controls" unique_id=1576448512]
+[node name="Randomize" type="Button" parent="App/AppMargin/AppCol/Controls"]
 layout_mode = 2
 mouse_default_cursor_shape = 2
 text = "Randomize accent"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
-[node name="Card" type="PanelContainer" parent="App/AppMargin/AppCol" unique_id=1699713585]
+[node name="Columns" type="HBoxContainer" parent="App/AppMargin/AppCol"]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="LeftCol" type="VBoxContainer" parent="App/AppMargin/AppCol/Columns"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Card" type="PanelContainer" parent="App/AppMargin/AppCol/Columns/LeftCol"]
 layout_mode = 2
 size_flags_horizontal = 0
 metadata/gdss_classes = PackedStringArray("CardPanel")
 
-[node name="CM" type="MarginContainer" parent="App/AppMargin/AppCol/Card" unique_id=31453784]
+[node name="CM" type="MarginContainer" parent="App/AppMargin/AppCol/Columns/LeftCol/Card"]
 layout_mode = 2
 theme_override_constants/margin_left = 16
 theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 16
 theme_override_constants/margin_bottom = 16
 
-[node name="CV" type="VBoxContainer" parent="App/AppMargin/AppCol/Card/CM" unique_id=248439564]
+[node name="CV" type="VBoxContainer" parent="App/AppMargin/AppCol/Columns/LeftCol/Card/CM"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Label" type="Label" parent="App/AppMargin/AppCol/Card/CM/CV" unique_id=2085598672]
+[node name="Label" type="Label" parent="App/AppMargin/AppCol/Columns/LeftCol/Card/CM/CV"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 text = "Label"
 
-[node name="Sublabel" type="Label" parent="App/AppMargin/AppCol/Card/CM/CV" unique_id=930346891]
+[node name="Sublabel" type="Label" parent="App/AppMargin/AppCol/Columns/LeftCol/Card/CM/CV"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
 text = "Sublabel"
 metadata/gdss_classes = PackedStringArray("SubtitleLabel")
 
-[node name="Row" type="HBoxContainer" parent="App/AppMargin/AppCol/Card/CM/CV" unique_id=130282901]
+[node name="Row" type="HBoxContainer" parent="App/AppMargin/AppCol/Columns/LeftCol/Card/CM/CV"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Button" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1052176415]
+[node name="Button" type="Button" parent="App/AppMargin/AppCol/Columns/LeftCol/Card/CM/CV/Row"]
 layout_mode = 2
 mouse_default_cursor_shape = 2
 text = "Button"
 
-[node name="GhostButton" type="Button" parent="App/AppMargin/AppCol/Card/CM/CV/Row" unique_id=1174941247]
+[node name="GhostButton" type="Button" parent="App/AppMargin/AppCol/Columns/LeftCol/Card/CM/CV/Row"]
 layout_mode = 2
 mouse_default_cursor_shape = 2
 text = "Ghost Button"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
-[node name="Showcase" type="VBoxContainer" parent="App/AppMargin/AppCol" unique_id=2102579630]
+[node name="ShowcaseTitle" type="Label" parent="App/AppMargin/AppCol/Columns/LeftCol"]
 layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="ShowcaseTitle" type="Label" parent="App/AppMargin/AppCol/Showcase" unique_id=1884438524]
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
 text = "feature showcase"
 metadata/gdss_classes = PackedStringArray("SubtitleLabel")
 
-[node name="VariationLabel" type="Label" parent="App/AppMargin/AppCol/Showcase" unique_id=739063342]
+[node name="VariationLabel" type="Label" parent="App/AppMargin/AppCol/Columns/LeftCol"]
 layout_mode = 2
 theme_type_variation = &"TooltipLabel"
-theme_override_font_sizes/font_size = 13
 text = "This line is styled via the \"TooltipLabel\" theme-type variation."
 
-[node name="CalcLabel" type="Label" parent="App/AppMargin/AppCol/Showcase" unique_id=739063343]
+[node name="CalcLabel" type="Label" parent="App/AppMargin/AppCol/Columns/LeftCol"]
 layout_mode = 2
 text = "This line is sized with calc()."
 metadata/gdss_classes = PackedStringArray("CalcLabel")
 
-[node name="FeatureRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Showcase" unique_id=84050427]
+[node name="MonoLabel" type="Label" parent="App/AppMargin/AppCol/Columns/LeftCol"]
+layout_mode = 2
+text = "This line's typeface is loaded with font() in the stylesheet."
+metadata/gdss_classes = PackedStringArray("MonoLabel")
+
+[node name="FeatureRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Columns/LeftCol"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="LiftBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow" unique_id=1596019980]
+[node name="LiftBtn" type="Button" parent="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow"]
 layout_mode = 2
 offset_transform_enabled = true
-tooltip_text = "HELLO WORLD!"
+tooltip_text = "transform_scale + transform_position on :hover"
 mouse_default_cursor_shape = 2
 text = "Hover me, I lift"
 metadata/gdss_classes = PackedStringArray("LiftButton")
 
-[node name="MenuBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow" unique_id=2014115717]
+[node name="MenuBtn" type="Button" parent="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow"]
 layout_mode = 2
 mouse_default_cursor_shape = 2
-text = "Open menu ▾"
+text = "Glass menu ▾"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
-[node name="ToggleBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow" unique_id=1042949312]
+[node name="ToggleBtn" type="Button" parent="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow"]
 layout_mode = 2
 mouse_default_cursor_shape = 2
 text = "Toggle card"
 metadata/gdss_classes = PackedStringArray("GhostButton")
 
-[node name="FeatureRow2" type="HBoxContainer" parent="App/AppMargin/AppCol/Showcase" unique_id=84050428]
+[node name="FeatureRow2" type="HBoxContainer" parent="App/AppMargin/AppCol/Columns/LeftCol"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="BounceBtn" type="Button" parent="App/AppMargin/AppCol/Showcase/FeatureRow2" unique_id=1042949313]
+[node name="BounceBtn" type="Button" parent="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow2"]
 layout_mode = 2
 offset_transform_enabled = true
 mouse_default_cursor_shape = 2
 text = "Press me to bounce"
 metadata/gdss_classes = PackedStringArray("BounceButton")
 
-[node name="Filler" type="Control" parent="App/AppMargin/AppCol" unique_id=1668308820]
+[node name="ModulateBtn" type="Button" parent="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow2"]
+layout_mode = 2
+tooltip_text = "modulate on :hover, reset on exit"
+mouse_default_cursor_shape = 2
+text = "Hover tints me"
+metadata/gdss_classes = PackedStringArray("ModulateButton")
+
+[node name="PopupBtn" type="MenuButton" parent="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow2"]
+layout_mode = 2
+tooltip_text = "A Window-derived PopupMenu styled by the PopupMenu block"
+mouse_default_cursor_shape = 2
+text = "Window popup ▾"
+item_count = 3
+popup/item_0/text = "Styled PopupMenu"
+popup/item_0/id = 0
+popup/item_1/text = "It is a real Window"
+popup/item_1/id = 1
+popup/item_2/text = "No backdrop to refract"
+popup/item_2/id = 2
+
+[node name="RightCol" type="VBoxContainer" parent="App/AppMargin/AppCol/Columns"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="GradientsTitle" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol"]
+layout_mode = 2
+text = "gradients & fills"
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="GradientRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Columns/RightCol"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LinearCard" type="PanelContainer" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow"]
+custom_minimum_size = Vector2(118, 72)
+layout_mode = 2
+metadata/gdss_classes = PackedStringArray("LinearGradientCard")
+
+[node name="LinearCap" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow/LinearCard"]
+layout_mode = 2
+text = "linear_gradient()"
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/gdss_classes = PackedStringArray("Caption")
+
+[node name="RadialCard" type="PanelContainer" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow"]
+custom_minimum_size = Vector2(118, 72)
+layout_mode = 2
+metadata/gdss_classes = PackedStringArray("RadialGradientCard")
+
+[node name="RadialCap" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow/RadialCard"]
+layout_mode = 2
+text = "radial_gradient()"
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/gdss_classes = PackedStringArray("Caption")
+
+[node name="BlurGradCard" type="PanelContainer" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow"]
+custom_minimum_size = Vector2(118, 72)
+layout_mode = 2
+metadata/gdss_classes = PackedStringArray("GradientCard")
+
+[node name="BlurGradCap" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow/BlurGradCard"]
+layout_mode = 2
+text = "blur gradient"
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/gdss_classes = PackedStringArray("Caption")
+
+[node name="TextureCard" type="PanelContainer" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow"]
+custom_minimum_size = Vector2(118, 72)
+layout_mode = 2
+metadata/gdss_classes = PackedStringArray("TextureCard")
+
+[node name="TextureCap" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol/GradientRow/TextureCard"]
+layout_mode = 2
+text = "texture()"
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/gdss_classes = PackedStringArray("GlassLabel")
+
+[node name="SwatchTitle" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol"]
+layout_mode = 2
+text = "color methods on $accent (hit Randomize)"
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="SwatchRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Columns/RightCol"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SwMix" type="Panel" parent="App/AppMargin/AppCol/Columns/RightCol/SwatchRow"]
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+tooltip_text = "mix($accent, WHITE, 0.5)"
+metadata/gdss_classes = PackedStringArray("SwatchMix")
+
+[node name="SwSat" type="Panel" parent="App/AppMargin/AppCol/Columns/RightCol/SwatchRow"]
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+tooltip_text = "saturate($accent, 0.3)"
+metadata/gdss_classes = PackedStringArray("SwatchSaturate")
+
+[node name="SwDesat" type="Panel" parent="App/AppMargin/AppCol/Columns/RightCol/SwatchRow"]
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+tooltip_text = "desaturate($accent, 0.4)"
+metadata/gdss_classes = PackedStringArray("SwatchDesaturate")
+
+[node name="SwInvert" type="Panel" parent="App/AppMargin/AppCol/Columns/RightCol/SwatchRow"]
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+tooltip_text = "invert($accent)"
+metadata/gdss_classes = PackedStringArray("SwatchInvert")
+
+[node name="SwComp" type="Panel" parent="App/AppMargin/AppCol/Columns/RightCol/SwatchRow"]
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+tooltip_text = "complement($accent)"
+metadata/gdss_classes = PackedStringArray("SwatchComplement")
+
+[node name="SwShift" type="Panel" parent="App/AppMargin/AppCol/Columns/RightCol/SwatchRow"]
+custom_minimum_size = Vector2(42, 42)
+layout_mode = 2
+tooltip_text = "hsv_shift($accent, 0.33)"
+metadata/gdss_classes = PackedStringArray("SwatchHsvShift")
+
+[node name="PerSideTitle" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol"]
+layout_mode = 2
+text = "per-side composite keys"
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="PerSideCard" type="PanelContainer" parent="App/AppMargin/AppCol/Columns/RightCol"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+size_flags_horizontal = 0
+metadata/gdss_classes = PackedStringArray("PerSideCard")
+
+[node name="PerSideCap" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol/PerSideCard"]
+layout_mode = 2
+text = "  corner_radius_top_left · corner_radius_bottom_right · border_bottom  "
+horizontal_alignment = 1
+vertical_alignment = 1
+metadata/gdss_classes = PackedStringArray("Caption")
+
+[node name="OverridesTitle" type="Label" parent="App/AppMargin/AppCol/Columns/RightCol"]
+layout_mode = 2
+text = "per-node overrides (gdss_overrides meta, editable in the inspector)"
+metadata/gdss_classes = PackedStringArray("SubtitleLabel")
+
+[node name="OverrideRow" type="HBoxContainer" parent="App/AppMargin/AppCol/Columns/RightCol"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OverridePlain" type="Button" parent="App/AppMargin/AppCol/Columns/RightCol/OverrideRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Stylesheet button"
+
+[node name="OverrideStyled" type="Button" parent="App/AppMargin/AppCol/Columns/RightCol/OverrideRow"]
+layout_mode = 2
+tooltip_text = "bg_color: complement($accent)
+corner_radius: 999 999 999 999
+font_color: contrast(complement($accent))"
+mouse_default_cursor_shape = 2
+text = "Same button + overrides"
+metadata/gdss_overrides = "bg_color: complement($accent)
+corner_radius: 999 999 999 999
+font_color: contrast(complement($accent))"
+
+[node name="Filler" type="Control" parent="App/AppMargin/AppCol"]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="TextureRect" type="TextureRect" parent="." unique_id=664598905]
+[node name="TextureRect" type="TextureRect" parent="."]
 self_modulate = Color(1, 1, 1, 0.7490196)
 layout_mode = 1
 anchors_preset = -1
-anchor_left = 0.363
-anchor_top = 0.22600001
-anchor_right = 0.637
-anchor_bottom = 0.77400005
-offset_left = 0.039978027
-offset_top = -0.08001709
-offset_right = -0.040039063
-offset_bottom = 0.079956055
+anchor_left = 0.45
+anchor_top = 0.42
+anchor_right = 0.78
+anchor_bottom = 0.88
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
@@ -181,7 +353,7 @@ texture = ExtResource("2_dar0o")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="BottomBar" type="MarginContainer" parent="." unique_id=2054922631]
+[node name="BottomBar" type="MarginContainer" parent="."]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -195,30 +367,29 @@ theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 24
 theme_override_constants/margin_bottom = 28
 
-[node name="ControlBar" type="PanelContainer" parent="BottomBar" unique_id=1013338759]
+[node name="ControlBar" type="PanelContainer" parent="BottomBar"]
 layout_mode = 2
 size_flags_horizontal = 4
 metadata/gdss_classes = PackedStringArray("ControlBar")
 
-[node name="CBM" type="MarginContainer" parent="BottomBar/ControlBar" unique_id=1779955379]
+[node name="CBM" type="MarginContainer" parent="BottomBar/ControlBar"]
 layout_mode = 2
 theme_override_constants/margin_left = 20
 theme_override_constants/margin_top = 14
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 14
 
-[node name="Grid" type="GridContainer" parent="BottomBar/ControlBar/CBM" unique_id=1023149493]
+[node name="Grid" type="GridContainer" parent="BottomBar/ControlBar/CBM"]
 layout_mode = 2
 theme_override_constants/h_separation = 14
 theme_override_constants/v_separation = 10
 columns = 3
 
-[node name="StrengthLabel" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=580953906]
+[node name="StrengthLabel" type="Label" parent="BottomBar/ControlBar/CBM/Grid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 text = "Blur strength"
 
-[node name="StrengthSlider" type="HSlider" parent="BottomBar/ControlBar/CBM/Grid" unique_id=691048223]
+[node name="StrengthSlider" type="HSlider" parent="BottomBar/ControlBar/CBM/Grid"]
 custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -227,19 +398,17 @@ max_value = 8.0
 step = 0.5
 value = 3.0
 
-[node name="StrengthValue" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=1967743298]
+[node name="StrengthValue" type="Label" parent="BottomBar/ControlBar/CBM/Grid"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 text = "3.0"
 horizontal_alignment = 2
 
-[node name="RefractionLabel" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=1759687932]
+[node name="RefractionLabel" type="Label" parent="BottomBar/ControlBar/CBM/Grid"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 text = "Refraction"
 
-[node name="RefractionSlider" type="HSlider" parent="BottomBar/ControlBar/CBM/Grid" unique_id=1449161508]
+[node name="RefractionSlider" type="HSlider" parent="BottomBar/ControlBar/CBM/Grid"]
 custom_minimum_size = Vector2(240, 0)
 layout_mode = 2
 size_flags_horizontal = 3
@@ -248,24 +417,23 @@ max_value = 3.0
 step = 0.1
 value = 1.0
 
-[node name="RefractionValue" type="Label" parent="BottomBar/ControlBar/CBM/Grid" unique_id=107938574]
+[node name="RefractionValue" type="Label" parent="BottomBar/ControlBar/CBM/Grid"]
 custom_minimum_size = Vector2(40, 0)
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 text = "1.0"
 horizontal_alignment = 2
 
-[node name="Frosted" type="Button" parent="." unique_id=1779138023]
+[node name="Frosted" type="Button" parent="."]
 layout_mode = 0
-offset_left = 441.0
-offset_top = 244.0
-offset_right = 741.0
-offset_bottom = 464.0
+offset_left = 950.0
+offset_top = 540.0
+offset_right = 1250.0
+offset_bottom = 760.0
 mouse_default_cursor_shape = 13
 script = ExtResource("3_drag")
 metadata/gdss_classes = PackedStringArray("FrostedButton")
 
-[node name="FC" type="CenterContainer" parent="Frosted" unique_id=1511978305]
+[node name="FC" type="CenterContainer" parent="Frosted"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -274,35 +442,34 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="FCol" type="VBoxContainer" parent="Frosted/FC" unique_id=2003203961]
+[node name="FCol" type="VBoxContainer" parent="Frosted/FC"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="FL" type="Label" parent="Frosted/FC/FCol" unique_id=1866495402]
+[node name="FL" type="Label" parent="Frosted/FC/FCol"]
 layout_mode = 2
 text = "blur()"
 horizontal_alignment = 1
 metadata/gdss_classes = PackedStringArray("GlassLabel")
 
-[node name="FCap" type="Label" parent="Frosted/FC/FCol" unique_id=1702145281]
+[node name="FCap" type="Label" parent="Frosted/FC/FCol"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
 text = "frosted backdrop"
 horizontal_alignment = 1
 metadata/gdss_classes = PackedStringArray("Caption")
 
-[node name="Liquid" type="Button" parent="." unique_id=1908222028]
+[node name="Liquid" type="Button" parent="."]
 layout_mode = 0
-offset_left = 640.0
-offset_top = 260.0
-offset_right = 880.0
-offset_bottom = 500.0
+offset_left = 1150.0
+offset_top = 640.0
+offset_right = 1390.0
+offset_bottom = 880.0
 mouse_default_cursor_shape = 13
 script = ExtResource("3_drag")
 metadata/gdss_classes = PackedStringArray("LiquidButton")
 
-[node name="LC" type="CenterContainer" parent="Liquid" unique_id=1039396583]
+[node name="LC" type="CenterContainer" parent="Liquid"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -311,25 +478,24 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="LCol" type="VBoxContainer" parent="Liquid/LC" unique_id=1664959552]
+[node name="LCol" type="VBoxContainer" parent="Liquid/LC"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="LL" type="Label" parent="Liquid/LC/LCol" unique_id=1233686828]
+[node name="LL" type="Label" parent="Liquid/LC/LCol"]
 layout_mode = 2
 text = "liquid_blur()"
 horizontal_alignment = 1
 metadata/gdss_classes = PackedStringArray("GlassLabel")
 
-[node name="LCap" type="Label" parent="Liquid/LC/LCol" unique_id=975949675]
+[node name="LCap" type="Label" parent="Liquid/LC/LCol"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 12
 text = "refracting glass"
 horizontal_alignment = 1
 metadata/gdss_classes = PackedStringArray("Caption")
 
-[node name="AnimCard" type="PanelContainer" parent="." unique_id=1221126606]
+[node name="AnimCard" type="PanelContainer" parent="."]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -346,32 +512,30 @@ grow_vertical = 2
 offset_transform_enabled = true
 metadata/gdss_classes = PackedStringArray("AnimCard")
 
-[node name="ACMargin" type="MarginContainer" parent="AnimCard" unique_id=1958565163]
+[node name="ACMargin" type="MarginContainer" parent="AnimCard"]
 layout_mode = 2
 theme_override_constants/margin_left = 22
 theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 22
 theme_override_constants/margin_bottom = 18
 
-[node name="ACCol" type="VBoxContainer" parent="AnimCard/ACMargin" unique_id=1105724491]
+[node name="ACCol" type="VBoxContainer" parent="AnimCard/ACMargin"]
 layout_mode = 2
 theme_override_constants/separation = 6
 
-[node name="ACTitle" type="Label" parent="AnimCard/ACMargin/ACCol" unique_id=1766576370]
+[node name="ACTitle" type="Label" parent="AnimCard/ACMargin/ACCol"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 14
 text = "on_show() / on_hide()"
 
-[node name="ACBody" type="Label" parent="AnimCard/ACMargin/ACCol" unique_id=1548629589]
+[node name="ACBody" type="Label" parent="AnimCard/ACMargin/ACCol"]
 layout_mode = 2
-theme_override_font_sizes/font_size = 13
 text = "Pops in with a springy ease and fades out via animatable opacity when shown or hidden."
 autowrap_mode = 2
 metadata/gdss_classes = PackedStringArray("SubtitleLabel")
 
 [connection signal="pressed" from="App/AppMargin/AppCol/Controls/Switch" to="." method="_on_switch_pressed"]
 [connection signal="pressed" from="App/AppMargin/AppCol/Controls/Randomize" to="." method="_on_randomize_pressed"]
-[connection signal="pressed" from="App/AppMargin/AppCol/Showcase/FeatureRow/MenuBtn" to="." method="_on_menu_pressed"]
-[connection signal="pressed" from="App/AppMargin/AppCol/Showcase/FeatureRow/ToggleBtn" to="." method="_on_toggle_card_pressed"]
+[connection signal="pressed" from="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow/MenuBtn" to="." method="_on_menu_pressed"]
+[connection signal="pressed" from="App/AppMargin/AppCol/Columns/LeftCol/FeatureRow/ToggleBtn" to="." method="_on_toggle_card_pressed"]
 [connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/StrengthSlider" to="." method="_on_strength_slider_value_changed"]
 [connection signal="value_changed" from="BottomBar/ControlBar/CBM/Grid/RefractionSlider" to="." method="_on_refraction_slider_value_changed"]
