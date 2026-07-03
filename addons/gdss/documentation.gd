@@ -152,6 +152,13 @@ var WritingGDSS: GDSSDocumentation
 ## [/codeblock]
 ## Anything a scheme omits falls back to the base [code]@global[/code] value, so the
 ## [code]dark[/code] scheme above (which matches the base) needs no entries.[br][br]
+## A scheme can inherit another scheme's overrides with [code]extends[/code]; its own
+## entries then layer on top of the parent chain:
+## [codeblock]
+## @scheme oled extends dark {
+##     bg: "#000000"
+## }
+## [/codeblock]
 ## Switch schemes from GDScript with [method GDSS.set_scheme]. Passing a time animates
 ## the change; colors, numbers, and composite values interpolate while everything else
 ## snaps:

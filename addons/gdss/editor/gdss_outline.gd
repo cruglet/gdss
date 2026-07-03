@@ -60,6 +60,7 @@ func _rebuild() -> void:
 	_tree.clear()
 	var open_blocks: Array[TreeItem] = [_tree.create_item()]
 	var base_selectors: Array[String] = [""]
+	var scheme_items: Dictionary = {}
 	var lines: PackedStringArray = code_edit.text.split("\n")
 	for line_number: int in lines.size():
 		var content: String = _without_comment(lines[line_number]).strip_edges()
@@ -67,10 +68,22 @@ func _rebuild() -> void:
 			var label: String = content.trim_suffix("{").strip_edges()
 			var depth: int = open_blocks.size()
 			var base_selector: String = label if depth <= 1 else base_selectors.back()
-			var item: TreeItem = _tree.create_item(open_blocks.back())
+			var tree_parent: TreeItem = open_blocks.back()
+			var scheme_name: String = ""
+			if label.begins_with("@scheme"):
+				var scheme_match: RegExMatch = GdssInterpreter._re_scheme.search(label)
+				if scheme_match != null:
+					scheme_name = scheme_match.get_string(1)
+					label = "@scheme " + scheme_name
+					var scheme_parent: String = scheme_match.get_string(2)
+					if not scheme_parent.is_empty() and scheme_items.has(scheme_parent):
+						tree_parent = scheme_items.get(scheme_parent)
+			var item: TreeItem = _tree.create_item(tree_parent)
 			item.set_text(0, label)
 			item.set_metadata(0, line_number)
 			_decorate(item, label, depth, base_selector)
+			if not scheme_name.is_empty():
+				scheme_items[scheme_name] = item
 			open_blocks.push_back(item)
 			base_selectors.push_back(base_selector)
 		elif content.begins_with("}") and open_blocks.size() > 1:

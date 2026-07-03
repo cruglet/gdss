@@ -2,7 +2,7 @@
 class_name GdssStorage
 extends RefCounted
 
-const FORMAT_VERSION: int = 2
+const FORMAT_VERSION: int = 3
 
 
 static func is_current_format(raw: Variant) -> bool:

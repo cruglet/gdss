@@ -27,6 +27,8 @@ static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*[:=]")
 static var _re_node_open: RegEx = RegEx.create_from_string(r"^([\w][\w\s,]*)(?::(\w+))?\s*\{")
 static var _re_variant_open: RegEx = RegEx.create_from_string(r"^:([\w][\w\s,:]*)?\s*\{")
 static var _re_scheme_open: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
+static var _re_scheme_head_parent: RegEx = RegEx.create_from_string(r"^\s*@scheme\s+(\w+)\s+extends\s+(\w*)$")
+static var _re_scheme_head_tail: RegEx = RegEx.create_from_string(r"^\s*@scheme\s+\w+\s+(\w*)$")
 static var _re_meta_open: RegEx = RegEx.create_from_string(r"^@meta\b")
 
 const BUILTIN_COLORS: Array[String] = [
@@ -147,6 +149,9 @@ func _on_text_changed() -> void:
 		editor.request_code_completion(true)
 		return
 	if word.is_empty():
+		if not (_scheme_header_mode().get("mode", "") as String).is_empty():
+			editor.request_code_completion(true)
+			return
 		var context: Dictionary = _get_context()
 		var type: String = context.get("type", "")
 		if type == "property_value" or type == "variant_decl" or type == "scheme_block" or type == "meta_block":
@@ -278,7 +283,22 @@ func _update_completions(word: String) -> void:
 		_complete_values(word, "", "")
 		editor.update_code_completion_options(true)
 		return
-	
+
+	var scheme_header: Dictionary = _scheme_header_mode()
+	var scheme_mode: String = scheme_header.get("mode", "")
+	if scheme_mode == "keyword":
+		if word.is_empty() or "extends".begins_with(word):
+			editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "extends", "extends ", _completion_color, _get_icon(&"MemberAnnotation"))
+		editor.update_code_completion_options(true)
+		return
+	if scheme_mode == "parent":
+		var own_name: String = scheme_header.get("name", "")
+		for scheme_name: String in GdssInterpreter.schemes:
+			if scheme_name != own_name and _matches(scheme_name, word):
+				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, scheme_name, scheme_name + " ", _completion_color, _get_icon(&"BlitMaterial"))
+		editor.update_code_completion_options(true)
+		return
+
 	var context: Dictionary = _get_context()
 	
 	match context.get("type", "top_level"):
@@ -815,6 +835,24 @@ func _strip_comment(line: String) -> String:
 		elif c == "#":
 			return line.substr(0, i)
 	return line
+
+
+func _scheme_header_mode() -> Dictionary:
+	var line: String = editor.get_line(editor.get_caret_line())
+	var head: String = line.substr(0, mini(editor.get_caret_column(), line.length()))
+	var parent_match: RegExMatch = _re_scheme_head_parent.search(head)
+	if parent_match != null:
+		if head.ends_with(" ") and not parent_match.get_string(2).is_empty():
+			return {}
+		if head.ends_with(" ") and not head.strip_edges().ends_with("extends"):
+			return {}
+		return {"mode": "parent", "name": parent_match.get_string(1)}
+	var tail_match: RegExMatch = _re_scheme_head_tail.search(head)
+	if tail_match != null and "extends".begins_with(tail_match.get_string(1)):
+		if head.ends_with(" ") and not tail_match.get_string(1).is_empty():
+			return {}
+		return {"mode": "keyword"}
+	return {}
 
 
 func _complete_scheme_vars(word: String) -> void:

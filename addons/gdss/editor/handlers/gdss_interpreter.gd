@@ -22,11 +22,13 @@ static var _cached_states: PackedStringArray = []
 static var _composite_map: Dictionary = {}
 static var _inst: GdssInterpreter
 
+const SCHEME_PARENT_KEY: String = "__gdss_extends__"
+
 static var _re_global: RegEx = RegEx.create_from_string(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
 static var _re_instance: RegEx = RegEx.create_from_string(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
 static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*:\s*(.+)")
 static var _re_bad_annotation: RegEx = RegEx.create_from_string(r"^@(\w+)")
-static var _re_scheme: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
+static var _re_scheme: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)(?:\s+extends\s+(\w+))?")
 static var _re_meta: RegEx = RegEx.create_from_string(r"^@meta\b")
 static var _re_import: RegEx = RegEx.create_from_string(r"^@import\s+([\"'])(.+?)\1")
 
@@ -627,6 +629,8 @@ func check_errors(source: String) -> Array[Array]:
 
 func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, declared_instances: Dictionary, errors: Array[Array]) -> void:
 	var scheme_names: Dictionary = {}
+	var scheme_parents: Dictionary = {}
+	var scheme_lines: Dictionary = {}
 	var default_scheme: String = ""
 	var default_line: int = -1
 	for block: Dictionary in blocks:
@@ -639,6 +643,10 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 			continue
 		if block["kind"] == "scheme":
 			scheme_names[block["name"]] = true
+			var block_parent: String = str(block.get("parent", ""))
+			if not block_parent.is_empty():
+				scheme_parents[block["name"]] = block_parent
+				scheme_lines[block["name"]] = block["header_line"]
 			for entry: Dictionary in block["entries"]:
 				var value_str: String = entry["value_str"]
 				if value_str.is_empty():
@@ -655,6 +663,23 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 				elif entry["key"] == "default_scheme":
 					default_scheme = _parse_meta_value(entry["value_str"])
 					default_line = entry["line"]
+	for scheme_name: String in scheme_parents:
+		var parent: String = str(scheme_parents.get(scheme_name))
+		var line: int = int(scheme_lines.get(scheme_name, 0))
+		if parent == scheme_name:
+			errors.append(["@scheme '%s' cannot extend itself" % scheme_name, line])
+			continue
+		if not scheme_names.has(parent):
+			errors.append(["@scheme '%s' extends unknown scheme '%s'" % [scheme_name, parent], line])
+			continue
+		var seen: Dictionary = {scheme_name: true}
+		var current: String = parent
+		while scheme_parents.has(current):
+			if seen.has(current):
+				errors.append(["@scheme '%s' has a circular extends chain" % scheme_name, line])
+				break
+			seen[current] = true
+			current = str(scheme_parents.get(current))
 	if not default_scheme.is_empty() and not scheme_names.has(default_scheme):
 		errors.append(["@meta default_scheme '%s' is not a defined @scheme" % default_scheme, default_line])
 
@@ -1011,18 +1036,30 @@ static func resolve_scheme(name: String) -> Dictionary:
 	var result: Dictionary = _global_defaults.duplicate(true)
 	for key: String in _instance_scheme_base:
 		result[key] = _instance_scheme_base[key]
-	if schemes.has(name):
-		var deltas: Dictionary = schemes[name]
+	for scheme_name: String in _scheme_chain(name):
+		var deltas: Dictionary = schemes.get(scheme_name, {})
 		for key: String in deltas:
-			result[key] = deltas[key]
+			if key != SCHEME_PARENT_KEY:
+				result[key] = deltas[key]
 	return result
+
+
+static func _scheme_chain(name: String) -> PackedStringArray:
+	var chain: PackedStringArray = []
+	var current: String = name
+	while not current.is_empty() and schemes.has(current) and not chain.has(current):
+		chain.append(current)
+		current = str((schemes.get(current, {}) as Dictionary).get(SCHEME_PARENT_KEY, ""))
+	chain.reverse()
+	return chain
 
 
 static func scheme_keys() -> PackedStringArray:
 	var keys: Dictionary = {}
 	for scheme_name: String in schemes:
 		for key: String in (schemes[scheme_name] as Dictionary):
-			keys[key] = true
+			if key != SCHEME_PARENT_KEY:
+				keys[key] = true
 	return PackedStringArray(keys.keys())
 
 
@@ -1045,6 +1082,7 @@ static func _strip_annotation_blocks(source: String) -> Dictionary:
 			continue
 		var kind: String = "scheme" if scheme_match != null else "meta"
 		var block_name: String = scheme_match.get_string(1) if scheme_match != null else ""
+		var block_parent: String = scheme_match.get_string(2) if scheme_match != null else ""
 		var header_line: int = i
 		var entries: Array[Dictionary] = []
 		out_lines.append("")
@@ -1059,7 +1097,7 @@ static func _strip_annotation_blocks(source: String) -> Dictionary:
 					i += 1
 					break
 				i += 1
-			blocks.append({"kind": kind, "name": block_name, "header_line": header_line, "entries": [], "malformed": true, "unterminated": false})
+			blocks.append({"kind": kind, "name": block_name, "parent": block_parent, "header_line": header_line, "entries": [], "malformed": true, "unterminated": false})
 			continue
 		var depth: int = _brace_delta(stripped)
 		var head_entry: Dictionary = _extract_block_entry(stripped.substr(stripped.find("{") + 1), header_line)
@@ -1074,7 +1112,7 @@ static func _strip_annotation_blocks(source: String) -> Dictionary:
 				entries.append(entry)
 			out_lines.append("")
 			i += 1
-		blocks.append({"kind": kind, "name": block_name, "header_line": header_line, "entries": entries, "malformed": false, "unterminated": depth > 0})
+		blocks.append({"kind": kind, "name": block_name, "parent": block_parent, "header_line": header_line, "entries": entries, "malformed": false, "unterminated": depth > 0})
 	return {"cleaned": "\n".join(out_lines), "blocks": blocks}
 
 
@@ -1116,6 +1154,9 @@ static func _accumulate_blocks(blocks: Array, known_states: PackedStringArray) -
 			var name: String = block["name"]
 			if not schemes.has(name):
 				schemes[name] = {}
+			var parent: String = str(block.get("parent", ""))
+			if not parent.is_empty():
+				schemes[name][SCHEME_PARENT_KEY] = parent
 			for entry: Dictionary in block["entries"]:
 				var value_str: String = entry["value_str"]
 				if value_str.is_empty():

@@ -371,6 +371,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					result[start] = {"color": col_control_flow if valid else col_default}
 				elif nodes.has(word):
 					result[start] = {"color": col_type}
+				elif word == "extends":
+					result[start] = {"color": col_keyword}
 				elif after.begins_with("(") and after.rfind("{") > after.rfind(")"):
 					result[start] = {"color": col_event}
 				elif is_before_brace:

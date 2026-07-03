@@ -35,6 +35,27 @@ Button {
 }
 """
 
+const FIXTURE_SCHEMES: String = """
+@global var accent: "#3b82f6"
+@scheme base {
+	accent: "#112233"
+}
+@scheme good extends base {
+}
+@scheme forward extends declared_later {
+}
+@scheme declared_later {
+}
+@scheme ghost extends missing {
+}
+@scheme selfish extends selfish {
+}
+@scheme ring_a extends ring_b {
+}
+@scheme ring_b extends ring_a {
+}
+"""
+
 const FIXTURE_CLASS_BLOCKS: String = """
 Button {
 	bg_color: BLACK
@@ -82,3 +103,9 @@ func run(t: TC) -> void:
 	t.check(not t.has_error_containing(class_blocks, "corner_radius_top_left"), "per-side key accepted in class block")
 	t.check(not t.has_error_containing(class_blocks, "transition_time"), "transition props accepted in event blocks")
 	t.check(not t.has_error_containing(class_blocks, "transform_scale"), "node props accepted in event blocks")
+	var scheme_errors: Array[Array] = t.validate_fixture(FIXTURE_SCHEMES)
+	t.check(t.has_error_containing(scheme_errors, "extends unknown scheme 'missing'"), "unknown scheme parent flagged")
+	t.check(t.has_error_containing(scheme_errors, "'selfish' cannot extend itself"), "self-extension flagged")
+	t.check(t.has_error_containing(scheme_errors, "circular extends chain"), "extends cycle flagged")
+	t.check(not t.has_error_containing(scheme_errors, "'good'"), "valid extends accepted")
+	t.check(not t.has_error_containing(scheme_errors, "'forward'"), "forward-declared parent accepted")
