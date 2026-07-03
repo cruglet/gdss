@@ -1546,7 +1546,7 @@ func _draw_color_swatches() -> void:
 		if anchor.x < 0 or anchor.y < 0:
 			continue
 		var swatch_y: float = anchor.y - line_height + (line_height - swatch_size) * 0.5
-		var cursor_x: float = anchor.x + 12.0
+		var cursor_x: float = anchor.x + (8.0 * EditorInterface.get_editor_scale())
 		for hit: Dictionary in colors:
 			var swatch: Rect2 = Rect2(cursor_x, swatch_y, swatch_size, swatch_size)
 			code_edit.draw_rect(swatch, Color(0, 0, 0, 0.6))
