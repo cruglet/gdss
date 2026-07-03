@@ -6,7 +6,7 @@ static var _cache: Dictionary = {}
 
 func _init() -> void:
 	method_name = "texture"
-	supported_prop_types = [GDSS.Type.COLOR]
+	supported_prop_types = [GDSS.Type.COLOR, GDSS.Type.ICON]
 	returns_texture = true
 	parameters = [
 		Param.new("path", ParamType.STRING, true, ""),

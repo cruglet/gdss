@@ -163,6 +163,8 @@ func _node_config(type: String) -> Array:
 			return [false, true, true]
 		"ItemList":
 			return [true, true, false]
+		"TextureRect", "ColorRect":
+			return [true, false, true]
 		"Panel", "PanelContainer":
 			return [false, true, false]
 		"PopupMenu":
@@ -181,10 +183,19 @@ func _build_nodes_code() -> void:
 	# Window-derived nodes GDSS styles explicitly (not caught by the Control filter).
 	types["PopupMenu"] = true
 	types["Window"] = true
+	# Theme-item-less Controls: absent from the default theme's type list, styled purely
+	# through node properties (color/texture plus the shared transform/visual props).
+	types["TextureRect"] = true
+	types["ColorRect"] = true
 	for type: String in types:
 		var node: GdssNode = _instantiate_node_class(type)
 		node.base_type = StringName(type)
 		node.style_name = StringName(type)
+		match type:
+			"ColorRect":
+				node.unique_properties.append(GdssProp.create("color", GDSS.Type.COLOR, Color.WHITE, GdssProp.Category.NODE_PROPERTY))
+			"TextureRect":
+				node.unique_properties.append(GdssProp.create("texture", GDSS.Type.ICON, null, GdssProp.Category.NODE_PROPERTY))
 		var ec: Dictionary[String, bool] = {}
 		var cfg: Array = _node_config(type)
 		if cfg.is_empty():
