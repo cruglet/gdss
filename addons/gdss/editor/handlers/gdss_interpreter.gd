@@ -374,7 +374,11 @@ func _check_calc_value(value_str: String, declared_vars: Dictionary, errors: Arr
 
 
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
+	var is_component: bool = prop.composite_of.has(prop_name)
 	if not _is_quoted_literal(value_str) and value_str.contains("("):
+		if is_component:
+			errors.append(["Component property '%s' expects a plain value, not a method call" % prop_name, line])
+			return
 		var method_name: String = _method_name_of(value_str)
 		if method_name == "calc":
 			_check_calc_value(value_str, declared_vars, errors, line)
@@ -383,8 +387,8 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		return
 	
 	var actual_type: GDSS.Type = prop.type
-	if prop.composite_of.has(prop_name):
-		actual_type = GDSS.Type.INT
+	if is_component:
+		actual_type = GDSS.Type.FLOAT if prop.type == GDSS.Type.VECTOR2 else GDSS.Type.INT
 	
 	if actual_type == GDSS.Type.COMPOSITE4:
 		var parts: PackedStringArray = value_str.replace("\t", " ").split(" ", false)
@@ -398,6 +402,20 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 					errors.append(["Undefined variable '$%s'" % var_name, line])
 			elif not part.is_valid_int():
 				errors.append(["Property '%s' expects all integer components, got '%s'" % [prop_name, part], line])
+		return
+	
+	if actual_type == GDSS.Type.VECTOR2:
+		var parts: PackedStringArray = value_str.replace("\t", " ").split(" ", false)
+		if parts.is_empty() or parts.size() > 2:
+			errors.append(["Property '%s' expects 1 or 2 numeric values, got %d" % [prop_name, parts.size()], line])
+			return
+		for part: String in parts:
+			if part.begins_with("$"):
+				var var_name: String = part.substr(1)
+				if _is_undefined_var(var_name, declared_vars):
+					errors.append(["Undefined variable '$%s'" % var_name, line])
+			elif not part.is_valid_float():
+				errors.append(["Property '%s' expects numeric components, got '%s'" % [prop_name, part], line])
 		return
 	
 	if value_str.begins_with("$"):
@@ -1631,8 +1649,18 @@ static func _parse_value(parts: Array[String]) -> Variant:
 			return Vector4i(int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]))
 		if all_int_resolvable:
 			return {"__gdss_composite4__": [parts[0], parts[1], parts[2], parts[3]]}
-	if parts.size() == 2 and parts[0].is_valid_float() and parts[1].is_valid_float():
-		return Vector2(float(parts[0]), float(parts[1]))
+	if parts.size() == 2:
+		var both_numeric: bool = true
+		var both_float_resolvable: bool = true
+		for p: String in parts:
+			if not p.is_valid_float():
+				both_numeric = false
+				if not p.begins_with("__gdss_global__") and not p.begins_with("__gdss_local__") and not p.begins_with("__gdss_instance__"):
+					both_float_resolvable = false
+		if both_numeric:
+			return Vector2(float(parts.front()), float(parts.back()))
+		if both_float_resolvable:
+			return {"__gdss_composite2__": [parts.front(), parts.back()]}
 	if parts.size() == 1:
 		var token: String = parts[0].trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 		if token.to_lower() == "true":
@@ -1660,29 +1688,54 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 		_fold_composite_component(result[selector][state], info["prop"], info["index"], value)
 		return
 	var registered: GdssProp = GDSS.get_db().property_list.get(prop)
-	if registered != null and value is String and not (value as String).begins_with("__gdss_"):
-		match registered.type:
-			GDSS.Type.CURSOR, GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
-				value = (value as String).to_upper()
+	if registered != null:
+		if value is String and not (value as String).begins_with("__gdss_"):
+			match registered.type:
+				GDSS.Type.CURSOR, GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
+					value = (value as String).to_upper()
+		elif registered.type == GDSS.Type.VECTOR2 and (value is int or value is float):
+			# Single-value shorthand splats to both components (transform_scale: 1.1).
+			value = Vector2(float(value), float(value))
 	result[selector][state][prop] = value
 
 
 static func _fold_composite_component(container: Dictionary, parent_prop: String, index: int, value: Variant) -> void:
 	var existing: Variant = container.get(parent_prop)
+	if value is Dictionary:
+		return
 	if _patch_composites and (existing == null or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite4_patch__"))):
 		var patch: Dictionary = (existing as Dictionary).get("__gdss_composite4_patch__") if existing is Dictionary else {}
 		patch[index] = value
 		container[parent_prop] = {"__gdss_composite4_patch__": patch}
 		return
+	var parent: GdssProp = GDSS.get_db().property_list.get(parent_prop)
 	if existing == null:
-		var parent: GdssProp = GDSS.get_db().property_list.get(parent_prop)
 		existing = parent.get_default_value() if parent != null else Vector4i.ZERO
+	# Two-component (Vector2) parents fold with float components; four-component ones
+	# stay int. Decide from the existing value first so patch resolution - which folds
+	# onto a scratch key with no registered prop - still picks the right shape.
+	var is_vec2: bool = existing is Vector2 \
+		or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite2__")) \
+		or (parent != null and parent.type == GDSS.Type.VECTOR2)
 	var is_ref: bool = value is String and (value as String).begins_with("__gdss_")
-	if existing is Dictionary and (existing as Dictionary).has("__gdss_composite4__"):
-		var parts: Array = (existing as Dictionary)["__gdss_composite4__"]
+	var sentinel: String = "__gdss_composite2__" if is_vec2 else "__gdss_composite4__"
+	if existing is Dictionary and (existing as Dictionary).has(sentinel):
+		var parts: Array = (existing as Dictionary)[sentinel]
 		if index < parts.size():
-			parts[index] = String(value) if is_ref else str(int(value))
+			parts[index] = String(value) if is_ref else (str(float(value)) if is_vec2 else str(int(value)))
 		container[parent_prop] = existing
+		return
+	if is_vec2:
+		var vec2: Vector2 = existing if existing is Vector2 else Vector2.ZERO
+		if is_ref:
+			var parts2: Array = [str(vec2.x), str(vec2.y)]
+			parts2[index] = value
+			container[parent_prop] = {"__gdss_composite2__": parts2}
+			return
+		match index:
+			0: vec2.x = float(value)
+			1: vec2.y = float(value)
+		container[parent_prop] = vec2
 		return
 	var vec: Vector4i = existing if existing is Vector4i else Vector4i.ZERO
 	if is_ref:

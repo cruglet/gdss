@@ -46,7 +46,8 @@ func _make_prop(n: String, t: GDSS.Type, d: Variant, c: GdssProp.Category, comp:
 	p.type = t
 	p.default_value = d
 	p.category = c
-	p.composite_of = comp # set after type so it overrides the auto _left/_right pattern
+	if not comp.is_empty():
+		p.composite_of = comp # set after type so it overrides the auto _left/_right pattern
 	p.category_subproperties = sub
 	property_list[n] = p
 
@@ -67,6 +68,17 @@ func _build_properties_code() -> void:
 	_make_prop("shadow_color", GDSS.Type.COLOR, Color(0, 0, 0, 1), GdssProp.Category.STYLE)
 	_make_prop("skew_x", GDSS.Type.FLOAT, 0.0, GdssProp.Category.STYLE)
 	_make_prop("skew_y", GDSS.Type.FLOAT, 0.0, GdssProp.Category.STYLE)
+	# Godot 4.7 Control offset-transform properties, exposed under the shorter
+	# "transform_" prefix. Registered here (not just on the nodes) so the composite
+	# machinery - per-component keys, single-value splat, override patches - sees them.
+	_make_prop("transform_enabled", GDSS.Type.BOOLEAN, false, GdssProp.Category.NODE_PROPERTY)
+	_make_prop("transform_pivot", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY)
+	_make_prop("transform_pivot_ratio", GDSS.Type.VECTOR2, Vector2(0.5, 0.5), GdssProp.Category.NODE_PROPERTY)
+	_make_prop("transform_position", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY)
+	_make_prop("transform_position_ratio", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY)
+	_make_prop("transform_rotation", GDSS.Type.FLOAT, 0.0, GdssProp.Category.NODE_PROPERTY)
+	_make_prop("transform_scale", GDSS.Type.VECTOR2, Vector2.ONE, GdssProp.Category.NODE_PROPERTY)
+	_make_prop("transform_visual_only", GDSS.Type.BOOLEAN, true, GdssProp.Category.NODE_PROPERTY)
 	_make_prop("transition_func", GDSS.Type.TRANSITION_FUNC, 0, GdssProp.Category.STYLE)
 	_make_prop("transition_time", GDSS.Type.FLOAT, 0.0, GdssProp.Category.STYLE)
 	_make_prop("transition_type", GDSS.Type.TRANSITION_TYPE, 1, GdssProp.Category.STYLE)

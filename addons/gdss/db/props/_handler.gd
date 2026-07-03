@@ -467,6 +467,10 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 					return
 				control.add_theme_icon_override(prop.name, val)
 		GdssProp.Category.NODE_PROPERTY:
+			# A $variable holding a single number can reach a Vector2 prop; splat it
+			# like the parse-time single-value shorthand.
+			if prop.type == GDSS.Type.VECTOR2 and (val is int or val is float):
+				val = Vector2(float(val), float(val))
 			var def: Variant = prop.get_default_value()
 			if not (typeof(val) == typeof(def) and val == def):
 				_applied_node_props[prop.name] = true
@@ -483,7 +487,8 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, gdss_node: GdssNode, va
 			# GDSS exposes the 4.7 Control transforms as "transform_*"; the real node
 			# property is "offset_transform_*".
 			var node_prop: String = "offset_" + prop.name if prop.name.begins_with("transform_") else prop.name
-			if control.get(node_prop) != val:
+			var current: Variant = control.get(node_prop)
+			if typeof(current) != typeof(val) or current != val:
 				control.set(node_prop, val)
 
 
@@ -717,6 +722,10 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 				var fallback: Vector2 = prop.get_default_value() if prop.get_default_value() is Vector2 else Vector2.ZERO
 				var from_val: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
 				var to_val: Variant = _get_parsed_val(prop_name, to_state, fallback)
+				if from_val is int or from_val is float:
+					from_val = Vector2(float(from_val), float(from_val))
+				if to_val is int or to_val is float:
+					to_val = Vector2(float(to_val), float(to_val))
 				if not from_val is Vector2 or not to_val is Vector2:
 					continue
 				var from: Vector2 = from_val as Vector2
@@ -1050,6 +1059,9 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4__"):
 		var parts: Array = (raw as Dictionary)["__gdss_composite4__"]
 		return Vector4i(_resolve_composite_part(parts[0]), _resolve_composite_part(parts[1]), _resolve_composite_part(parts[2]), _resolve_composite_part(parts[3]))
+	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite2__"):
+		var parts2: Array = (raw as Dictionary)["__gdss_composite2__"]
+		return Vector2(_resolve_composite_part_f(parts2.front()), _resolve_composite_part_f(parts2.back()))
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_calc__"):
 		return _eval_calc((raw as Dictionary)["__gdss_calc__"])
 	raw = _resolve_sentinel(raw, fallback)
@@ -1116,6 +1128,17 @@ func _resolve_composite_part(part: String) -> int:
 	if resolved is String and (resolved as String).is_valid_int():
 		return int(resolved)
 	return 0
+
+
+func _resolve_composite_part_f(part: String) -> float:
+	if part.is_valid_float():
+		return float(part)
+	var resolved: Variant = _resolve_sentinel(part, 0.0)
+	if resolved is int or resolved is float:
+		return float(resolved)
+	if resolved is String and (resolved as String).is_valid_float():
+		return float(resolved)
+	return 0.0
 
 
 func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Array[Variant]:
@@ -1352,8 +1375,8 @@ func _is_dynamic_raw(raw: Variant) -> bool:
 		return s.begins_with("__gdss_global__") or s.begins_with("__gdss_instance__")
 	if raw is Dictionary:
 		var d: Dictionary = raw as Dictionary
-		if d.has("__gdss_composite4__"):
-			for part: Variant in d["__gdss_composite4__"]:
+		if d.has("__gdss_composite4__") or d.has("__gdss_composite2__"):
+			for part: Variant in d.get("__gdss_composite4__", d.get("__gdss_composite2__")):
 				if part is String and ((part as String).begins_with("__gdss_global__") or (part as String).begins_with("__gdss_instance__")):
 					return true
 			return false

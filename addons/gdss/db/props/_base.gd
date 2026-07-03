@@ -23,12 +23,15 @@ var type: GDSS.Type = GDSS.Type.INT:
 		if t == GDSS.Type.COMPOSITE4 and name:
 			default_value = Vector4i.ZERO
 			composite_of = ("%s_left;%s_right;%s_top;%s_bottom" % [name, name, name, name]).split(";")
+		if t == GDSS.Type.VECTOR2 and name:
+			default_value = Vector2.ZERO
+			composite_of = ("%s_x;%s_y" % [name, name]).split(";")
 		notify_property_list_changed()
 var default_value: Variant
 var category: Category = Category.STYLE
 var composite_of: PackedStringArray = []:
 	get():
-		if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE:
+		if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE or type == GDSS.Type.VECTOR2:
 			return composite_of
 		else:
 			return []
@@ -78,7 +81,7 @@ func _get_property_list() -> Array[Dictionary]:
 		GDSS.Type.TRANSITION_FUNC: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionFunc.keys())})
 		GDSS.Type.ICON: props.append({"name": "default_value", "type": TYPE_OBJECT, "hint": PROPERTY_HINT_RESOURCE_TYPE, "hint_string": "Texture2D"})
 	
-	if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE:
+	if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE or type == GDSS.Type.VECTOR2:
 		props.append({"name": "composite_of", "type": TYPE_PACKED_STRING_ARRAY})
 	
 	props.append({

@@ -213,7 +213,7 @@ func _show_composite_hint(line: String, col: int) -> bool:
 		return false
 	var prop_name: String = line.substr(0, colon).strip_edges()
 	var prop_def: GdssProp = GDSS.get_db().property_list.get(prop_name)
-	if prop_def == null or prop_def.type != GDSS.Type.COMPOSITE4:
+	if prop_def == null or not prop_def.is_composite() or prop_def.type == GDSS.Type.COMPOSITE:
 		return false
 	var context_type: String = str(_get_context().get("type", ""))
 	if context_type != "property_value" and context_type != "property_value_filled":
@@ -368,17 +368,14 @@ func _complete_properties(word: String, style_name: String) -> void:
 		if _matches(prop, word):
 			editor.add_code_completion_option(CodeEdit.KIND_MEMBER, prop, prop + ": ", _completion_color, icon)
 
-		if prop_def == null or prop_def.type != GDSS.Type.COMPOSITE4:
+		if prop_def == null or not prop_def.is_composite() or prop_def.type == GDSS.Type.COMPOSITE:
 			continue
-		if prop_def.default_value == null or not prop_def.default_value is Vector4i:
-			continue
-		var v4: Vector4i = prop_def.default_value
-		var components: Array[Variant] = [v4.x, v4.y, v4.z, v4.w]
+		var sub_icon: Texture2D = _get_icon(&"float") if prop_def.type == GDSS.Type.VECTOR2 else _get_icon(&"int")
 
 		for idx: int in range(prop_def.composite_of.size()):
 			var sub: String = prop_def.composite_of[idx]
 			if _matches(sub, word):
-				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, _get_icon(&"int"))
+				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, sub_icon)
 
 
 func _complete_events(word: String, style_name: String) -> void:
@@ -424,20 +421,23 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			if not raw is GdssProp:
 				continue
 			var pd: GdssProp = raw
-			if pd.type != GDSS.Type.COMPOSITE4:
-				continue
-			var raw_default: Variant = pd.default_value
-			if not raw_default is Vector4i:
+			if not pd.is_composite() or pd.type == GDSS.Type.COMPOSITE:
 				continue
 			var idx: int = pd.composite_of.find(prop)
 			if idx == -1:
 				continue
-			var v4: Vector4i = raw_default
-			var components: Array[Variant] = [v4.x, v4.y, v4.z, v4.w]
+			var raw_default: Variant = pd.default_value
+			var components: Array[Variant] = []
+			if raw_default is Vector4i:
+				var v4: Vector4i = raw_default
+				components = [v4.x, v4.y, v4.z, v4.w]
+			elif raw_default is Vector2:
+				var v2: Vector2 = raw_default
+				components = [v2.x, v2.y]
 			if idx < components.size():
 				var hint: String = str(components[idx])
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, hint, hint, _completion_color, _get_icon(&"MemberProperty"))
-			effective_type = GDSS.Type.INT
+			effective_type = GDSS.Type.FLOAT if pd.type == GDSS.Type.VECTOR2 else GDSS.Type.INT
 			break
 	else:
 		effective_type = prop_def.type

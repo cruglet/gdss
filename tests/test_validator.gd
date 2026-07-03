@@ -35,6 +35,23 @@ Button {
 }
 """
 
+const FIXTURE_VEC2_BAD: String = """
+Button {
+	transform_position: 10, 20
+	transform_scale: 1 2 3
+	transform_position_x: calc(1 + 2)
+}
+"""
+
+const FIXTURE_VEC2_GOOD: String = """
+@global var lift: -4.0
+Button {
+	transform_position: 0 $lift
+	transform_scale: 1.5
+	transform_scale_y: 2.0
+}
+"""
+
 const FIXTURE_SCHEMES: String = """
 @global var accent: "#3b82f6"
 @scheme base {
@@ -103,6 +120,12 @@ func run(t: TC) -> void:
 	t.check(not t.has_error_containing(class_blocks, "corner_radius_top_left"), "per-side key accepted in class block")
 	t.check(not t.has_error_containing(class_blocks, "transition_time"), "transition props accepted in event blocks")
 	t.check(not t.has_error_containing(class_blocks, "transform_scale"), "node props accepted in event blocks")
+	var vec2_bad: Array[Array] = t.validate_fixture(FIXTURE_VEC2_BAD)
+	t.check(t.has_error_containing(vec2_bad, "expects numeric components, got '10,'"), "comma in vector2 value flagged")
+	t.check(t.has_error_containing(vec2_bad, "expects 1 or 2 numeric values, got 3"), "vector2 arity flagged")
+	t.check(t.has_error_containing(vec2_bad, "expects a plain value, not a method call"), "method call in component key flagged")
+	var vec2_good: Array[Array] = t.validate_fixture(FIXTURE_VEC2_GOOD)
+	t.check(vec2_good.is_empty(), "vector2 forms validate clean (got: %s)" % ", ".join(t.error_messages(vec2_good)))
 	var scheme_errors: Array[Array] = t.validate_fixture(FIXTURE_SCHEMES)
 	t.check(t.has_error_containing(scheme_errors, "extends unknown scheme 'missing'"), "unknown scheme parent flagged")
 	t.check(t.has_error_containing(scheme_errors, "'selfish' cannot extend itself"), "self-extension flagged")

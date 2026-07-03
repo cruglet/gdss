@@ -52,6 +52,18 @@ Button {
 }
 """
 
+const FIXTURE_VEC2: String = """
+@global var lift: -4.0
+Button {
+	transform_scale: 1.5
+	transform_position: 0 $lift
+	transform_pivot_ratio_y: 1.0
+	Lift {
+		transform_scale_x: 2
+	}
+}
+"""
+
 const FIXTURE_VALUES: String = """
 var unit: 12
 @global var accent: "#3b82f6"
@@ -129,3 +141,13 @@ func run(t: TC) -> void:
 	t.check_eq(GdssPropHandler._resolve_ease_val(1), Tween.EASE_OUT, "int transition_type resolves through enum keys")
 	t.check_eq(GdssPropHandler._resolve_ease_val("nonsense"), Tween.EASE_OUT, "unknown transition_type falls back to declared default")
 	t.check_eq(GdssPropHandler._resolve_trans_val(6), Tween.TRANS_ELASTIC, "int transition_func resolves through enum keys")
+	var vec2: Dictionary = t.parse_fixture(FIXTURE_VEC2)
+	t.check_eq(t.entry_val(vec2, "Button", "all", "transform_scale"), Vector2(1.5, 1.5), "single vector2 value splats to both components")
+	var lift_pos: Variant = t.entry_val(vec2, "Button", "all", "transform_position")
+	t.check(lift_pos is Dictionary and (lift_pos as Dictionary).has("__gdss_composite2__"), "var-ref vector2 deferred as composite2 sentinel")
+	if lift_pos is Dictionary:
+		var lift_parts: Array = (lift_pos as Dictionary).get("__gdss_composite2__", [])
+		t.check_eq(lift_parts.back(), "__gdss_global__lift", "deferred vector2 component keeps the var sentinel")
+	t.check_eq(t.entry_val(vec2, "Button", "all", "transform_pivot_ratio"), Vector2(0.5, 1.0), "vector2 component key folds onto the prop default")
+	var lift_class: Dictionary = t.class_entry(vec2, "Button", "Lift")
+	t.check_eq((lift_class.get("all", {}) as Dictionary).get("transform_scale"), Vector2(2.0, 1.0), "vector2 component folds inside a class block")

@@ -178,20 +178,20 @@ func unbind_canvas_item(canvas_item: Node) -> void:
 # properties under the shorter "transform_" prefix. _apply_theme_prop maps them back to
 # Godot's "offset_transform_*" Control properties. Defaults match Godot's, so a node that
 # styles none of them keeps an identity transform. Set transform_enabled: true to activate.
+# The props live in the db registry so the composite machinery sees them too.
+const _TRANSFORM_PROP_NAMES: PackedStringArray = [
+	"transform_enabled", "transform_position", "transform_position_ratio",
+	"transform_scale", "transform_rotation", "transform_pivot",
+	"transform_pivot_ratio", "transform_visual_only",
+]
 static var _transform_props: Array[GdssProp] = []
-static func _get_transform_props() -> Array[GdssProp]:
+static func _get_transform_props(registry: Dictionary[String, GdssProp]) -> Array[GdssProp]:
 	if not _transform_props.is_empty():
 		return _transform_props
-	_transform_props = [
-		GdssProp.create("transform_enabled", GDSS.Type.BOOLEAN, false, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("transform_position", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("transform_position_ratio", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("transform_scale", GDSS.Type.VECTOR2, Vector2.ONE, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("transform_rotation", GDSS.Type.FLOAT, 0.0, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("transform_pivot", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("transform_pivot_ratio", GDSS.Type.VECTOR2, Vector2(0.5, 0.5), GdssProp.Category.NODE_PROPERTY),
-		GdssProp.create("transform_visual_only", GDSS.Type.BOOLEAN, true, GdssProp.Category.NODE_PROPERTY),
-	]
+	for prop_name: String in _TRANSFORM_PROP_NAMES:
+		var prop: GdssProp = registry.get(prop_name)
+		if prop != null:
+			_transform_props.append(prop)
 	return _transform_props
 
 
@@ -223,7 +223,7 @@ func get_enabled_props() -> Array[GdssProp]:
 			props.append_array(component.properties)
 	props.append_array(unique_properties)
 	if base_type == &"Control" or ClassDB.is_parent_class(base_type, &"Control"):
-		props.append_array(_get_transform_props())
+		props.append_array(_get_transform_props(overrides))
 		props.append_array(_get_visual_props())
 	for item_name: String in _constants:
 		if overrides.has(item_name):
