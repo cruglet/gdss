@@ -1480,10 +1480,19 @@ func _ensure_gpu_ci(to_canvas_item: RID, want_blur: bool = false) -> void:
 		_gpu_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
 		RenderingServer.canvas_item_set_material(_gpu_ci, _gpu_material.get_rid())
 		RenderingServer.canvas_item_set_draw_behind_parent(_gpu_ci, true)
+		# Godot captures the screen texture only once per frame, before the FIRST item
+		# that reads it - every later glass panel would sample that same stale snapshot,
+		# missing anything drawn in between (and the capture point moves with culling,
+		# so it varied with scroll/zoom). Requesting an explicit full-screen backbuffer
+		# copy on this item refreshes the capture right before each glass panel draws.
+		# Region-limited copies land misplaced on the compatibility renderer, so the
+		# copy stays full-screen; its cost scales with the number of visible glass panels.
+		RenderingServer.canvas_item_set_copy_to_backbuffer(_gpu_ci, want_blur, Rect2())
 		_gpu_parent = RID()
 	elif _gpu_is_blur != want_blur:
 		_gpu_is_blur = want_blur
 		_gpu_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
+		RenderingServer.canvas_item_set_copy_to_backbuffer(_gpu_ci, want_blur, Rect2())
 		_gpu_last.clear()
 	if _gpu_parent != to_canvas_item:
 		RenderingServer.canvas_item_set_parent(_gpu_ci, to_canvas_item)

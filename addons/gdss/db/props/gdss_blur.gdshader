@@ -27,7 +27,7 @@ uniform vec2 u_border_p1 = vec2(1.0, 0.5);
 uniform vec4 u_shadow_color : source_color = vec4(0.0, 0.0, 0.0, 0.4);
 uniform sampler2D u_tex : source_color, hint_default_white;
 
-uniform sampler2D u_screen : hint_screen_texture, filter_linear_mipmap;
+uniform sampler2D u_screen : hint_screen_texture, filter_linear;
 uniform vec4 u_fill_glass = vec4(4.0, 0.0, 0.0, 1.0);
 uniform vec4 u_border_glass = vec4(4.0, 0.0, 0.0, 1.0);
 uniform vec4 u_fill_glass2 = vec4(0.0, 0.0, 0.0, 1.0);
@@ -43,6 +43,19 @@ uniform float u_lens_power = 3.0;
 
 const float EPS = 0.0001;
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
+const int BLUR_TAPS = 24;
+const float GOLDEN_ANGLE = 2.39996323;
+
+// The blur is a raw golden-angle disk convolution at base screen resolution -
+// no screen-texture mipmaps, whose partial-copy generation is position- and
+// zoom-dependent in the editor. Radius and refraction offsets track the canvas
+// scale so a zoomed 2D view keeps the blur proportional to the content.
+varying float v_canvas_scale;
+
+
+void vertex() {
+	v_canvas_scale = length(vec2(CANVAS_MATRIX[0].x, CANVAS_MATRIX[0].y));
+}
 
 
 float sd_round_box(vec2 p, vec2 b, vec4 r) {
@@ -79,13 +92,23 @@ vec4 glass(vec2 screen_uv, vec2 uv, vec2 p, vec2 b, float d, vec4 tint, vec4 g, 
 	float reach = max(min(b.x, b.y), EPS);
 	float dist = clamp(-d / reach, 0.0, 1.0);
 	float s = pow(clamp(lens_f(dist), 0.0, 1.0), u_lens_power);
-	vec2 warp = p * (s - 1.0) * g.y;
-	vec2 base = screen_uv + warp * px;
-	vec2 disp = warp * px * 0.04;
-	vec3 backdrop;
-	backdrop.r = textureLod(u_screen, base - disp, g.x).r;
-	backdrop.g = textureLod(u_screen, base, g.x).g;
-	backdrop.b = textureLod(u_screen, base + disp, g.x).b;
+	vec2 warp_px = p * (s - 1.0) * g.y * px * v_canvas_scale;
+	vec2 base = screen_uv + warp_px;
+	vec2 disp = warp_px * 0.04;
+	float radius = clamp(exp2(g.x) * 0.5 * v_canvas_scale, 0.0, 48.0);
+	vec2 frag = screen_uv / px;
+	float jitter = fract(52.9829189 * fract(0.06711056 * frag.x + 0.00583715 * frag.y));
+	vec3 backdrop = vec3(0.0);
+	for (int i = 0; i < BLUR_TAPS; i++) {
+		float fi = float(i);
+		float r = radius * sqrt((fi + 0.5) / float(BLUR_TAPS));
+		float a = (fi + jitter) * GOLDEN_ANGLE;
+		vec2 off = vec2(cos(a), sin(a)) * r * px;
+		backdrop.r += texture(u_screen, base + off - disp).r;
+		backdrop.g += texture(u_screen, base + off).g;
+		backdrop.b += texture(u_screen, base + off + disp).b;
+	}
+	backdrop /= float(BLUR_TAPS);
 
 	float luma = dot(backdrop, LUMA);
 	backdrop = mix(vec3(luma), backdrop, g.w);
