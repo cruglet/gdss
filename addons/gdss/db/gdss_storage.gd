@@ -110,7 +110,7 @@ static func write_cache(parsed: Dictionary, global_defaults: Dictionary, instanc
 	if cache_file == null:
 		printerr("[GDSS] Failed to open cache file for writing: ", get_cache_path())
 		return
-	cache_file.store_var({"format": FORMAT_VERSION, "parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": schemes, "meta": meta})
+	cache_file.store_var({"format": FORMAT_VERSION, "source_modified": get_latest_modified(), "parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": schemes, "meta": meta})
 	cache_file.close()
 
 
@@ -131,7 +131,7 @@ static func load_data(path: String = "") -> Dictionary:
 		return result
 	var cache: Variant = cache_file.get_var()
 	cache_file.close()
-	if is_current_format(cache):
+	if is_current_format(cache) and int((cache as Dictionary).get("source_modified", 0)) >= get_latest_modified():
 		for key: String in (cache as Dictionary):
 			result[key] = (cache as Dictionary)[key]
 	return result

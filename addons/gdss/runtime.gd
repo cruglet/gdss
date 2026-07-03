@@ -25,6 +25,8 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_APPLICATION_FOCUS_IN and not Engine.is_editor_hint() and OS.is_debug_build():
+		if not is_node_ready():
+			return
 		var modified: int = GdssStorage.get_latest_modified()
 		if modified == _last_modified:
 			return
@@ -111,6 +113,8 @@ func _reload_parsed() -> void:
 		GdssInterpreter._global_defaults.clear()
 		for key: String in global_defaults:
 			GdssInterpreter._global_defaults[key] = global_defaults[key]
+			if not GdssInterpreter.globals.has(key):
+				GdssInterpreter.globals[key] = global_defaults[key]
 	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
 		var instance_defaults: Dictionary = data["instance_defaults"]
 		GdssInterpreter._instance_defaults.clear()
