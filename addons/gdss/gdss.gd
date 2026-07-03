@@ -8,6 +8,7 @@ const DEBUG_MODE: bool = false
 const DEBUG_WAS_VISIBLE: StringName = &"gdss_was_visible"
 const CLASSES_META: StringName = &"gdss_classes"
 const MODE_META: StringName = &"gdss_mode"
+const OVERRIDES_META: StringName = &"gdss_overrides"
 
 enum GdssMode {
 	INHERIT,
@@ -516,6 +517,82 @@ static func clear_classes(node: Node) -> void:
 	if get_classes(node).is_empty():
 		return
 	set_classes(node, PackedStringArray())
+
+
+## Returns the freeform GDSS override text stored on [param node], or an empty
+## string if none (or if the node uses dictionary-form overrides).
+static func get_override_text(node: Node) -> String:
+	var raw: Variant = node.get_meta(OVERRIDES_META, "")
+	return raw if raw is String else ""
+
+
+## Stores per-node style overrides as freeform GDSS text (property lines, with
+## optional [code]:state { }[/code] blocks) and reapplies the node's style. The
+## overrides layer on top of everything else - base type, variation, and classes.
+## Methods, [code]$variables[/code], and [code]calc()[/code] all work. An empty
+## string removes the overrides.
+## [codeblock]
+## GDSS.set_override_text(my_button, "bg_color: $accent\ncorner_radius: 16 16 16 16")
+## [/codeblock]
+static func set_override_text(node: Node, text: String) -> void:
+	if text.strip_edges().is_empty():
+		if node.has_meta(OVERRIDES_META):
+			node.remove_meta(OVERRIDES_META)
+	else:
+		node.set_meta(OVERRIDES_META, text)
+	if node is CanvasItem or node is Window:
+		GdssNodeHandler.refresh(node)
+
+
+## Returns the dictionary-form overrides stored on [param node] ({prop: value}),
+## or an empty dictionary if none (or if the node uses text-form overrides).
+static func get_prop_overrides(node: Node) -> Dictionary:
+	var raw: Variant = node.get_meta(OVERRIDES_META, {})
+	return (raw as Dictionary).duplicate() if raw is Dictionary else {}
+
+
+## Sets a single per-node property override with a final value (no parsing) and
+## reapplies the node's style. Coexists with classes/variations but not with
+## text-form overrides - clear those first.
+## [codeblock]
+## GDSS.set_prop_override(my_button, "corner_radius", Vector4i(16, 16, 16, 16))
+## [/codeblock]
+static func set_prop_override(node: Node, prop: String, value: Variant) -> void:
+	var raw: Variant = node.get_meta(OVERRIDES_META) if node.has_meta(OVERRIDES_META) else null
+	if raw is String:
+		push_warning("[GDSS] %s has text-form overrides; clear them before using set_prop_override." % node)
+		return
+	var overrides: Dictionary = (raw as Dictionary).duplicate() if raw is Dictionary else {}
+	overrides[prop] = value
+	node.set_meta(OVERRIDES_META, overrides)
+	if node is CanvasItem or node is Window:
+		GdssNodeHandler.refresh(node)
+
+
+## Removes a single dictionary-form override from [param node] and reapplies its
+## style. Removes the meta entirely when the last override is cleared.
+static func clear_prop_override(node: Node, prop: String) -> void:
+	var raw: Variant = node.get_meta(OVERRIDES_META) if node.has_meta(OVERRIDES_META) else null
+	if not raw is Dictionary:
+		return
+	var overrides: Dictionary = (raw as Dictionary).duplicate()
+	overrides.erase(prop)
+	if overrides.is_empty():
+		node.remove_meta(OVERRIDES_META)
+	else:
+		node.set_meta(OVERRIDES_META, overrides)
+	if node is CanvasItem or node is Window:
+		GdssNodeHandler.refresh(node)
+
+
+## Removes every per-node override (text or dictionary form) from [param node]
+## and reapplies its style.
+static func clear_overrides(node: Node) -> void:
+	if not node.has_meta(OVERRIDES_META):
+		return
+	node.remove_meta(OVERRIDES_META)
+	if node is CanvasItem or node is Window:
+		GdssNodeHandler.refresh(node)
 
 
 ## Returns [code]true[/code] if GDSS styling resolves to enabled on [param node],

@@ -90,6 +90,7 @@ func _reload_parsed() -> void:
 	var data: Dictionary = _load_bundle()
 	if not data.has("parsed"):
 		return
+	GdssInterpreter._override_entry_cache.clear()
 	var raw: Variant = data["parsed"]
 	if not raw is Dictionary:
 		return

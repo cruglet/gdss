@@ -280,6 +280,101 @@ class GdssClassesProperty extends EditorProperty:
 		undo_redo.commit_action()
 
 
+class GdssOverridesProperty extends EditorProperty:
+	var _edit: TextEdit
+	var _status: Label
+	var _updating: bool = false
+
+	func _init() -> void:
+		var root: VBoxContainer = VBoxContainer.new()
+		root.size_flags_horizontal = SIZE_EXPAND_FILL
+		add_child(root)
+		_edit = TextEdit.new()
+		_edit.custom_minimum_size = Vector2(0, 72)
+		_edit.placeholder_text = "bg_color: $accent\ncorner_radius: 8 8 8 8"
+		_edit.size_flags_horizontal = SIZE_EXPAND_FILL
+		_edit.scroll_fit_content_height = true
+		root.add_child(_edit)
+		add_focusable(_edit)
+		_status = Label.new()
+		_status.visible = false
+		_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_status.add_theme_color_override(&"font_color", Color(1.0, 0.75, 0.4))
+		root.add_child(_status)
+		_edit.focus_exited.connect(_commit)
+		_edit.text_changed.connect(_on_text_changed)
+
+	func _ready() -> void:
+		_update_property.call_deferred()
+
+	func _update_property() -> void:
+		var obj: Object = get_edited_object()
+		if obj == null:
+			return
+		_updating = true
+		var raw: Variant = obj.get_meta(GDSS.OVERRIDES_META) if obj.has_meta(GDSS.OVERRIDES_META) else null
+		if raw is Dictionary:
+			_edit.editable = false
+			_edit.text = "(dictionary overrides set from code)"
+		else:
+			_edit.editable = true
+			var text: String = raw if raw is String else ""
+			if _edit.text != text and not _edit.has_focus():
+				_edit.text = text
+			_validate(_edit.text)
+		_updating = false
+
+	func _on_text_changed() -> void:
+		if not _updating:
+			_validate(_edit.text)
+
+	func _validate(text: String) -> void:
+		var obj: Object = get_edited_object()
+		if obj == null or text.strip_edges().is_empty():
+			_status.visible = false
+			return
+		var gdss_node: GdssNode = GDSS._get_gdss_nodes().get((obj as Node).get_class())
+		if gdss_node == null:
+			_status.visible = false
+			return
+		var entry: Dictionary = GdssInterpreter.parse_override_entry(text)
+		var props_by_name: Dictionary = gdss_node.get_props_by_name()
+		var unknown: PackedStringArray = []
+		for state_key: String in entry:
+			if state_key == "_classes" or state_key == "_variations":
+				continue
+			var state_dict: Variant = entry[state_key]
+			if not state_dict is Dictionary:
+				continue
+			for prop_name: String in (state_dict as Dictionary):
+				if not props_by_name.has(prop_name) and not unknown.has(prop_name):
+					unknown.append(prop_name)
+		if unknown.is_empty():
+			_status.visible = false
+		else:
+			_status.text = "Unknown: %s" % ", ".join(unknown)
+			_status.visible = true
+
+	func _commit() -> void:
+		if _updating:
+			return
+		var obj: Object = get_edited_object()
+		if obj == null or not _edit.editable:
+			return
+		var old_raw: Variant = obj.get_meta(GDSS.OVERRIDES_META) if obj.has_meta(GDSS.OVERRIDES_META) else null
+		if old_raw is Dictionary:
+			return
+		var old_text: String = old_raw if old_raw is String else ""
+		var new_text: String = _edit.text
+		if new_text == old_text:
+			return
+		var undo_redo: EditorUndoRedoManager = EditorInterface.get_editor_undo_redo()
+		undo_redo.create_action("Set GDSS Overrides")
+		undo_redo.add_do_method(GDSS, &"set_override_text", obj, new_text)
+		undo_redo.add_undo_method(GDSS, &"set_override_text", obj, old_text)
+		undo_redo.commit_action()
+
+
 class GdssPreviewProperty extends EditorProperty:
 	var _option: OptionButton
 
@@ -336,6 +431,9 @@ func _parse_property(object: Object, type: Variant.Type, name: String, hint_type
 			var classes_prop: GdssClassesProperty = GdssClassesProperty.new()
 			classes_prop.set_label("Classes")
 			add_custom_control(classes_prop)
+			var overrides_prop: GdssOverridesProperty = GdssOverridesProperty.new()
+			overrides_prop.set_label("Overrides")
+			add_custom_control(overrides_prop)
 			var gdss_node: GdssNode = GDSS._get_gdss_nodes().get((object as Node).get_class())
 			if gdss_node != null and not gdss_node.is_static and gdss_node.states.size() > 1:
 				var preview_prop: GdssPreviewProperty = GdssPreviewProperty.new()

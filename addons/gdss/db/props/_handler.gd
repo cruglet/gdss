@@ -59,6 +59,7 @@ var _entry_cache: Dictionary = {}
 var _entry_cache_dirty: bool = true
 var _entry_cache_classes: PackedStringArray = []
 var _entry_cache_variation: String = ""
+var _entry_cache_overrides: Variant = null
 # Set of prop names present in ANY state of the resolved entry. Lets _apply_overrides
 # skip node properties the stylesheet never sets (e.g. the 8 offset_transform props on
 # nodes that don't use them) instead of resolving + control.get-checking each one.
@@ -938,20 +939,21 @@ func _resolve_entry() -> Dictionary:
 		return {}
 	var current_classes: PackedStringArray = ref.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray
 	var variation: String = String((ref as Control).theme_type_variation) if ref is Control else ""
-	if not _entry_cache_dirty and _entry_cache_classes == current_classes and _entry_cache_variation == variation:
+	var override_meta: Variant = ref.get_meta(GDSS.OVERRIDES_META) if ref.has_meta(GDSS.OVERRIDES_META) else null
+	if not _entry_cache_dirty and _entry_cache_classes == current_classes and _entry_cache_variation == variation and _entry_cache_overrides == override_meta:
 		return _entry_cache
 	_styled_props_dirty = true # entry is being recomputed; its styled-prop set is stale
 	var parsed: Dictionary[String, Dictionary] = GdssInterpreter.parsed
 	var selector: String = ref.get_class()
-	if not parsed.has(selector):
-		return {}
-	var entry: Dictionary = parsed[selector]
-	var variations: Dictionary = parsed[selector].get("_variations", {})
+	var entry: Dictionary = parsed.get(selector, {})
+	var variations: Dictionary = entry.get("_variations", {}) if not entry.is_empty() else {}
 	var has_variation: bool = not variation.is_empty() and variations.has(variation)
-	if current_classes.is_empty() and not has_variation:
+	var override_entry: Dictionary = _build_override_entry(override_meta)
+	if current_classes.is_empty() and not has_variation and override_entry.is_empty():
 		_entry_cache = entry
 		_entry_cache_classes = current_classes
 		_entry_cache_variation = variation
+		_entry_cache_overrides = override_meta
 		_entry_cache_dirty = false
 		return entry
 	# Layer order (lowest to highest priority): base type -> theme_type_variation
@@ -959,14 +961,75 @@ func _resolve_entry() -> Dictionary:
 	if has_variation:
 		entry = _merge_entries(entry, variations[variation])
 	for gdss_class_name: String in current_classes:
-		var override: Dictionary = _find_class_in_tree(parsed[selector].get("_classes", {}), gdss_class_name)
+		var override: Dictionary = _find_class_in_tree((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name)
 		if not override.is_empty():
 			entry = _merge_entries(entry, override)
+	if not override_entry.is_empty():
+		override_entry = _resolve_override_patches(entry, override_entry)
+		entry = _merge_entries(entry, override_entry)
+		var all_overrides: Variant = override_entry.get("all")
+		if all_overrides is Dictionary:
+			for state_key: String in entry:
+				if state_key == "all" or state_key == "_classes" or state_key == "_variations" or state_key.begins_with("on_"):
+					continue
+				if (override_entry as Dictionary).has(state_key):
+					continue
+				var state_dict: Variant = entry[state_key]
+				if not state_dict is Dictionary:
+					continue
+				for prop_name: String in (all_overrides as Dictionary):
+					(state_dict as Dictionary)[prop_name] = (all_overrides as Dictionary)[prop_name]
 	_entry_cache = entry
 	_entry_cache_classes = current_classes
 	_entry_cache_variation = variation
+	_entry_cache_overrides = override_meta
 	_entry_cache_dirty = false
 	return entry
+
+
+func _build_override_entry(override_meta: Variant) -> Dictionary:
+	if override_meta is String:
+		return GdssInterpreter.parse_override_entry(override_meta)
+	if override_meta is Dictionary:
+		return {"all": (override_meta as Dictionary).duplicate()}
+	return {}
+
+
+func _resolve_override_patches(base: Dictionary, override_entry: Dictionary) -> Dictionary:
+	var has_patch: bool = false
+	for state_key: String in override_entry:
+		var state_dict: Variant = override_entry[state_key]
+		if not state_dict is Dictionary:
+			continue
+		for prop_name: String in (state_dict as Dictionary):
+			var raw: Variant = (state_dict as Dictionary)[prop_name]
+			if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__"):
+				has_patch = true
+	if not has_patch:
+		return override_entry
+	var resolved: Dictionary = override_entry.duplicate(true)
+	for state_key: String in resolved:
+		var state_dict: Variant = resolved[state_key]
+		if not state_dict is Dictionary:
+			continue
+		for prop_name: String in (state_dict as Dictionary):
+			var raw: Variant = (state_dict as Dictionary)[prop_name]
+			if not (raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__")):
+				continue
+			var patch: Dictionary = (raw as Dictionary)["__gdss_composite4_patch__"]
+			var scratch: Dictionary = {"value": _base_composite_value(base, state_key, prop_name)}
+			for index: Variant in patch:
+				GdssInterpreter._fold_composite_component(scratch, "value", int(index), patch[index])
+			(state_dict as Dictionary)[prop_name] = scratch.get("value")
+	return resolved
+
+
+func _base_composite_value(base: Dictionary, state_key: String, prop_name: String) -> Variant:
+	var raw: Variant = _raw_entry_val(base, state_key, prop_name)
+	if raw != null:
+		return raw if not raw is Dictionary else (raw as Dictionary).duplicate(true)
+	var prop: GdssProp = GDSS.get_db().property_list.get(prop_name)
+	return prop.get_default_value() if prop != null else Vector4i.ZERO
 
 
 func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> Variant:

@@ -796,6 +796,32 @@ static func _restore_statics(snapshot: Dictionary) -> void:
 		schemes[key] = snapshot["schemes"][key]
 
 
+static var _override_entry_cache: Dictionary = {}
+static var _patch_composites: bool = false
+
+
+static func parse_override_entry(text: String) -> Dictionary:
+	if text.strip_edges().is_empty():
+		return {}
+	var cached: Variant = _override_entry_cache.get(text)
+	if cached is Dictionary:
+		return cached
+	var known_states: PackedStringArray = _get_known_states()
+	var tokens: Array[String] = _substitute_globals(_tokenize(_normalize_separators(text)), _local_vars)
+	var container: Dictionary = {}
+	_ensure_selector(container, "__override__", known_states)
+	_patch_composites = true
+	_parse_block(tokens, 0, container, "__override__", known_states, true)
+	_patch_composites = false
+	var entry: Dictionary = container.get("__override__", {})
+	entry.erase("_classes")
+	entry.erase("_variations")
+	if _override_entry_cache.size() > 512:
+		_override_entry_cache.clear()
+	_override_entry_cache[text] = entry
+	return entry
+
+
 static func _get_composite_map() -> Dictionary:
 	if not _composite_map.is_empty():
 		return _composite_map
@@ -925,6 +951,7 @@ static func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dict
 	_local_vars.clear()
 	schemes.clear()
 	meta.clear()
+	_override_entry_cache.clear()
 	var known_states: PackedStringArray = _get_known_states()
 	var cleaned_sources: PackedStringArray = []
 	for source: String in sources:
@@ -1601,6 +1628,11 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 
 static func _fold_composite_component(container: Dictionary, parent_prop: String, index: int, value: Variant) -> void:
 	var existing: Variant = container.get(parent_prop)
+	if _patch_composites and (existing == null or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite4_patch__"))):
+		var patch: Dictionary = (existing as Dictionary).get("__gdss_composite4_patch__") if existing is Dictionary else {}
+		patch[index] = value
+		container[parent_prop] = {"__gdss_composite4_patch__": patch}
+		return
 	if existing == null:
 		var parent: GdssProp = GDSS.get_db().property_list.get(parent_prop)
 		existing = parent.get_default_value() if parent != null else Vector4i.ZERO
