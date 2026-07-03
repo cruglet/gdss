@@ -180,11 +180,11 @@ func _update_code_hint(_word: String) -> void:
 	if paren_pos != -1:
 		var before_paren: String = line.substr(0, paren_pos).strip_edges()
 		var method_name: String = before_paren.split(" ")[-1].split(":")[-1].strip_edges()
-		if method_name == "calc":
-			_show_hint("calc( expression )  —  + - * /, numbers, $variables")
-			return
 		var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
-		if method != null:
+		if (method_name == "calc" or method != null) and not _in_meta_block():
+			if method_name == "calc":
+				_show_hint("calc( expression )  —  + - * /, numbers, $variables")
+				return
 			var inside: String = line.substr(paren_pos + 1, col - paren_pos - 1)
 			var depth: int = 0
 			var active_param: int = 0
@@ -203,6 +203,10 @@ func _update_code_hint(_word: String) -> void:
 	_hide_hint()
 
 
+func _in_meta_block() -> bool:
+	return str(_get_context().get("type", "")) == "meta_block"
+
+
 func _show_composite_hint(line: String, col: int) -> bool:
 	var colon: int = line.find(":")
 	if colon == -1 or col <= colon:
@@ -210,6 +214,9 @@ func _show_composite_hint(line: String, col: int) -> bool:
 	var prop_name: String = line.substr(0, colon).strip_edges()
 	var prop_def: GdssProp = GDSS.get_db().property_list.get(prop_name)
 	if prop_def == null or prop_def.type != GDSS.Type.COMPOSITE4:
+		return false
+	var context_type: String = str(_get_context().get("type", ""))
+	if context_type != "property_value" and context_type != "property_value_filled":
 		return false
 	var value_before: String = line.substr(colon + 1, col - colon - 1)
 	var tokens: PackedStringArray = value_before.strip_edges().split(" ", false)

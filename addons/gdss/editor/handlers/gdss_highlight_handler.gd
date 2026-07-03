@@ -108,6 +108,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var builtin_colors: Array[String] = []
 	var _node_states: Dictionary = {}
 	var _brace_depth_cache: Array[int] = []
+	var _annotation_cache: Array[int] = []
 	var _cache_dirty: bool = true
 	var value_functions: Array[String] = []
 	var col_variable: Color
@@ -241,6 +242,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 			_cache_dirty = false
 
 		var brace_depth: int = _brace_depth_cache[p_line] if p_line < _brace_depth_cache.size() else 0
+		var annotation_kind: int = _annotation_cache[p_line] if p_line < _annotation_cache.size() else 0
 
 		if line_length == 0:
 			return result
@@ -373,6 +375,15 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					result[start] = {"color": col_type}
 				elif word == "extends":
 					result[start] = {"color": col_keyword}
+				elif trimmed_before.strip_edges().ends_with("@scheme"):
+					result[start] = {"color": col_user_type}
+				elif annotation_kind != 0 and not in_value:
+					if global_variables.has(word):
+						result[start] = {"color": col_global}
+					elif instance_variables.has(word):
+						result[start] = {"color": col_instance}
+					else:
+						result[start] = {"color": col_default}
 				elif after.begins_with("(") and after.rfind("{") > after.rfind(")"):
 					result[start] = {"color": col_event}
 				elif is_before_brace:
@@ -407,15 +418,30 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		var total_lines: int = get_text_edit().get_line_count()
 		_brace_depth_cache.resize(total_lines)
 		_brace_depth_cache.fill(0)
+		_annotation_cache.resize(total_lines)
+		_annotation_cache.fill(0)
 		var depth: int = 0
+		var annotation_kind: int = 0
+		var annotation_depth: int = 0
 		for line_idx: int in range(total_lines):
 			_brace_depth_cache[line_idx] = depth
+			_annotation_cache[line_idx] = annotation_kind
 			var line: String = get_text_edit().get_line(line_idx)
+			if annotation_kind == 0:
+				var stripped: String = line.strip_edges()
+				if stripped.begins_with("@scheme") and stripped.contains("{"):
+					annotation_kind = 1
+					annotation_depth = depth
+				elif stripped.begins_with("@meta") and stripped.contains("{"):
+					annotation_kind = 2
+					annotation_depth = depth
 			for ch: String in line:
 				if ch == "{":
 					depth += 1
 				elif ch == "}":
 					depth -= 1
+					if annotation_kind != 0 and depth <= annotation_depth:
+						annotation_kind = 0
 
 
 func _on_text_changed() -> void:
