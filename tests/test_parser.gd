@@ -125,16 +125,22 @@ func run(t: TC) -> void:
 	t.check_eq(GdssInterpreter._local_vars.get("unit"), 12, "local var accumulates")
 	var composite: Dictionary = t.parse_fixture(FIXTURE_COMPOSITE_CLASS)
 	var card: Dictionary = t.class_entry(composite, "Button", "Card")
-	t.check_eq((card.get("all", {}) as Dictionary).get("corner_radius"), Vector4i(30, 0, 0, 0), "per-side key folds inside a class block")
+	var card_radius: Variant = (card.get("all", {}) as Dictionary).get("corner_radius")
+	t.check(card_radius is Dictionary and (card_radius as Dictionary).has("__gdss_composite4_patch__"), "per-side key in a class defers as a patch")
+	if card_radius is Dictionary:
+		t.check_eq(((card_radius as Dictionary)["__gdss_composite4_patch__"] as Dictionary).get(0), 30, "class patch records only the set side")
 	var card_padding: Variant = (card.get("all", {}) as Dictionary).get("padding")
-	t.check(card_padding is Dictionary and (card_padding as Dictionary).has("__gdss_composite4__"), "per-side var ref defers the composite")
+	t.check(card_padding is Dictionary and (card_padding as Dictionary).has("__gdss_composite4_patch__"), "per-side var ref in a class defers as a patch")
 	if card_padding is Dictionary:
-		var parts: Array = (card_padding as Dictionary).get("__gdss_composite4__", [])
-		t.check_eq(parts.front(), "__gdss_local__pad", "deferred per-side component keeps the var sentinel")
+		var patch: Dictionary = (card_padding as Dictionary)["__gdss_composite4_patch__"]
+		t.check_eq(patch.get(0), "__gdss_local__pad", "class patch keeps the var sentinel")
 	var fancy: Variant = ((composite.get("Button", {}) as Dictionary).get("_variations", {}) as Dictionary).get("Fancy")
 	t.check(fancy is Dictionary, "variation block parses")
 	if fancy is Dictionary:
-		t.check_eq(((fancy as Dictionary).get("all", {}) as Dictionary).get("border"), Vector4i(0, 0, 3, 0), "per-side key folds inside a variation block")
+		var fancy_border: Variant = ((fancy as Dictionary).get("all", {}) as Dictionary).get("border")
+		t.check(fancy_border is Dictionary and (fancy_border as Dictionary).has("__gdss_composite4_patch__"), "per-side key in a variation defers as a patch")
+		if fancy_border is Dictionary:
+			t.check_eq(((fancy_border as Dictionary)["__gdss_composite4_patch__"] as Dictionary).get(2), 3, "variation patch records only the top side")
 	t.check_eq(t.entry_val(composite, "Button", "all", "transition_func"), "QUINT", "transition_func normalized to upper case")
 	t.check_eq(t.entry_val(composite, "Button", "all", "transition_type"), "EASE_IN", "transition_type normalized to upper case")
 	t.check_eq(t.entry_val(composite, "Button", "all", "cursor"), "POINTING", "cursor normalized to upper case")
@@ -150,4 +156,7 @@ func run(t: TC) -> void:
 		t.check_eq(lift_parts.back(), "__gdss_global__lift", "deferred vector2 component keeps the var sentinel")
 	t.check_eq(t.entry_val(vec2, "Button", "all", "transform_pivot_ratio"), Vector2(0.5, 1.0), "vector2 component key folds onto the prop default")
 	var lift_class: Dictionary = t.class_entry(vec2, "Button", "Lift")
-	t.check_eq((lift_class.get("all", {}) as Dictionary).get("transform_scale"), Vector2(2.0, 1.0), "vector2 component folds inside a class block")
+	var lift_scale: Variant = (lift_class.get("all", {}) as Dictionary).get("transform_scale")
+	t.check(lift_scale is Dictionary and (lift_scale as Dictionary).has("__gdss_composite4_patch__"), "vector2 component in a class defers as a patch")
+	if lift_scale is Dictionary:
+		t.check_eq(((lift_scale as Dictionary)["__gdss_composite4_patch__"] as Dictionary).get(0), 2, "vector2 class patch records only the x side")

@@ -1008,10 +1008,14 @@ static func interpret_all(sources: PackedStringArray) -> Dictionary[String, Dict
 			local_vars[key] = file_locals[key]
 	_instance_scheme_base = _instance_defaults.duplicate(true)
 	var result: Dictionary[String, Dictionary] = {}
+	_patch_composites = true
 	for source: String in cleaned_sources:
 		var tokens: Array[String] = _tokenize(source)
 		tokens = _substitute_globals(tokens, local_vars)
 		_parse_block(tokens, 0, result, "", known_states)
+	_patch_composites = false
+	for selector: String in result:
+		_resolve_base_composite_patches(result[selector])
 	return result
 
 
@@ -1749,3 +1753,31 @@ static func _fold_composite_component(container: Dictionary, parent_prop: String
 		2: vec.z = int(value)
 		3: vec.w = int(value)
 	container[parent_prop] = vec
+
+
+static func _resolve_base_composite_patches(selector_entry: Dictionary) -> void:
+	var all_dict: Variant = selector_entry.get("all")
+	if all_dict is Dictionary:
+		_fold_state_patches(all_dict as Dictionary, {})
+	for state_key: String in selector_entry:
+		if state_key == "all" or state_key == "_classes" or state_key == "_variations":
+			continue
+		var sd: Variant = selector_entry[state_key]
+		if sd is Dictionary:
+			_fold_state_patches(sd as Dictionary, all_dict if all_dict is Dictionary else {})
+
+
+static func _fold_state_patches(state_dict: Dictionary, base_all: Dictionary) -> void:
+	for prop_name: String in state_dict.keys():
+		var raw: Variant = state_dict[prop_name]
+		if not (raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__")):
+			continue
+		var patch: Dictionary = (raw as Dictionary)["__gdss_composite4_patch__"]
+		var base_val: Variant = base_all.get(prop_name)
+		if base_val == null:
+			var prop: GdssProp = GDSS.get_db().property_list.get(prop_name)
+			base_val = prop.get_default_value() if prop != null else Vector4i.ZERO
+		var scratch: Dictionary = {"value": base_val if not base_val is Dictionary else (base_val as Dictionary).duplicate(true)}
+		for index: Variant in patch:
+			_fold_composite_component(scratch, "value", int(index), patch[index])
+		state_dict[prop_name] = scratch.get("value")

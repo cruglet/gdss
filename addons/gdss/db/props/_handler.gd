@@ -982,11 +982,11 @@ func _resolve_entry() -> Dictionary:
 	# Layer order (lowest to highest priority): base type -> theme_type_variation
 	# -> explicit gdss_classes. Classes win because they're the explicit runtime layer.
 	if has_variation:
-		entry = _merge_entries(entry, variations[variation])
+		entry = _merge_entries(entry, _resolve_override_patches(entry, variations[variation]))
 	for gdss_class_name: String in current_classes:
 		var override: Dictionary = _find_class_in_tree((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name)
 		if not override.is_empty():
-			entry = _merge_entries(entry, override)
+			entry = _merge_entries(entry, _resolve_override_patches(entry, override))
 	if not override_entry.is_empty():
 		override_entry = _resolve_override_patches(entry, override_entry)
 		entry = _merge_entries(entry, override_entry)
