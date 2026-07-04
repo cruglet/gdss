@@ -260,11 +260,15 @@ func get_enabled_props() -> Array[GdssProp]:
 		if any_match:
 			subprop_overrides.append(override_prop)
 	props.append_array(subprop_overrides)
+	var sub_color_props: Array[GdssProp] = []
 	for item_name: String in _colors:
 		if overrides.has(item_name):
 			props.append(overrides[item_name])
-		elif not grouped_colors.has(item_name):
+		elif grouped_colors.has(item_name):
+			sub_color_props.append(GdssProp.create(item_name, GDSS.Type.COLOR, td.get(item_name, Color.TRANSPARENT), GdssProp.Category.COLOR))
+		else:
 			props.append(GdssProp.create(item_name, GDSS.Type.COLOR, td.get(item_name, Color.TRANSPARENT), GdssProp.Category.COLOR))
+	props.append_array(sub_color_props)
 	_props_cache = props
 	_props_dirty = false
 	return _props_cache
