@@ -8,6 +8,8 @@ extends Resource
 ## sync, or repopulate. GDSS.get_db() builds it once and caches it for the run.
 
 
+const _WINDOW_PANEL_NODE: GDScript = preload("res://addons/gdss/db/nodes/WindowPanel.gd")
+
 @export_group("Lists")
 @export var node_list: Dictionary[String, GdssNode]
 @export var property_list: Dictionary[String, GdssProp]
@@ -139,6 +141,8 @@ func _instantiate_node_class(type: String) -> GdssNode:
 			return GdssNode_Panel.new()
 		"PopupMenu":
 			return GdssNode_PopupMenu.new()
+		"PopupPanel", "AcceptDialog", "ConfirmationDialog", "FileDialog":
+			return _WINDOW_PANEL_NODE.new()
 		"Window":
 			return GdssNode_Window.new()
 	return GdssNode_Base.new()
@@ -167,9 +171,7 @@ func _node_config(type: String) -> Array:
 			return [true, false, true]
 		"Panel", "PanelContainer":
 			return [false, true, false]
-		"PopupMenu":
-			return [true, true, false]
-		"Window":
+		"PopupMenu", "PopupPanel", "AcceptDialog", "ConfirmationDialog", "FileDialog", "Window":
 			return [true, true, false]
 	return []
 
@@ -181,8 +183,8 @@ func _build_nodes_code() -> void:
 		if ClassDB.class_exists(t) and (t == "Control" or ClassDB.is_parent_class(StringName(t), &"Control")):
 			types[t] = true
 	# Window-derived nodes GDSS styles explicitly (not caught by the Control filter).
-	types["PopupMenu"] = true
-	types["Window"] = true
+	for window_type: String in ["PopupMenu", "Window", "PopupPanel", "AcceptDialog", "ConfirmationDialog", "FileDialog"]:
+		types[window_type] = true
 	# Theme-item-less Controls: absent from the default theme's type list, styled purely
 	# through node properties (color/texture plus the shared transform/visual props).
 	types["TextureRect"] = true
