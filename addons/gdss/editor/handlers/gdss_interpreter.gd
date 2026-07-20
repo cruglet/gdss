@@ -881,6 +881,14 @@ static func interpret(source: String) -> Dictionary[String, Dictionary]:
 	return interpret_all(_gather_import_sources(source, GdssStorage.get_save_path().get_base_dir(), seen))
 
 
+static func interpret_paths(paths: PackedStringArray) -> Dictionary[String, Dictionary]:
+	var seen: Dictionary = {}
+	var gathered: PackedStringArray = []
+	for path: String in paths:
+		gathered.append_array(_gather_import_sources(GdssStorage.read_source(path), path.get_base_dir(), seen))
+	return interpret_all(gathered)
+
+
 static func _collect_imports(source: String) -> Array:
 	var result: Array = []
 	var lines: PackedStringArray = source.split("\n")

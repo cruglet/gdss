@@ -64,7 +64,7 @@ func _parse_sources() -> Dictionary:
 			break
 	if not has_content:
 		return {}
-	var parsed_data: Dictionary = GdssInterpreter.interpret_all(sources)
+	var parsed_data: Dictionary = GdssInterpreter.interpret_paths(GdssStorage.get_save_paths())
 	if OS.is_debug_build() and not Engine.is_editor_hint():
 		GdssStorage.write_cache(parsed_data, GdssInterpreter._global_defaults, GdssInterpreter._instance_defaults, GdssInterpreter._local_vars, GdssInterpreter.schemes, GdssInterpreter.meta)
 	return {
