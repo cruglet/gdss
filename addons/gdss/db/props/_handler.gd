@@ -4,6 +4,9 @@ extends StyleBox
 
 static var _corner_start_angles: Array[float] = [PI, PI * 1.5, 0.0, PI * 0.5]
 const _DEFAULT_SHADOW_COLOR: Color = Color(0, 0, 0, 0.4)
+# How far past the panel a corner's taper can carry a neighbouring side's shadow, as a
+# share of that side's reach. The direction-weighted falloff peaks at 2/(3 * sqrt(3)).
+const _SHADOW_CORNER_SPILL: float = 0.4
 
 const _TRANSITION_FUNCS: Dictionary = {
 	"LINEAR": Tween.TRANS_LINEAR, "SINE": Tween.TRANS_SINE, "QUINT": Tween.TRANS_QUINT,
@@ -1441,10 +1444,9 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	var skew_x: float = vals.get("skew_x", 0.0)
 	var skew_y: float = vals.get("skew_y", 0.0)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
-	var shadow_src: Variant = vals.get("shadow_color", Color(0, 0, 0, 0.4))
-	var shadow_size: float = float(shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
-	if shadow_size > 1.0:
-		var shadow_outer: Rect2 = rect.grow(shadow_size)
+	var shadow_src: Variant = vals.get("shadow_color", _DEFAULT_SHADOW_COLOR)
+	if _max_side(shadow) > 0.5:
+		var shadow_outer: Rect2 = rect.grow_individual(shadow.x, shadow.z, shadow.y, shadow.w)
 		var fitted: Vector4 = _fit_corners(corner_radius, rect)
 		if shadow_src is GdssGradient:
 			_draw_linear_gradient_ring(to_canvas_item, shadow_src as GdssGradient, rect, shadow_outer, fitted, detail, skew_x, skew_y, true)
@@ -1481,6 +1483,10 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 					_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_tint, aa_size, detail, skew_x, skew_y)
 			elif border_src is Color and (border_src as Color).a > 0.0:
 				_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_src as Color, aa_size, detail, skew_x, skew_y)
+
+
+static func _max_side(sides: Vector4) -> float:
+	return maxf(maxf(sides.x, sides.y), maxf(sides.z, sides.w))
 
 
 static func _get_shared_shader() -> Shader:
@@ -1544,21 +1550,33 @@ func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	var border_src: Variant = vals.get("border_color", Color.TRANSPARENT)
 	_ensure_gpu_ci(to_canvas_item, bg is GdssBlur or border_src is GdssBlur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
-	var shadow_size: float = (shadow.x + shadow.y + shadow.z + shadow.w) * 0.25
-	var pad: float = shadow_size + 2.0 if shadow_size > 0.5 else 0.0
-	var quad: Rect2 = rect.grow(pad)
-	var pad_frac: Vector2 = Vector2(pad / quad.size.x, pad / quad.size.y) if pad > 0.0 else Vector2.ZERO
+	# Every side pads the quad by its own reach plus a slice of slack for the falloff's
+	# antialiasing. A shadow tapering around a corner still spills a little past the panel
+	# on the quiet side, so each side also keeps room for its neighbours' share.
+	var pad: Vector4 = Vector4.ZERO
+	if _max_side(shadow) > 0.5:
+		var spill_x: float = maxf(shadow.z, shadow.w) * _SHADOW_CORNER_SPILL
+		var spill_y: float = maxf(shadow.x, shadow.y) * _SHADOW_CORNER_SPILL
+		pad = Vector4(
+			maxf(shadow.x, spill_x) + 2.0,
+			maxf(shadow.y, spill_x) + 2.0,
+			maxf(shadow.z, spill_y) + 2.0,
+			maxf(shadow.w, spill_y) + 2.0,
+		)
+	var quad: Rect2 = rect.grow_individual(pad.x, pad.z, pad.y, pad.w)
+	var pad_min: Vector2 = Vector2(pad.x / quad.size.x, pad.z / quad.size.y)
+	var pad_max: Vector2 = Vector2(pad.y / quad.size.x, pad.w / quad.size.y)
 	var anti_aliasing: bool = vals.get("anti_aliasing", true)
 	_set_param(&"u_size", quad.size)
-	_set_param(&"u_pad", Vector2(pad, pad))
+	_set_param(&"u_pad", pad)
 	_set_param(&"u_corner_radius", Vector4(vals.get("corner_radius", Vector4i.ZERO)))
 	_set_param(&"u_border_widths", Vector4(vals.get("border", Vector4i.ZERO)))
 	_set_param(&"u_shadow", shadow)
 	_set_param(&"u_aa", 1.0 if anti_aliasing else 0.0)
 	var shadow_src: Variant = vals.get("shadow_color", _DEFAULT_SHADOW_COLOR)
 	_set_param(&"u_shadow_color", shadow_src if shadow_src is Color else _DEFAULT_SHADOW_COLOR)
-	_push_fill(bg, pad_frac)
-	_push_border(border_src, pad_frac)
+	_push_fill(bg, pad_min, pad_max)
+	_push_border(border_src, pad_min, pad_max)
 	var xform: Transform2D = _skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
 	if not _gpu_emitted or quad != _gpu_quad or xform != _gpu_xform:
 		_gpu_quad = quad
@@ -1569,14 +1587,14 @@ func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 		RenderingServer.canvas_item_add_rect(_gpu_ci, quad, Color.WHITE)
 
 
-func _push_fill(bg: Variant, pad_frac: Vector2) -> void:
+func _push_fill(bg: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
 	if bg is GdssGradient:
 		var grad: GdssGradient = bg as GdssGradient
 		_set_param(&"u_fill_a", grad.color_a)
 		_set_param(&"u_fill_b", grad.color_b)
 		_set_param(&"u_grad_offsets", grad.offsets)
-		_set_param(&"u_grad_p0", _remap_uv(grad.p0, pad_frac))
-		_set_param(&"u_grad_p1", _remap_uv(grad.p1, pad_frac))
+		_set_param(&"u_grad_p0", _remap_uv(grad.p0, pad_min, pad_max))
+		_set_param(&"u_grad_p1", _remap_uv(grad.p1, pad_min, pad_max))
 		_set_param(&"u_fill_mode", grad.mode)
 	elif bg is GdssBlur:
 		var blur: GdssBlur = bg as GdssBlur
@@ -1586,8 +1604,8 @@ func _push_fill(bg: Variant, pad_frac: Vector2) -> void:
 			_set_param(&"u_fill_mode", 5)
 			_set_param(&"u_fill_glass2", Vector4(blur.strength_end, blur.refraction, blur.highlight, blur.saturation))
 			_set_param(&"u_grad_offsets", blur.grad_offsets)
-			_set_param(&"u_grad_p0", _remap_uv(blur.grad_p0, pad_frac))
-			_set_param(&"u_grad_p1", _remap_uv(blur.grad_p1, pad_frac))
+			_set_param(&"u_grad_p0", _remap_uv(blur.grad_p0, pad_min, pad_max))
+			_set_param(&"u_grad_p1", _remap_uv(blur.grad_p1, pad_min, pad_max))
 		else:
 			_set_param(&"u_fill_mode", 4)
 	elif bg is Texture2D:
@@ -1601,14 +1619,14 @@ func _push_fill(bg: Variant, pad_frac: Vector2) -> void:
 		_set_param(&"u_fill_a", Color.TRANSPARENT)
 
 
-func _push_border(border_src: Variant, pad_frac: Vector2) -> void:
+func _push_border(border_src: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
 	if border_src is GdssGradient:
 		var grad: GdssGradient = border_src as GdssGradient
 		_set_param(&"u_border_mode", 1)
 		_set_param(&"u_border_a", grad.color_a)
 		_set_param(&"u_border_b", grad.color_b)
-		_set_param(&"u_border_p0", _remap_uv(grad.p0, pad_frac))
-		_set_param(&"u_border_p1", _remap_uv(grad.p1, pad_frac))
+		_set_param(&"u_border_p0", _remap_uv(grad.p0, pad_min, pad_max))
+		_set_param(&"u_border_p1", _remap_uv(grad.p1, pad_min, pad_max))
 	elif border_src is GdssBlur:
 		var blur: GdssBlur = border_src as GdssBlur
 		_set_param(&"u_border_a", blur.tint)
@@ -1616,8 +1634,8 @@ func _push_border(border_src: Variant, pad_frac: Vector2) -> void:
 		if blur.strength_end != blur.strength:
 			_set_param(&"u_border_mode", 3)
 			_set_param(&"u_border_glass2", Vector4(blur.strength_end, blur.refraction, blur.highlight, blur.saturation))
-			_set_param(&"u_border_p0", _remap_uv(blur.grad_p0, pad_frac))
-			_set_param(&"u_border_p1", _remap_uv(blur.grad_p1, pad_frac))
+			_set_param(&"u_border_p0", _remap_uv(blur.grad_p0, pad_min, pad_max))
+			_set_param(&"u_border_p1", _remap_uv(blur.grad_p1, pad_min, pad_max))
 		else:
 			_set_param(&"u_border_mode", 2)
 	elif border_src is Color:
@@ -1628,8 +1646,8 @@ func _push_border(border_src: Variant, pad_frac: Vector2) -> void:
 		_set_param(&"u_border_a", Color.TRANSPARENT)
 
 
-func _remap_uv(uv: Vector2, pad_frac: Vector2) -> Vector2:
-	return pad_frac + uv * (Vector2.ONE - pad_frac * 2.0)
+func _remap_uv(uv: Vector2, pad_min: Vector2, pad_max: Vector2) -> Vector2:
+	return pad_min + uv * (Vector2.ONE - pad_min - pad_max)
 
 
 func _skew_transform(rect: Rect2, skew_x: float, skew_y: float) -> Transform2D:
