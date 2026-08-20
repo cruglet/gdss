@@ -23,6 +23,8 @@ static var _composite_map: Dictionary = {}
 static var _inst: GdssInterpreter
 
 const SCHEME_PARENT_KEY: String = "__gdss_extends__"
+## Marks a color property that carries one value per side (left, right, top, bottom).
+const COLOR4_KEY: String = "__gdss_color4__"
 
 static var _re_global: RegEx = RegEx.create_from_string(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
 static var _re_instance: RegEx = RegEx.create_from_string(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
@@ -375,8 +377,11 @@ func _check_calc_value(value_str: String, declared_vars: Dictionary, errors: Arr
 
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
 	var is_component: bool = prop.composite_of.has(prop_name)
+	# A per-side color holds a whole color, so it takes the same methods the shorthand
+	# does; the numeric composites only ever hold a plain number.
+	var is_color_component: bool = is_component and prop.type == GDSS.Type.COLOR
 	if not _is_quoted_literal(value_str) and value_str.contains("("):
-		if is_component:
+		if is_component and not is_color_component:
 			errors.append(["Component property '%s' expects a plain value, not a method call" % prop_name, line])
 			return
 		var method_name: String = _method_name_of(value_str)
@@ -387,7 +392,7 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		return
 	
 	var actual_type: GDSS.Type = prop.type
-	if is_component:
+	if is_component and not is_color_component:
 		actual_type = GDSS.Type.FLOAT if prop.type == GDSS.Type.VECTOR2 else GDSS.Type.INT
 	
 	if actual_type == GDSS.Type.COMPOSITE4:
@@ -1713,19 +1718,36 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 
 static func _fold_composite_component(container: Dictionary, parent_prop: String, index: int, value: Variant) -> void:
 	var existing: Variant = container.get(parent_prop)
-	if value is Dictionary:
+	var parent: GdssProp = GDSS.get_db().property_list.get(parent_prop)
+	# Color parents fold whole values (a color, a var sentinel, a method descriptor)
+	# per side; every other parent packs numbers, so a dictionary value is a method call
+	# in a slot that cannot hold one.
+	var is_color: bool = existing is Color \
+		or (existing is Dictionary and (existing as Dictionary).has(COLOR4_KEY)) \
+		or (parent != null and parent.type == GDSS.Type.COLOR)
+	if value is Dictionary and not is_color:
 		return
 	if _patch_composites and (existing == null or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite4_patch__"))):
 		var patch: Dictionary = (existing as Dictionary).get("__gdss_composite4_patch__") if existing is Dictionary else {}
 		patch[index] = value
 		container[parent_prop] = {"__gdss_composite4_patch__": patch}
 		return
-	var parent: GdssProp = GDSS.get_db().property_list.get(parent_prop)
 	if existing == null:
 		existing = parent.get_default_value() if parent != null else Vector4i.ZERO
+	if is_color:
+		var sides: Array = []
+		if existing is Dictionary and (existing as Dictionary).has(COLOR4_KEY):
+			sides = (existing as Dictionary)[COLOR4_KEY]
+		else:
+			# Sides the sheet never names keep whatever the shorthand set, so
+			# "border_color: RED" plus "border_color_top: BLUE" leaves three red sides.
+			sides = [existing, existing, existing, existing]
+		sides[index] = value
+		container[parent_prop] = {COLOR4_KEY: sides}
+		return
 	# Two-component (Vector2) parents fold with float components; four-component ones
-	# stay int. Decide from the existing value first so patch resolution - which folds
-	# onto a scratch key with no registered prop - still picks the right shape.
+	# stay int. Decide from the existing value first so a patch folding onto an already
+	# resolved base still picks the right shape.
 	var is_vec2: bool = existing is Vector2 \
 		or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite2__")) \
 		or (parent != null and parent.type == GDSS.Type.VECTOR2)
@@ -1785,7 +1807,8 @@ static func _fold_state_patches(state_dict: Dictionary, base_all: Dictionary) ->
 		if base_val == null:
 			var prop: GdssProp = GDSS.get_db().property_list.get(prop_name)
 			base_val = prop.get_default_value() if prop != null else Vector4i.ZERO
-		var scratch: Dictionary = {"value": base_val if not base_val is Dictionary else (base_val as Dictionary).duplicate(true)}
+		# Keyed by the real property name so the fold can still see the parent's type.
+		var scratch: Dictionary = {prop_name: base_val if not base_val is Dictionary else (base_val as Dictionary).duplicate(true)}
 		for index: Variant in patch:
-			_fold_composite_component(scratch, "value", int(index), patch[index])
-		state_dict[prop_name] = scratch.get("value")
+			_fold_composite_component(scratch, prop_name, int(index), patch[index])
+		state_dict[prop_name] = scratch.get(prop_name)

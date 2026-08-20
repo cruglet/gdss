@@ -684,6 +684,22 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 				var fallback: Color = prop.get_default_value() if prop.get_default_value() is Color else Color.TRANSPARENT
 				var from_val: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
 				var to_val: Variant = _get_parsed_val(prop_name, to_state, fallback)
+				if from_val is Array or to_val is Array:
+					var sides_from: Array = _side_colors(from_val, fallback)
+					var sides_to: Array = _side_colors(to_val, fallback)
+					if sides_from == sides_to:
+						continue
+					var captured_sides: String = prop_name
+					_tweened_values[captured_sides] = sides_from
+					pending_tween.tween_method(func(t: float) -> void:
+						var lerped: Array = []
+						for side: int in 4:
+							lerped.append((sides_from.get(side) as Color).lerp(sides_to.get(side), t))
+						_tweened_values[captured_sides] = lerped
+						_safe_redraw()
+					, 0.0, 1.0, transition_time)
+					tweener_count += 1
+					continue
 				if not from_val is Color or not to_val is Color:
 					continue
 				var from: Color = from_val as Color
@@ -1043,10 +1059,11 @@ func _resolve_override_patches(base: Dictionary, override_entry: Dictionary) -> 
 			if not (raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__")):
 				continue
 			var patch: Dictionary = (raw as Dictionary)["__gdss_composite4_patch__"]
-			var scratch: Dictionary = {"value": _base_composite_value(base, state_key, prop_name)}
+			# Keyed by the real property name so the fold can still see the parent's type.
+			var scratch: Dictionary = {prop_name: _base_composite_value(base, state_key, prop_name)}
 			for index: Variant in patch:
-				GdssInterpreter._fold_composite_component(scratch, "value", int(index), patch[index])
-			(state_dict as Dictionary)[prop_name] = scratch.get("value")
+				GdssInterpreter._fold_composite_component(scratch, prop_name, int(index), patch[index])
+			(state_dict as Dictionary)[prop_name] = scratch.get(prop_name)
 	return resolved
 
 
@@ -1065,6 +1082,12 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite2__"):
 		var parts2: Array = (raw as Dictionary)["__gdss_composite2__"]
 		return Vector2(_resolve_composite_part_f(parts2.front()), _resolve_composite_part_f(parts2.back()))
+	if raw is Dictionary and (raw as Dictionary).has(GdssInterpreter.COLOR4_KEY):
+		var sides: Array = (raw as Dictionary)[GdssInterpreter.COLOR4_KEY]
+		var resolved_sides: Array = []
+		for side: Variant in sides:
+			resolved_sides.append(_resolve_value(side, fallback, state_key))
+		return resolved_sides
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_calc__"):
 		return _eval_calc((raw as Dictionary)["__gdss_calc__"])
 	raw = _resolve_sentinel(raw, fallback)
@@ -1383,6 +1406,11 @@ func _is_dynamic_raw(raw: Variant) -> bool:
 				if part is String and ((part as String).begins_with("__gdss_global__") or (part as String).begins_with("__gdss_instance__")):
 					return true
 			return false
+		if d.has(GdssInterpreter.COLOR4_KEY):
+			for side: Variant in d[GdssInterpreter.COLOR4_KEY]:
+				if _is_dynamic_raw(side):
+					return true
+			return false
 		if d.has("__gdss_calc__"):
 			return _calc_has_dynamic_ref(d["__gdss_calc__"])
 		if not d.has("__gdss_method__"):
@@ -1470,12 +1498,16 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	elif bg is Color and (bg as Color).a > 0.0:
 		_draw_rect(to_canvas_item, rect, bg as Color, corner_radius, aa_size, detail, skew_x, skew_y)
 	var border: Vector4 = Vector4(vals.get("border", Vector4i.ZERO))
-	var border_src: Variant = vals.get("border_color", Color.TRANSPARENT)
+	var border_raw: Variant = vals.get("border_color", Color.TRANSPARENT)
+	var border_src: Variant = _border_base(border_raw)
+	var border_sides: Array = _border_side_colors(border_raw)
 	var has_border: bool = border.x > 0 or border.y > 0 or border.z > 0 or border.w > 0
 	if has_border:
 		var inner_rect: Rect2 = rect.grow_individual(-border.x, -border.z, -border.y, -border.w)
 		if inner_rect.has_area():
-			if border_src is GdssGradient:
+			if not border_sides.is_empty():
+				_draw_ring_sides(to_canvas_item, inner_rect, rect, corner_radius, border_sides, detail, skew_x, skew_y)
+			elif border_src is GdssGradient:
 				_draw_linear_gradient_ring(to_canvas_item, border_src as GdssGradient, inner_rect, rect, corner_radius, detail, skew_x, skew_y)
 			elif border_src is GdssBlur:
 				var border_tint: Color = (border_src as GdssBlur).tint
@@ -1483,6 +1515,45 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 					_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_tint, aa_size, detail, skew_x, skew_y)
 			elif border_src is Color and (border_src as Color).a > 0.0:
 				_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_src as Color, aa_size, detail, skew_x, skew_y)
+
+
+# A per-side color value as four colors, so a state that only styles the shorthand can
+# still tween against one that styles the sides.
+func _side_colors(src: Variant, fallback: Color) -> Array:
+	var sides: Array = src as Array if src is Array else [src, src, src, src]
+	var result: Array = []
+	for side: Variant in sides:
+		result.append(side if side is Color else fallback)
+	return result
+
+
+# border_color resolves to a four-entry array (left, right, top, bottom) as soon as the
+# sheet names any border_color_<side>. Only plain colors can differ per side, so a
+# gradient/blur/texture anywhere in the mix drives the whole border, and four equal
+# colors stay on the cheaper single-ring path.
+func _border_side_colors(src: Variant) -> Array:
+	if not src is Array:
+		return []
+	var sides: Array = src as Array
+	var uniform: bool = true
+	for side: Variant in sides:
+		if not side is Color:
+			return []
+		if side != sides.front():
+			uniform = false
+	return [] if uniform else sides
+
+
+# The value the whole border falls back to: the plain shorthand, or - once sides are in
+# play - the one source that cannot be drawn per side.
+func _border_base(src: Variant) -> Variant:
+	if not src is Array:
+		return src
+	var sides: Array = src as Array
+	for side: Variant in sides:
+		if not side is Color:
+			return side
+	return sides.front()
 
 
 static func _max_side(sides: Vector4) -> float:
@@ -1547,7 +1618,9 @@ func _set_param(key: StringName, value: Variant) -> void:
 
 func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	var bg: Variant = vals.get("bg_color", Color.TRANSPARENT)
-	var border_src: Variant = vals.get("border_color", Color.TRANSPARENT)
+	var border_raw: Variant = vals.get("border_color", Color.TRANSPARENT)
+	var border_src: Variant = _border_base(border_raw)
+	var border_sides: Array = _border_side_colors(border_raw)
 	_ensure_gpu_ci(to_canvas_item, bg is GdssBlur or border_src is GdssBlur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
 	# Every side pads the quad by its own reach plus a slice of slack for the falloff's
@@ -1576,7 +1649,7 @@ func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	var shadow_src: Variant = vals.get("shadow_color", _DEFAULT_SHADOW_COLOR)
 	_set_param(&"u_shadow_color", shadow_src if shadow_src is Color else _DEFAULT_SHADOW_COLOR)
 	_push_fill(bg, pad_min, pad_max)
-	_push_border(border_src, pad_min, pad_max)
+	_push_border(border_src, border_sides, pad_min, pad_max)
 	var xform: Transform2D = _skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
 	if not _gpu_emitted or quad != _gpu_quad or xform != _gpu_xform:
 		_gpu_quad = quad
@@ -1619,7 +1692,14 @@ func _push_fill(bg: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
 		_set_param(&"u_fill_a", Color.TRANSPARENT)
 
 
-func _push_border(border_src: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
+func _push_border(border_src: Variant, border_sides: Array, pad_min: Vector2, pad_max: Vector2) -> void:
+	if not border_sides.is_empty():
+		_set_param(&"u_border_mode", 4)
+		_set_param(&"u_border_left", border_sides.get(0))
+		_set_param(&"u_border_right", border_sides.get(1))
+		_set_param(&"u_border_top", border_sides.get(2))
+		_set_param(&"u_border_bottom", border_sides.get(3))
+		return
 	if border_src is GdssGradient:
 		var grad: GdssGradient = border_src as GdssGradient
 		_set_param(&"u_border_mode", 1)
@@ -1824,6 +1904,73 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 		colors = [color]
 
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, all_points, colors)
+
+
+# Per-side border colors. Each side owns its straight edge plus the half of each
+# neighbouring corner arc up to the 45-degree split, so two colors meet on the corner
+# diagonal the way a mitred frame does.
+func _draw_ring_sides(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, corner_radii: Vector4, colors: Array, detail: int, skew_x: float, skew_y: float) -> void:
+	var outer_fitted: Vector4 = _fit_corners(corner_radii, outer_rect)
+	var inner_fitted: Vector4 = _match_corner_counts(_fit_corners(corner_radii, inner_rect), outer_fitted)
+	var inner_points: PackedVector2Array = _apply_skew(_get_rounded_rect(inner_rect, inner_fitted, detail), inner_rect, skew_x, skew_y)
+	var outer_points: PackedVector2Array = _apply_skew(_get_rounded_rect(outer_rect, outer_fitted, detail), outer_rect, skew_x, skew_y)
+	var count: int = outer_points.size()
+	if inner_points.size() != count:
+		return
+	var splits: PackedInt32Array = _corner_splits(outer_fitted, detail)
+	# Spans in the composite's side order: left wraps the array end, from the bottom-left
+	# split round to the top-left one, and the rest follow clockwise.
+	var spans: Array[Vector2i] = [
+		Vector2i(splits[3], splits[0]),
+		Vector2i(splits[1], splits[2]),
+		Vector2i(splits[0], splits[1]),
+		Vector2i(splits[2], splits[3]),
+	]
+	for side: int in 4:
+		var color: Color = colors.get(side)
+		if color.a <= 0.0:
+			continue
+		_draw_ring_span(to_canvas_item, inner_points, outer_points, spans.get(side), count, color)
+
+
+func _draw_ring_span(to_canvas_item: RID, inner_points: PackedVector2Array, outer_points: PackedVector2Array, span: Vector2i, count: int, color: Color) -> void:
+	var quads: int = posmod(span.y - span.x, count)
+	var verts: PackedVector2Array
+	var indices: PackedInt32Array
+	for i: int in quads:
+		var near: int = (span.x + i) % count
+		var far: int = (span.x + i + 1) % count
+		var base: int = verts.size()
+		verts.append_array(PackedVector2Array([inner_points[near], outer_points[near], outer_points[far], inner_points[far]]))
+		indices.append_array([base, base + 1, base + 2, base, base + 2, base + 3])
+	if indices.is_empty():
+		return
+	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, verts, PackedColorArray([color]))
+
+
+# Vertex index of the 45-degree split inside each corner arc, where one side's span hands
+# over to the next. _get_rounded_rect walks the corners clockwise from the top-left,
+# emitting a single point for a square corner and detail + 1 for a rounded one.
+func _corner_splits(radii: Vector4, detail: int) -> PackedInt32Array:
+	var splits: PackedInt32Array
+	var index: int = 0
+	for corner: int in 4:
+		var points: int = 1 if radii[corner] == 0.0 else detail + 1
+		splits.append(index + points / 2)
+		index += points
+	return splits
+
+
+# A corner that survives the outer fit but collapses on the inner one would pair a single
+# point against a whole arc and break the side spans. Keep it at a hairline radius: the
+# arc keeps its vertex count, just gathered on the corner.
+func _match_corner_counts(inner: Vector4, outer: Vector4) -> Vector4:
+	return Vector4(
+		maxf(inner.x, 0.001) if outer.x > 0.0 else 0.0,
+		maxf(inner.y, 0.001) if outer.y > 0.0 else 0.0,
+		maxf(inner.z, 0.001) if outer.z > 0.0 else 0.0,
+		maxf(inner.w, 0.001) if outer.w > 0.0 else 0.0,
+	)
 
 
 func _triangulate_ring(inner_size: int, outer_size: int) -> PackedInt32Array:

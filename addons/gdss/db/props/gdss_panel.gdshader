@@ -21,6 +21,10 @@ uniform vec4 u_border_a : source_color = vec4(0.0);
 uniform vec4 u_border_b : source_color = vec4(0.0);
 uniform vec2 u_border_p0 = vec2(0.0, 0.5);
 uniform vec2 u_border_p1 = vec2(1.0, 0.5);
+uniform vec4 u_border_left : source_color = vec4(0.0);
+uniform vec4 u_border_right : source_color = vec4(0.0);
+uniform vec4 u_border_top : source_color = vec4(0.0);
+uniform vec4 u_border_bottom : source_color = vec4(0.0);
 
 uniform vec4 u_shadow_color : source_color = vec4(0.0, 0.0, 0.0, 0.4);
 uniform sampler2D u_tex : source_color, hint_default_white;
@@ -29,8 +33,8 @@ const float EPS = 0.0001;
 
 
 // How far past each edge the point sits, measured from the corner circle's centre, with
-// that corner's radius in z. Kept separate from the distance so the shadow can read the
-// outward direction out of it.
+// that corner's radius in z. Its two components also name the side a point belongs to:
+// the larger one wins, which splits every corner down its 45-degree diagonal.
 vec3 box_q(vec2 p, vec2 b, vec4 r) {
 	r.xy = (p.x > 0.0) ? r.xy : r.zw;
 	r.x = (p.y > 0.0) ? r.x : r.y;
@@ -102,6 +106,10 @@ void fragment() {
 		float denom = max(dot(dir, dir), EPS);
 		float t = clamp(dot(UV - u_border_p0, dir) / denom, 0.0, 1.0);
 		border_col = mix(u_border_a, u_border_b, t);
+	} else if (u_border_mode == 4) {
+		border_col = (q_outer.x > q_outer.y)
+			? (p.x < 0.0 ? u_border_left : u_border_right)
+			: (p.y < 0.0 ? u_border_top : u_border_bottom);
 	} else {
 		border_col = u_border_a;
 	}

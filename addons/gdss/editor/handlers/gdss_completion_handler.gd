@@ -213,7 +213,9 @@ func _show_composite_hint(line: String, col: int) -> bool:
 		return false
 	var prop_name: String = line.substr(0, colon).strip_edges()
 	var prop_def: GdssProp = GDSS.get_db().property_list.get(prop_name)
-	if prop_def == null or not prop_def.is_composite() or prop_def.type == GDSS.Type.COMPOSITE:
+	# Only the packed numeric composites spell their components out on the shorthand line;
+	# a color shorthand still takes a single value.
+	if prop_def == null or (prop_def.type != GDSS.Type.COMPOSITE4 and prop_def.type != GDSS.Type.VECTOR2):
 		return false
 	var context_type: String = str(_get_context().get("type", ""))
 	if context_type != "property_value" and context_type != "property_value_filled":
@@ -370,7 +372,8 @@ func _complete_properties(word: String, style_name: String) -> void:
 
 		if prop_def == null or not prop_def.is_composite() or prop_def.type == GDSS.Type.COMPOSITE:
 			continue
-		var sub_icon: Texture2D = _get_icon(&"float") if prop_def.type == GDSS.Type.VECTOR2 else _get_icon(&"int")
+		var sub_icon: Texture2D = _get_prop_icon(prop_def) if prop_def.type == GDSS.Type.COLOR \
+			else (_get_icon(&"float") if prop_def.type == GDSS.Type.VECTOR2 else _get_icon(&"int"))
 
 		for idx: int in range(prop_def.composite_of.size()):
 			var sub: String = prop_def.composite_of[idx]
@@ -437,7 +440,10 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			if idx < components.size():
 				var hint: String = str(components[idx])
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, hint, hint, _completion_color, _get_icon(&"MemberProperty"))
-			effective_type = GDSS.Type.FLOAT if pd.type == GDSS.Type.VECTOR2 else GDSS.Type.INT
+			match pd.type:
+				GDSS.Type.COLOR: effective_type = GDSS.Type.COLOR
+				GDSS.Type.VECTOR2: effective_type = GDSS.Type.FLOAT
+				_: effective_type = GDSS.Type.INT
 			break
 	else:
 		effective_type = prop_def.type
@@ -461,13 +467,13 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			editor.add_code_completion_option(CodeEdit.KIND_FUNCTION, "calc(…)", "calc(", _completion_color, _get_icon(&"MemberMethod"))
 
 	if prop_def == null:
+		if effective_type == GDSS.Type.COLOR:
+			_complete_named_colors(word)
 		return
 
 	match prop_def.type:
 		GDSS.Type.COLOR:
-			for c: String in GdssInterpreter.NAMED_COLORS:
-				if _matches(c, word):
-					editor.add_code_completion_option(CodeEdit.KIND_CONSTANT, c, c, _completion_color, _get_icon(&"Color"))
+			_complete_named_colors(word)
 		GDSS.Type.CURSOR:
 			for cursor_key: String in GDSS.CursorType:
 				if _matches(cursor_key, word):
@@ -493,6 +499,12 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			if default != null:
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, str(default), str(default), _completion_color, _get_icon(&"MemberProperty"))
 
+
+
+func _complete_named_colors(word: String) -> void:
+	for c: String in GdssInterpreter.NAMED_COLORS:
+		if _matches(c, word):
+			editor.add_code_completion_option(CodeEdit.KIND_CONSTANT, c, c, _completion_color, _get_icon(&"Color"))
 
 
 func _complete_at_directives(word: String) -> void:

@@ -15,6 +15,18 @@ Button {
 }
 """
 
+const FIXTURE_SIDE_COLORS: String = """
+Button {
+	border: 2 2 2 2
+	border_color: "#000000"
+	border_color_top: "#ff0000"
+	transition_time: 0.2
+	:disabled {
+		border_color_top: "#00ff00"
+	}
+}
+"""
+
 
 func _enter_disabled(t: TC, button: Button) -> GdssPropHandler:
 	var handler: GdssPropHandler = GdssNodeHandler.get_primary_handler(button)
@@ -48,6 +60,15 @@ func run(t: TC) -> void:
 	reapplied_handler.reapply()
 	t.check(reapplied_handler._tween == null, "reapply kills the in-flight tween")
 	t.check(reapplied_handler._tweened_values.is_empty(), "reapply clears tweened values")
+	t.apply_fixture(FIXTURE_SIDE_COLORS)
+	var sided: Button = t.make_styled_button()
+	var sided_handler: GdssPropHandler = _enter_disabled(t, sided)
+	var mid: Variant = sided_handler._tweened_values.get("border_color")
+	t.check(mid is Array and (mid as Array).size() == 4, "per-side border color tweens as four sides")
+	await t.await_seconds(0.45)
+	t.check_eq(sided_handler._get_val("border_color"), [Color.BLACK, Color.BLACK, Color("#00ff00"), Color.BLACK], "per-side color tween settles on the target side")
+	sided.free()
+	t.apply_fixture(FIXTURE)
 	var doomed: Button = t.make_styled_button()
 	var doomed_handler: GdssPropHandler = _enter_disabled(t, doomed)
 	t.check(doomed_handler._tween != null, "fourth tween starts")

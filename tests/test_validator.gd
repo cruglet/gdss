@@ -52,6 +52,24 @@ Button {
 }
 """
 
+const FIXTURE_SIDE_COLOR_BAD: String = """
+Panel {
+	border_color_top: nonsense
+	border_color_left: 4 5
+}
+"""
+
+const FIXTURE_SIDE_COLOR_GOOD: String = """
+@global var accent: "#3b82f6"
+Panel {
+	border_color_top: RED
+	border_color_left: alpha("#ffffff", 0.5)
+	border_color_right: $accent
+	border_color_bottom: "#101010"
+	shadow_bottom: 5
+}
+"""
+
 const FIXTURE_SCHEMES: String = """
 @global var accent: "#3b82f6"
 @scheme base {
@@ -126,6 +144,11 @@ func run(t: TC) -> void:
 	t.check(t.has_error_containing(vec2_bad, "expects a plain value, not a method call"), "method call in component key flagged")
 	var vec2_good: Array[Array] = t.validate_fixture(FIXTURE_VEC2_GOOD)
 	t.check(vec2_good.is_empty(), "vector2 forms validate clean (got: %s)" % ", ".join(t.error_messages(vec2_good)))
+	var side_color_bad: Array[Array] = t.validate_fixture(FIXTURE_SIDE_COLOR_BAD)
+	t.check(t.has_error_containing(side_color_bad, "'border_color_top' expects a color value"), "non-color per-side border value flagged")
+	t.check(t.has_error_containing(side_color_bad, "'border_color_left' expects a color value"), "multi-part per-side border value flagged")
+	var side_color_good: Array[Array] = t.validate_fixture(FIXTURE_SIDE_COLOR_GOOD)
+	t.check(side_color_good.is_empty(), "per-side color and shadow forms validate clean (got: %s)" % ", ".join(t.error_messages(side_color_good)))
 	var scheme_errors: Array[Array] = t.validate_fixture(FIXTURE_SCHEMES)
 	t.check(t.has_error_containing(scheme_errors, "extends unknown scheme 'missing'"), "unknown scheme parent flagged")
 	t.check(t.has_error_containing(scheme_errors, "'selfish' cannot extend itself"), "self-extension flagged")

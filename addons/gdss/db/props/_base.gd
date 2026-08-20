@@ -31,7 +31,7 @@ var default_value: Variant
 var category: Category = Category.STYLE
 var composite_of: PackedStringArray = []:
 	get():
-		if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE or type == GDSS.Type.VECTOR2:
+		if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE or type == GDSS.Type.VECTOR2 or type == GDSS.Type.COLOR:
 			return composite_of
 		else:
 			return []
@@ -81,7 +81,7 @@ func _get_property_list() -> Array[Dictionary]:
 		GDSS.Type.TRANSITION_FUNC: props.append({"name": "default_value", "type": TYPE_INT, "hint": PROPERTY_HINT_ENUM, "hint_string": ",".join(GDSS.TransitionFunc.keys())})
 		GDSS.Type.ICON: props.append({"name": "default_value", "type": TYPE_OBJECT, "hint": PROPERTY_HINT_RESOURCE_TYPE, "hint_string": "Texture2D"})
 	
-	if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE or type == GDSS.Type.VECTOR2:
+	if type == GDSS.Type.COMPOSITE4 or type == GDSS.Type.COMPOSITE or type == GDSS.Type.VECTOR2 or type == GDSS.Type.COLOR:
 		props.append({"name": "composite_of", "type": TYPE_PACKED_STRING_ARRAY})
 	
 	props.append({

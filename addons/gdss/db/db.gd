@@ -58,7 +58,7 @@ func _build_properties_code() -> void:
 	_make_prop("anti_aliasing", GDSS.Type.BOOLEAN, true, GdssProp.Category.STYLE)
 	_make_prop("bg_color", GDSS.Type.COLOR, Color(0, 0, 0, 0), GdssProp.Category.STYLE)
 	_make_prop("border", GDSS.Type.COMPOSITE4, Vector4i.ZERO, GdssProp.Category.STYLE, PackedStringArray(["border_left", "border_right", "border_top", "border_bottom"]))
-	_make_prop("border_color", GDSS.Type.COLOR, Color(0, 0, 0, 0), GdssProp.Category.STYLE)
+	_make_prop("border_color", GDSS.Type.COLOR, Color(0, 0, 0, 0), GdssProp.Category.STYLE, PackedStringArray(["border_color_left", "border_color_right", "border_color_top", "border_color_bottom"]))
 	_make_prop("corner_detail", GDSS.Type.INT, 8, GdssProp.Category.STYLE)
 	_make_prop("corner_radius", GDSS.Type.COMPOSITE4, Vector4i.ZERO, GdssProp.Category.STYLE, PackedStringArray(["corner_radius_top_left", "corner_radius_top_right", "corner_radius_bottom_left", "corner_radius_bottom_right"]))
 	_make_prop("cursor", GDSS.Type.CURSOR, 0, GdssProp.Category.NODE_PROPERTY)
