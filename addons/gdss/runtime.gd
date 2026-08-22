@@ -4,7 +4,29 @@ signal scheme_changed(scheme_name: String)
 signal globals_changed
 signal parsed_reloaded
 
+# How many frames an ambiguous tree-exit is re-checked before the node is assumed to
+# be deliberately detached rather than on its way out.
+const PURGE_GRACE_FRAMES: int = 4
+
 var _last_modified: int = 0
+# Nodes whose tree-exit was ambiguous, mapped to how many frames they have been waited
+# on. See _on_styled_node_exited.
+var _pending_purge: Dictionary[int, int] = {}
+
+
+func _process(_delta: float) -> void:
+	if _pending_purge.is_empty():
+		return
+	for id: int in _pending_purge.keys():
+		if not is_instance_valid(instance_from_id(id)):
+			GdssNodeHandler.purge(id)
+			_pending_purge.erase(id)
+			continue
+		var waited: int = _pending_purge.get(id) + 1
+		if waited >= PURGE_GRACE_FRAMES:
+			_pending_purge.erase(id)
+		else:
+			_pending_purge.set(id, waited)
 
 
 func _ready() -> void:
@@ -260,8 +282,11 @@ func _disconnect_node_signals(canvas_item: Node) -> void:
 # tree for good must drop its registry slot, or GdssNodeHandler._registry (and
 # every handler StyleBox it holds) grows without bound. tree_exited also fires on
 # a plain remove or a reparent, so we only purge when the node is actually being
-# destroyed; an ambiguous removal is re-checked deferred, by which point a
-# reparented node is valid again and a freed one is gone.
+# destroyed; an ambiguous removal is re-checked over the next few frames, after which
+# a reparented node is still valid and a freed one is gone. The re-check cannot ride
+# call_deferred: change_scene_to_file emits tree_exited for the outgoing scene while
+# its nodes are still valid and unqueued, and they only become invalid two frames
+# later, so a single deferred check kept every slot of every scene ever left.
 func _on_styled_node_exited(id: int) -> void:
 	var obj: Object = instance_from_id(id)
 	if not is_instance_valid(obj):
@@ -270,7 +295,7 @@ func _on_styled_node_exited(id: int) -> void:
 	if (obj as Node).is_queued_for_deletion():
 		GdssNodeHandler.purge(id)
 		return
-	GdssNodeHandler._check_purge.call_deferred(id)
+	_pending_purge.set(id, 0)
 
 
 # Drives on_show()/on_hide() one-shot transitions off the node's own visibility.
