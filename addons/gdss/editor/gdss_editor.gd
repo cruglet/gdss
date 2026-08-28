@@ -123,7 +123,7 @@ func _ready() -> void:
 	_setup_version_button()
 	_setup_menu_bar()
 	_push_recent(GdssStorage.get_save_path())
-	_setup_interpreter()
+	_setup_stylesheet()
 	_setup_chunk_tabs()
 	_setup_search()
 	_setup_color_swatches()
@@ -380,7 +380,7 @@ func _create_chunk(chunk_name: String) -> void:
 	code_edit.text = ""
 	_rebuild_chunk_tabs()
 	_clear_suppress_dirty.call_deferred()
-	GdssInterpreter.get_instance().save_current(get_full_source())
+	GdssStylesheet.get_instance().save_current(get_full_source())
 
 
 func _on_chunk_closed(idx: int) -> void:
@@ -463,7 +463,7 @@ func _on_chunk_rename(idx: int) -> void:
 		if not new_name.is_empty():
 			_chunks[idx]["name"] = new_name
 			_rebuild_chunk_tabs()
-			GdssInterpreter.get_instance().save_current(get_full_source())
+			GdssStylesheet.get_instance().save_current(get_full_source())
 	)
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)
@@ -531,7 +531,7 @@ func get_code_edit() -> CodeEdit:
 	return code_edit
 
 
-func _setup_interpreter() -> void:
+func _setup_stylesheet() -> void:
 	_error_timer = Timer.new()
 	_error_timer.wait_time = 0.5
 	_error_timer.one_shot = true
@@ -539,14 +539,14 @@ func _setup_interpreter() -> void:
 	add_child(_error_timer)
 	if not code_edit.text_changed.is_connected(_on_source_changed):
 		code_edit.text_changed.connect(_on_source_changed)
-	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
-	if interpreter == null:
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet == null:
 		return
-	if not interpreter.source_loaded.is_connected(_on_interpreter_source_loaded):
-		interpreter.source_loaded.connect(_on_interpreter_source_loaded)
-	if not interpreter.saved.is_connected(_on_interpreter_saved):
-		interpreter.saved.connect(_on_interpreter_saved)
-	interpreter.initialize()
+	if not stylesheet.source_loaded.is_connected(_on_stylesheet_source_loaded):
+		stylesheet.source_loaded.connect(_on_stylesheet_source_loaded)
+	if not stylesheet.saved.is_connected(_on_stylesheet_saved):
+		stylesheet.saved.connect(_on_stylesheet_saved)
+	stylesheet.initialize()
 
 
 func _on_source_changed() -> void:
@@ -559,12 +559,12 @@ func _on_error_check_timeout() -> void:
 
 
 func _recheck_errors() -> void:
-	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
-	if interpreter != null:
-		display_errors(interpreter.check_errors(get_full_source()))
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet != null:
+		display_errors(stylesheet.check_errors(get_full_source()))
 
 
-func _on_interpreter_source_loaded(source: String) -> void:
+func _on_stylesheet_source_loaded(source: String) -> void:
 	var was_connected: bool = code_edit.text_changed.is_connected(_on_source_changed)
 	if was_connected:
 		code_edit.text_changed.disconnect(_on_source_changed)
@@ -574,7 +574,7 @@ func _on_interpreter_source_loaded(source: String) -> void:
 	_recheck_errors.call_deferred()
 
 
-func _on_interpreter_saved() -> void:
+func _on_stylesheet_saved() -> void:
 	_user_saved()
 
 
@@ -643,7 +643,7 @@ func _on_code_edit_input(event: InputEvent) -> void:
 		_apply_font_size()
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_S and key.is_command_or_control_pressed():
-		GdssInterpreter.get_instance().save_current(get_full_source())
+		GdssStylesheet.get_instance().save_current(get_full_source())
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_I and key.is_command_or_control_pressed() and key.shift_pressed:
 		_convert_spaces_to_tabs()
@@ -741,7 +741,7 @@ func _setup_menu_bar() -> void:
 func _on_menu_id_pressed(id: int) -> void:
 	match id:
 		MENU_SAVE:
-			GdssInterpreter.get_instance().save_current(get_full_source())
+			GdssStylesheet.get_instance().save_current(get_full_source())
 		MENU_NEW:
 			_new_file()
 		MENU_OPEN:
@@ -1182,13 +1182,13 @@ func _open_theme_properties() -> void:
 
 
 func upsert_meta_block(block_text: String) -> void:
-	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
-	if interpreter == null:
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet == null:
 		return
 	_sync_active_chunk()
 	var replaced: bool = false
 	for chunk: Dictionary in _chunks:
-		var outcome: Dictionary = interpreter.replace_meta_block(str(chunk["content"]), block_text)
+		var outcome: Dictionary = stylesheet.replace_meta_block(str(chunk["content"]), block_text)
 		if outcome["found"]:
 			chunk["content"] = outcome["source"]
 			replaced = true
@@ -1198,7 +1198,7 @@ func upsert_meta_block(block_text: String) -> void:
 	_suppress_dirty = true
 	code_edit.text = _chunks[_active_chunk]["content"]
 	_clear_suppress_dirty.call_deferred()
-	interpreter.save_current(get_full_source())
+	stylesheet.save_current(get_full_source())
 
 
 func _insert_meta_at_top(content: String, block_text: String) -> String:
@@ -1397,11 +1397,11 @@ func _switch_to_file(path: String) -> void:
 	GdssStorage.set_save_path(path)
 	_active_chunk = 0
 	_push_recent(path)
-	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
-	if interpreter != null:
-		interpreter.reload_active_file()
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet != null:
+		stylesheet.reload_active_file()
 	if Engine.is_editor_hint():
-		GdssNodeHandler.rebind_tree(EditorInterface.get_edited_scene_root())
+		GdssNodeBinder.rebind_tree(EditorInterface.get_edited_scene_root())
 	_user_saved(false)
 
 
@@ -1415,9 +1415,9 @@ func _confirm_unsaved(on_proceed: Callable) -> void:
 	dialog.ok_button_text = "Save & Continue"
 	dialog.add_button("Discard", true, "discard")
 	dialog.confirmed.connect(func() -> void:
-		var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
-		if interpreter != null:
-			interpreter.save_current(get_full_source())
+		var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+		if stylesheet != null:
+			stylesheet.save_current(get_full_source())
 		on_proceed.call()
 		dialog.queue_free()
 	)
@@ -1512,7 +1512,7 @@ func _find_colors_in_line(line: String) -> Array[Dictionary]:
 		var start: int = m.get_start(0)
 		if not _is_value_position(code, start):
 			continue
-		var col: Color = GdssInterpreter.parse_named_color(m.get_string(0), sentinel)
+		var col: Color = GdssStylesheet.parse_named_color(m.get_string(0), sentinel)
 		if col != sentinel:
 			out.append({"color": col, "from": start, "to": m.get_end(0)})
 	return out

@@ -41,7 +41,7 @@ func _run() -> void:
 func _ensure_runtime() -> void:
 	if GDSS._runtime != null:
 		return
-	var runtime: Node = (load("res://addons/gdss/runtime.gd") as GDScript).new() as Node
+	var runtime: Node = (load("res://addons/gdss/core/gdss_runtime.gd") as GDScript).new() as Node
 	runtime.name = "GdssRuntime"
 	root.add_child(runtime)
 

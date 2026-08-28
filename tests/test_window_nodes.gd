@@ -30,10 +30,10 @@ func run(t: TC) -> void:
 
 func _check(t: TC, node: Window, type_name: String, bg: Color) -> void:
 	t.add_styled(node)
-	var handler: GdssPropHandler = GdssNodeHandler.get_primary_handler(node)
-	t.check(handler != null, "%s binds" % type_name)
+	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(node)
+	t.check(stylebox != null, "%s binds" % type_name)
 	t.check(node.has_theme_stylebox_override("panel"), "%s targets its panel stylebox" % type_name)
-	t.check(node.get_theme_stylebox("panel") is GdssPropHandler, "%s panel override is the GDSS handler" % type_name)
-	if handler != null:
-		t.check_eq(handler._get_val("bg_color"), bg, "%s panel bg resolves" % type_name)
+	t.check(node.get_theme_stylebox("panel") is GdssStylebox, "%s panel override is the GDSS stylebox" % type_name)
+	if stylebox != null:
+		t.check_eq(stylebox._get_val("bg_color"), bg, "%s panel bg resolves" % type_name)
 	node.free()

@@ -22,9 +22,9 @@ var _loading_scene: bool = false
 
 func _enter_tree() -> void:
 	_inst = self
-	var db: GdssDB = GDSS.get_db()
-	if db != null and db.node_list.is_empty():
-		db.repopulate()
+	var registry: GdssRegistry = GDSS.get_registry()
+	if registry != null and registry.node_list.is_empty():
+		registry.repopulate()
 	var is_first_run: bool = not ProjectSettings.has_setting("gdss/internal/initialized")
 	if is_first_run:
 		ProjectSettings.set_setting("gdss/internal/initialized", true)
@@ -132,17 +132,17 @@ func _setup_editor() -> void:
 	import_plugin = GdssImportPlugin.new()
 	add_import_plugin(import_plugin)
 	if not ProjectSettings.has_setting("autoload/GdssRuntime"):
-		add_autoload_singleton("GdssRuntime", "res://addons/gdss/runtime.gd")
+		add_autoload_singleton("GdssRuntime", "res://addons/gdss/core/gdss_runtime.gd")
 	if not scene_changed.is_connected(_on_scene_changed):
 		scene_changed.connect(_on_scene_changed)
 	if not get_tree().node_added.is_connected(_on_editor_node_added):
 		get_tree().node_added.connect(_on_editor_node_added)
-	GdssNodeHandler.rebind_tree.bind(EditorInterface.get_edited_scene_root()).call_deferred()
+	GdssNodeBinder.rebind_tree.bind(EditorInterface.get_edited_scene_root()).call_deferred()
 
 
 func _on_scene_changed(scene_root: Node) -> void:
 	_loading_scene = true
-	GdssNodeHandler.rebind_tree(scene_root)
+	GdssNodeBinder.rebind_tree(scene_root)
 	_clear_loading_scene.call_deferred()
 
 
@@ -160,8 +160,8 @@ func _on_editor_node_added(node: Node) -> void:
 		return
 	if node != scene_root and not scene_root.is_ancestor_of(node):
 		return
-	GdssNodeHandler.detach_foreign_handlers(node)
-	GdssNodeHandler.apply_mode.call_deferred(node as CanvasItem)
+	GdssNodeBinder.detach_foreign_styleboxes(node)
+	GdssNodeBinder.apply_mode.call_deferred(node as CanvasItem)
 
 
 # Called by the editor right before a scene is packed for saving, and again before the
@@ -170,7 +170,7 @@ func _on_editor_node_added(node: Node) -> void:
 # idle frame so the editor preview is uninterrupted.
 func _apply_changes() -> void:
 	_flush_editor_source()
-	GdssNodeHandler.strip_overrides()
+	GdssNodeBinder.strip_overrides()
 	_reapply_overrides_deferred.call_deferred()
 
 
@@ -186,14 +186,14 @@ func _save_external_data() -> void:
 func _flush_editor_source() -> void:
 	if not is_instance_valid(gdss_editor) or not gdss_editor.has_unsaved_changes():
 		return
-	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
-	if interpreter == null:
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet == null:
 		return
-	interpreter.save_current(gdss_editor.get_full_source())
+	stylesheet.save_current(gdss_editor.get_full_source())
 
 
 func _reapply_overrides_deferred() -> void:
-	GdssNodeHandler.reapply_overrides()
+	GdssNodeBinder.reapply_overrides()
 
 
 func _prompt_reload() -> void:
@@ -254,7 +254,7 @@ func _debug_hook() -> void:
 	debug_repopulate_button = Button.new()
 	debug_repopulate_button.text = "Repopulate (Nodes + Methods)"
 	debug_repopulate_button.pressed.connect(func() -> void:
-		GDSS.get_db().repopulate()
+		GDSS.get_registry().repopulate()
 		EditorInterface.get_editor_toaster().push_toast("Repopulated nodes + methods!", EditorToaster.SEVERITY_INFO)
 	)
 	debug_container.add_child(debug_repopulate_button)

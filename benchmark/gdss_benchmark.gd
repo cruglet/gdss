@@ -421,7 +421,7 @@ func _render_fps(button_class: String, backdrop: Texture2D) -> float:
 
 
 func _has_button_class(name: String) -> bool:
-	var btn: Dictionary = GdssInterpreter.parsed.get("Button", {})
+	var btn: Dictionary = GdssStylesheet.parsed.get("Button", {})
 	var classes: Dictionary = btn.get("_classes", {})
 	return classes.has(name)
 
@@ -581,7 +581,7 @@ func _bench_animating(count: int) -> Dictionary:
 
 
 func _inject_bench_classes() -> void:
-	var btn: Dictionary = GdssInterpreter.parsed.get("Button", {})
+	var btn: Dictionary = GdssStylesheet.parsed.get("Button", {})
 	if btn.is_empty():
 		return
 	var classes: Dictionary = btn.get("_classes", {})

@@ -22,7 +22,7 @@ func canary() -> bool:
 	if GDSS._runtime == null:
 		printerr("canary: GDSS._runtime is null")
 		return false
-	if GDSS._get_gdss_nodes().is_empty():
+	if GDSS._get_node_types().is_empty():
 		printerr("canary: node registry is empty")
 		return false
 	var ci: RID = RenderingServer.canvas_item_create()
@@ -87,11 +87,11 @@ func free_children() -> void:
 
 
 func parse_fixture(source: String) -> Dictionary:
-	return GdssInterpreter.interpret_all(PackedStringArray([source]))
+	return GdssStylesheet.parse_all(PackedStringArray([source]))
 
 
 func validate_fixture(source: String) -> Array[Array]:
-	var interp: GdssInterpreter = GdssInterpreter.new()
+	var interp: GdssStylesheet = GdssStylesheet.new()
 	var errors: Array[Array] = interp.check_errors(source)
 	interp.free()
 	return errors
@@ -112,11 +112,11 @@ func has_error_containing(errors: Array[Array], needle: String) -> bool:
 
 
 func apply_fixture(source: String) -> void:
-	_interpret_into_parsed(PackedStringArray([source]))
+	_parse_into_stylesheet(PackedStringArray([source]))
 
 
 func restore_theme() -> void:
-	_interpret_into_parsed(GdssStorage.load_sources())
+	_parse_into_stylesheet(GdssStorage.load_sources())
 
 
 func entry_val(result: Dictionary, selector: String, state: String, prop: String) -> Variant:
@@ -140,10 +140,10 @@ func class_entry(result: Dictionary, selector: String, gdss_class: String) -> Di
 	return found if found is Dictionary else {}
 
 
-func _interpret_into_parsed(sources: PackedStringArray) -> void:
-	var result: Dictionary = GdssInterpreter.interpret_all(sources)
-	GdssInterpreter.parsed.clear()
+func _parse_into_stylesheet(sources: PackedStringArray) -> void:
+	var result: Dictionary = GdssStylesheet.parse_all(sources)
+	GdssStylesheet.parsed.clear()
 	for key: String in result:
-		GdssInterpreter.parsed[key] = result[key]
+		GdssStylesheet.parsed[key] = result[key]
 	if GDSS._runtime != null:
-		GDSS._runtime._refresh_all_handlers()
+		GDSS._runtime._refresh_all_styleboxes()

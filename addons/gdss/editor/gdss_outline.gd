@@ -34,9 +34,9 @@ func _ready() -> void:
 	_search.text_changed.connect(_on_filter_changed)
 	_tree.item_selected.connect(_jump_to_selected)
 	code_edit.text_changed.connect(_queue_rebuild)
-	var interpreter: GdssInterpreter = GdssInterpreter.get_instance()
-	if interpreter != null:
-		interpreter.parsed_changed.connect(_queue_rebuild)
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet != null:
+		stylesheet.parsed_changed.connect(_queue_rebuild)
 	_rebuild()
 
 
@@ -71,7 +71,7 @@ func _rebuild() -> void:
 			var tree_parent: TreeItem = open_blocks.back()
 			var scheme_name: String = ""
 			if label.begins_with("@scheme"):
-				var scheme_match: RegExMatch = GdssInterpreter._re_scheme.search(label)
+				var scheme_match: RegExMatch = GdssStylesheet._re_scheme.search(label)
 				if scheme_match != null:
 					scheme_name = scheme_match.get_string(1)
 					label = "@scheme " + scheme_name

@@ -1,12 +1,12 @@
 [gd_scene format=3 uid="uid://bh4sv3ta53fmk"]
 
 [ext_resource type="Script" uid="uid://c8ecxj182iey" path="res://addons/gdss/editor/gdss_editor.gd" id="1_52mtl"]
-[ext_resource type="Script" uid="uid://ct5gmahfbd0cc" path="res://addons/gdss/editor/handlers/gdss_completion_handler.gd" id="2_vh56t"]
-[ext_resource type="Script" uid="uid://b8vfgh1l41n0a" path="res://addons/gdss/editor/handlers/gdss_highlight_handler.gd" id="2_wia40"]
-[ext_resource type="Script" uid="uid://d243kyxgy1fcy" path="res://addons/gdss/editor/handlers/gdss_interpreter.gd" id="4_squo2"]
-[ext_resource type="Texture2D" uid="uid://ceogrxr1lg3up" path="res://addons/gdss/editor/Map.svg" id="5_50ht1"]
-[ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/ActionCopy.svg" id="5_by7tt"]
-[ext_resource type="Texture2D" uid="uid://c55pmw55mh1ut" path="res://addons/gdss/editor/Doc.svg" id="5_djuub"]
+[ext_resource type="Script" uid="uid://ct5gmahfbd0cc" path="res://addons/gdss/editor/gdss_completion_provider.gd" id="2_vh56t"]
+[ext_resource type="Script" uid="uid://b8vfgh1l41n0a" path="res://addons/gdss/editor/gdss_highlight_provider.gd" id="2_wia40"]
+[ext_resource type="Script" uid="uid://d243kyxgy1fcy" path="res://addons/gdss/core/gdss_stylesheet.gd" id="4_squo2"]
+[ext_resource type="Texture2D" uid="uid://ceogrxr1lg3up" path="res://addons/gdss/editor/icons/Map.svg" id="5_50ht1"]
+[ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/icons/ActionCopy.svg" id="5_by7tt"]
+[ext_resource type="Texture2D" uid="uid://c55pmw55mh1ut" path="res://addons/gdss/editor/icons/Doc.svg" id="5_djuub"]
 [ext_resource type="Script" uid="uid://b6selo2ptljhh" path="res://addons/gdss/editor/gdss_outline.gd" id="9_outln"]
 
 [sub_resource type="GDScript" id="GDScript_rjngg"]
@@ -33,16 +33,16 @@ caret_pos_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxCont
 zoom_percentage = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ZoomPercentage")
 outline = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/GdssOutline")
 
-[node name="GdssHighlightHandler" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor", "interpreter")]
+[node name="GdssHighlightProvider" type="Node" parent="." unique_id=766305843 node_paths=PackedStringArray("editor", "stylesheet")]
 script = ExtResource("2_wia40")
 editor = NodePath("../VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/CodeEdit")
-interpreter = NodePath("../GdssInterpreter")
+stylesheet = NodePath("../GdssStylesheet")
 
-[node name="GdssCompletionHandler" type="Node" parent="." unique_id=1313950794 node_paths=PackedStringArray("editor")]
+[node name="GdssCompletionProvider" type="Node" parent="." unique_id=1313950794 node_paths=PackedStringArray("editor")]
 script = ExtResource("2_vh56t")
 editor = NodePath("../VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/CodeEdit")
 
-[node name="GdssInterpreter" type="Node" parent="." unique_id=1840043936]
+[node name="GdssStylesheet" type="Node" parent="." unique_id=1840043936]
 script = ExtResource("4_squo2")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1783720769]
