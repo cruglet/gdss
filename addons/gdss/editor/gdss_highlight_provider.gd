@@ -57,22 +57,22 @@ func _build_from_objects() -> void:
 		var style_name: String = obj.style_name
 		if not _nodes.has(style_name):
 			_nodes.append(style_name)
-
+		
 		var props_dict: Dictionary = {}
 		for prop: GdssProp in obj.get_enabled_props():
-			props_dict[prop.name] = prop
+			props_dict.set(prop.name, prop)
 			if not _properties.has(prop.name):
 				_properties.append(prop.name)
 			for sub: String in prop.composite_of:
 				if not _properties.has(sub):
 					_properties.append(sub)
-
-		_property_meta[style_name] = props_dict
-
+		
+		_property_meta.set(style_name, props_dict)
+		
 		for v: String in obj.states:
 			if not _states.has(v):
 				_states.append(v)
-
+	
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if not _value_functions.has(method.method_name):
 			_value_functions.append(method.method_name)
@@ -118,7 +118,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var local_variables: Array[String] = []
 	var instance_variables: Array[String] = []
 	var enum_values: Array[String] = []
-
+	
 	var col_keyword: Color
 	var col_type: Color
 	var col_user_type: Color
@@ -140,8 +140,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var _critical_markers: PackedStringArray = []
 	var _warning_markers: PackedStringArray = []
 	var _notice_markers: PackedStringArray = []
-
-
+	
+	
 	func refresh_colors() -> void:
 		var s: EditorSettings = EditorInterface.get_editor_settings()
 		col_keyword = s.get_setting("text_editor/theme/highlighting/keyword_color")
@@ -168,13 +168,13 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		_critical_markers = _get_marker_list(s, "critical_list")
 		_warning_markers = _get_marker_list(s, "warning_list")
 		_notice_markers = _get_marker_list(s, "notice_list")
-
-
+	
+	
 	func _get_marker_color(s: EditorSettings, key: String) -> Color:
 		var path: String = "text_editor/theme/highlighting/comment_markers/" + key
 		return s.get_setting(path) if s.has_setting(path) else col_comment
-
-
+	
+	
 	func _get_marker_list(s: EditorSettings, key: String) -> PackedStringArray:
 		var path: String = "text_editor/theme/highlighting/comment_markers/" + key
 		var result: PackedStringArray = []
@@ -185,8 +185,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 			if not trimmed.is_empty():
 				result.append(trimmed)
 		return result
-
-
+	
+	
 	func _marker_color_for(word: String) -> Variant:
 		if _critical_markers.has(word):
 			return col_critical
@@ -195,8 +195,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		if _notice_markers.has(word):
 			return col_notice
 		return null
-
-
+	
+	
 	func _highlight_comment_markers(text: String, start: int, result: Dictionary) -> void:
 		var n: int = text.length()
 		var i: int = start
@@ -209,59 +209,59 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				i += 1
 			var marker_color: Variant = _marker_color_for(text.substr(word_start, i - word_start))
 			if marker_color != null:
-				result[word_start] = {"color": marker_color}
+				result.set(word_start, {"color": marker_color})
 				if i < n:
-					result[i] = {"color": col_comment}
-
-
+					result.set(i, {"color": col_comment})
+	
+	
 	func invalidate_cache() -> void:
 		_cache_dirty = true
-
-
+	
+	
 	func _is_word_char(c: String) -> bool:
 		var code: int = c.unicode_at(0)
 		return (code >= 65 and code <= 90) or (code >= 97 and code <= 122) or (code >= 48 and code <= 57) or code == 95
-
-
+	
+	
 	func _node_has_state(node_name: String, state: String) -> bool:
 		if _node_states.has(node_name):
-			var v: PackedStringArray = _node_states[node_name]
+			var v: PackedStringArray = _node_states.get(node_name)
 			return v.has(state)
 		return false
-
-
+	
+	
 	func _get_line_syntax_highlighting(p_line: int) -> Dictionary:
 		var result: Dictionary = {}
 		var text: String = get_text_edit().get_line(p_line)
 		var line_length: int = text.length()
-
+		
 		var total_lines: int = get_text_edit().get_line_count()
-
+		
 		if _cache_dirty or _brace_depth_cache.size() != total_lines:
 			_rebuild_brace_cache()
 			_cache_dirty = false
-
-		var brace_depth: int = _brace_depth_cache[p_line] if p_line < _brace_depth_cache.size() else 0
-		var annotation_kind: int = _annotation_cache[p_line] if p_line < _annotation_cache.size() else 0
-
+		
+		var brace_depth: int = _brace_depth_cache.get(p_line) if p_line < _brace_depth_cache.size() else 0
+		var annotation_kind: int = _annotation_cache.get(p_line) if p_line < _annotation_cache.size() else 0
+		
 		if line_length == 0:
 			return result
-
+		
 		var i: int = 0
 		while i < line_length:
 			var c: String = text[i]
-
+			
 			if c == "#":
-				result[i] = {"color": col_comment}
+				result.set(i, {"color": col_comment})
 				_highlight_comment_markers(text, i, result)
 				break
-
+			
 			if c == "\"":
-				result[i] = {"color": col_string}
+				result.set(i, {"color": col_string})
 				var j: int = i + 1
 				while j < line_length and text[j] != "\"":
 					j += 1
-				result[j] = {"color": col_string}
+				result.set(j, {"color": col_string})
 				i = j + 1
 				continue
 			
@@ -290,49 +290,49 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 					if not is_word_char:
 						break
 					i += 1
-				result[start] = {"color": col_annotation}
+				result.set(start, {"color": col_annotation})
 				continue
-
+			
 			if c == "{":
-				result[i] = {"color": col_symbol if brace_depth >= 0 else col_brace_mismatch}
+				result.set(i, {"color": col_symbol if brace_depth >= 0 else col_brace_mismatch})
 				brace_depth += 1
 				i += 1
 				continue
-
+			
 			if c == "}":
 				brace_depth -= 1
-				result[i] = {"color": col_symbol if brace_depth >= 0 else col_brace_mismatch}
+				result.set(i, {"color": col_symbol if brace_depth >= 0 else col_brace_mismatch})
 				i += 1
 				continue
-
+			
 			if c in ["(", ")", "[", "]"]:
-				result[i] = {"color": col_symbol}
+				result.set(i, {"color": col_symbol})
 				i += 1
 				continue
-
+			
 			if c in [":", ",", "="]:
-				result[i] = {"color": col_symbol}
+				result.set(i, {"color": col_symbol})
 				i += 1
 				continue
-
+			
 			if c == ";":
-				result[i] = {"color": col_default}
+				result.set(i, {"color": col_default})
 				i += 1
 				continue
-
+			
 			if c == "+" or c == "*" or c == "/":
-				result[i] = {"color": col_symbol}
+				result.set(i, {"color": col_symbol})
 				i += 1
 				continue
-
+			
 			if c.is_valid_int() or (c == "-" and i + 1 < line_length and text[i + 1].is_valid_int()):
 				var start: int = i
 				i += 1
 				while i < line_length and (text[i].is_valid_int() or text[i] == "."):
 					i += 1
-				result[start] = {"color": col_number}
+				result.set(start, {"color": col_number})
 				continue
-
+			
 			var is_letter: bool = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c == "_"
 			if is_letter:
 				var start: int = i
@@ -357,9 +357,9 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				var colon_idx: int = maxi(trimmed_before.rfind(":"), trimmed_before.rfind("="))
 				var brace_idx: int = trimmed_before.rfind("{")
 				var in_value: bool = colon_idx != -1 and colon_idx > brace_idx and not is_after_colon
-
+				
 				if word == "pass":
-					result[start] = {"color": col_control_flow}
+					result.set(start, {"color": col_control_flow})
 				elif is_after_colon and states.has(word):
 					var before_colon: String = trimmed_before.substr(0, trimmed_before.length() - 1).strip_edges()
 					var valid: bool = false
@@ -370,50 +370,50 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 								break
 					else:
 						valid = _node_has_state(before_colon, word)
-					result[start] = {"color": col_control_flow if valid else col_default}
+					result.set(start, {"color": col_control_flow if valid else col_default})
 				elif nodes.has(word):
-					result[start] = {"color": col_type}
+					result.set(start, {"color": col_type})
 				elif word == "extends":
-					result[start] = {"color": col_keyword}
+					result.set(start, {"color": col_keyword})
 				elif trimmed_before.strip_edges().ends_with("@scheme"):
-					result[start] = {"color": col_user_type}
+					result.set(start, {"color": col_user_type})
 				elif annotation_kind != 0 and not in_value:
 					if global_variables.has(word):
-						result[start] = {"color": col_global}
+						result.set(start, {"color": col_global})
 					elif instance_variables.has(word):
-						result[start] = {"color": col_instance}
+						result.set(start, {"color": col_instance})
 					else:
-						result[start] = {"color": col_default}
+						result.set(start, {"color": col_default})
 				elif after.begins_with("(") and after.rfind("{") > after.rfind(")"):
-					result[start] = {"color": col_event}
+					result.set(start, {"color": col_event})
 				elif is_before_brace:
-					result[start] = {"color": col_user_type}
+					result.set(start, {"color": col_user_type})
 				elif in_value:
 					if value_functions.has(word):
-						result[start] = {"color": col_function}
+						result.set(start, {"color": col_function})
 					elif word.to_lower() == "true" or word.to_lower() == "false":
-						result[start] = {"color": col_keyword}
+						result.set(start, {"color": col_keyword})
 					elif builtin_colors.has(word):
-						result[start] = {"color": col_const}
+						result.set(start, {"color": col_const})
 					elif enum_values.has(word):
-						result[start] = {"color": col_const}
+						result.set(start, {"color": col_const})
 					else:
-						result[start] = {"color": col_default}
+						result.set(start, {"color": col_default})
 				elif word == "var":
-					result[start] = {"color": col_keyword}
+					result.set(start, {"color": col_keyword})
 				elif word == "true" or word == "false":
-					result[start] = {"color": col_keyword}
+					result.set(start, {"color": col_keyword})
 				elif properties.has(word):
-					result[start] = {"color": col_member}
+					result.set(start, {"color": col_member})
 				else:
-					result[start] = {"color": col_default}
+					result.set(start, {"color": col_default})
 				continue
-
+			
 			i += 1
-
+		
 		return result
-
-
+	
+	
 	func _rebuild_brace_cache() -> void:
 		var total_lines: int = get_text_edit().get_line_count()
 		_brace_depth_cache.resize(total_lines)
@@ -424,8 +424,8 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 		var annotation_kind: int = 0
 		var annotation_depth: int = 0
 		for line_idx: int in range(total_lines):
-			_brace_depth_cache[line_idx] = depth
-			_annotation_cache[line_idx] = annotation_kind
+			_brace_depth_cache.set(line_idx, depth)
+			_annotation_cache.set(line_idx, annotation_kind)
 			var line: String = get_text_edit().get_line(line_idx)
 			if annotation_kind == 0:
 				var stripped: String = line.strip_edges()

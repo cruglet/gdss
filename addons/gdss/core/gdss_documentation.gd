@@ -29,9 +29,9 @@ var FileFormat: GDSSDocumentation
 ## The syntax for GDSS is similar to CSS, with some Godot elements mixed in.[br][br]
 ## You start by declaring any themable node (See [member SupportedNodes]):
 ## [codeblock]
-## 
+##
 ## Button {
-##     
+##
 ## }
 ## [/codeblock][br]
 ## Then, you can enter any of that node's theme properties. To see a list, you can hit [kbd]Ctrl+Space[/kbd] on an empty line or begin typing.[br]
@@ -45,7 +45,7 @@ var FileFormat: GDSSDocumentation
 ## }
 ## [/codeblock]
 ## As you can see, the property name is defined first, followed by a colon, then the value.[br][br]
-## Some nodes have "states" or alternate styleboxes, these can be seen by inserting a [code]:[/code] 
+## Some nodes have "states" or alternate styleboxes, these can be seen by inserting a [code]:[/code]
 ## in a block (recommended) or after a node declaration:
 ## [codeblock]
 ## Button {
@@ -65,7 +65,7 @@ var FileFormat: GDSSDocumentation
 ## }
 ## [/codeblock]
 ## Any block that is inside/below another will inherit its ancestor's properties.
-## So in the code snippets above, the hover state will have a bg_color of [b]RED[/b] [u]and[/u] a 
+## So in the code snippets above, the hover state will have a bg_color of [b]RED[/b] [u]and[/u] a
 ## border_color of [b]ORANGE[/b]. [br][br]
 ## You can also define variables, too. There are three main types of variables: [code]local[/code],
 ## [code]instance[/code], and [code]global[/code]. You can define them in the top scope like you would a property:
@@ -94,7 +94,7 @@ var FileFormat: GDSSDocumentation
 ## [codeblock]
 ## Button {
 ##     bg_color: "#444"
-##     
+##
 ##     RoundedButton {
 ##         corner_radius: 8 8 8 8
 ##     }
@@ -104,14 +104,14 @@ var FileFormat: GDSSDocumentation
 ## [codeblock]
 ## Button {
 ##     bg_color: rgba(0.2, 0.2, 0.2)
-##     
+##
 ##     :hover {
 ##         expand: 3 3 3 3
 ##     }
-## 
+##
 ##     RoundedButton {
 ##         corner_radius: 8 8 8 8
-##         
+##
 ##         RoundedSkewButton {
 ##             skew_y: 0.2
 ##

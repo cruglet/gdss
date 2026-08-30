@@ -22,7 +22,7 @@ func call_method(args: Array[Variant], node_id: int = -1, state_key: String = ""
 	var blur: GdssBlur = GdssBlur.new()
 	blur.strength = maxf(_arg(args, 0, 4.0), 0.0)
 	blur.strength_end = maxf(_arg(args, 1, 0.0), 0.0)
-	var base: Color = args[2] if args.size() > 2 and args[2] is Color else Color.WHITE
+	var base: Color = args.get(2) if args.size() > 2 and args.get(2) is Color else Color.WHITE
 	var opacity: float = clampf(_arg(args, 3, 0.06), 0.0, 1.0)
 	blur.tint = Color(base.r, base.g, base.b, opacity)
 	blur.refraction = 0.0
@@ -39,8 +39,8 @@ func call_method(args: Array[Variant], node_id: int = -1, state_key: String = ""
 
 
 func _arg(args: Array, index: int, fallback: float) -> float:
-	if index < args.size() and args[index] != null:
-		return float(args[index])
+	if index < args.size() and args.get(index) != null:
+		return float(args.get(index))
 	return fallback
 
 
@@ -49,8 +49,8 @@ func get_tweenable_args() -> Array[int]:
 
 
 func interpolate_args(from_args: Array[Variant], to_args: Array[Variant], t: float) -> Array[Variant]:
-	var from_color: Color = from_args[2] if from_args.size() > 2 and from_args[2] is Color else Color.WHITE
-	var to_color: Color = to_args[2] if to_args.size() > 2 and to_args[2] is Color else Color.WHITE
+	var from_color: Color = from_args.get(2) if from_args.size() > 2 and from_args.get(2) is Color else Color.WHITE
+	var to_color: Color = to_args.get(2) if to_args.size() > 2 and to_args.get(2) is Color else Color.WHITE
 	return [
 		lerpf(_arg(from_args, 0, 4.0), _arg(to_args, 0, 4.0), t),
 		lerpf(_arg(from_args, 1, 0.0), _arg(to_args, 1, 0.0), t),

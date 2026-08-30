@@ -164,25 +164,22 @@ func _on_editor_node_added(node: Node) -> void:
 	GdssNodeBinder.apply_mode.call_deferred(node as CanvasItem)
 
 
-# Called by the editor right before a scene is packed for saving, and again before the
-# project runs. Flush the editor buffer the way Godot flushes open scripts, then strip the
-# live GDSS overrides so they are never baked into the .tscn, restoring them on the next
-# idle frame so the editor preview is uninterrupted.
+# Fires right before a scene is packed and again before the project runs. Flush the
+# editor buffer, then strip the live overrides so they are never baked into the .tscn,
+# restoring them on the next idle frame.
 func _apply_changes() -> void:
 	_flush_editor_source()
 	GdssNodeBinder.strip_overrides()
 	_reapply_overrides_deferred.call_deferred()
 
 
-# The editor asks every plugin to write its external data before it runs the project
-# (EditorNode::try_autosave), which is the only hook that fires with no scene open.
+# The only autosave hook that fires with no scene open (EditorNode::try_autosave).
 func _save_external_data() -> void:
 	_flush_editor_source()
 
 
-# The GDSS editor holds its edits in memory until Ctrl+S, and the runtime reads the
-# stylesheet off disk - so without this the game would start on the last written source
-# and silently drop whatever is still unsaved.
+# The editor holds edits in memory until Ctrl+S and the runtime reads the stylesheet off
+# disk, so without this the game would start on the last written source.
 func _flush_editor_source() -> void:
 	if not is_instance_valid(gdss_editor) or not gdss_editor.has_unsaved_changes():
 		return

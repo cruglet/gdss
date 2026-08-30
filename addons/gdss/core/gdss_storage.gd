@@ -29,8 +29,7 @@ static func get_save_uid() -> int:
 	return ResourceUID.text_to_id(text)
 
 
-# Heals the active save path after the .tgdss is moved or renamed in the editor by
-# resolving its tracked UID, and keeps that UID current while the path is valid.
+# Heals the save path after the .tgdss is moved or renamed, via its tracked UID.
 static func sync_save_path() -> void:
 	var path: String = get_save_path()
 	if FileAccess.file_exists(path):
@@ -133,7 +132,7 @@ static func load_data(path: String = "") -> Dictionary:
 	cache_file.close()
 	if is_current_format(cache) and int((cache as Dictionary).get("source_modified", 0)) >= get_latest_modified():
 		for key: String in (cache as Dictionary):
-			result[key] = (cache as Dictionary)[key]
+			result.set(key, (cache as Dictionary).get(key))
 	return result
 
 

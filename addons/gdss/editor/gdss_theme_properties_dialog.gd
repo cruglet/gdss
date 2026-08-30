@@ -28,7 +28,7 @@ func _init() -> void:
 		var line: LineEdit = LineEdit.new()
 		line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		grid.add_child(line)
-		_inputs[field] = line
+		_inputs.set(field, line)
 	var ds_label: Label = Label.new()
 	ds_label.text = "Default Scheme"
 	grid.add_child(ds_label)
@@ -46,16 +46,16 @@ func _init() -> void:
 func open_for(editor: GdssEditor) -> void:
 	_editor = editor
 	for field: String in FIELDS:
-		_inputs[field].text = str(GdssStylesheet.meta.get(field, ""))
+		_inputs.get(field).text = str(GdssStylesheet.meta.get(field, ""))
 	var schemes: PackedStringArray = GDSS.get_schemes()
 	var current: String = GDSS.get_default_scheme()
 	_scheme_option.clear()
 	_scheme_option.add_item("(none)")
 	_scheme_option.set_item_metadata(0, "")
 	for i: int in schemes.size():
-		_scheme_option.add_item(schemes[i])
-		_scheme_option.set_item_metadata(i + 1, schemes[i])
-		if schemes[i] == current:
+		_scheme_option.add_item(schemes.get(i))
+		_scheme_option.set_item_metadata(i + 1, schemes.get(i))
+		if schemes.get(i) == current:
 			_scheme_option.select(i + 1)
 	if not current.is_empty() and not schemes.has(current):
 		_scheme_option.add_item("%s (missing)" % current)
@@ -65,7 +65,7 @@ func open_for(editor: GdssEditor) -> void:
 	_schemes_label.text = "Declared schemes: " + (", ".join(schemes) if not schemes.is_empty() else "(none)")
 	reset_size()
 	popup_centered()
-	_inputs["name"].grab_focus()
+	_inputs.get("name").grab_focus()
 
 
 func _on_confirmed() -> void:
@@ -73,23 +73,23 @@ func _on_confirmed() -> void:
 		return
 	var meta: Dictionary = GdssStylesheet.meta.duplicate(true)
 	for field: String in FIELDS:
-		var value: String = _inputs[field].text.strip_edges().replace("\n", " ")
+		var value: String = _inputs.get(field).text.strip_edges().replace("\n", " ")
 		if value.is_empty():
 			meta.erase(field)
 		else:
-			meta[field] = value
+			meta.set(field, value)
 	var default_scheme: String = str(_scheme_option.get_item_metadata(_scheme_option.selected))
 	if default_scheme.is_empty():
 		meta.erase("default_scheme")
 	else:
-		meta["default_scheme"] = default_scheme
+		meta.set("default_scheme", default_scheme)
 	_editor.upsert_meta_block(_build_block(meta))
 
 
 func _build_block(meta: Dictionary) -> String:
 	var lines: PackedStringArray = ["@meta {"]
 	for key: String in meta:
-		var value: String = str(meta[key]).strip_edges()
+		var value: String = str(meta.get(key)).strip_edges()
 		if value.is_empty():
 			continue
 		if key == "default_scheme":

@@ -2,6 +2,7 @@
 class_name GdssMethod_Hsv
 extends GdssMethod
 
+
 func _init() -> void:
 	method_name = "hsv"
 	supported_prop_types = [GDSS.Type.COLOR]
@@ -18,8 +19,8 @@ func call_method(args: Array[Variant], node_id: int = -1, state_key: String = ""
 	if args.size() < 3:
 		return Color.WHITE
 	return Color.from_hsv(
-		float(args[0]),
-		float(args[1]),
-		float(args[2]),
-		float(args[3]) if args.size() > 3 else 1.0
+		float(args.get(0)),
+		float(args.get(1)),
+		float(args.get(2)),
+		float(args.get(3)) if args.size() > 3 else 1.0
 	)

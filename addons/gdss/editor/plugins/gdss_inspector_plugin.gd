@@ -6,7 +6,7 @@ extends EditorInspectorPlugin
 class GdssModeProperty extends EditorProperty:
 	var _option: OptionButton
 	var _updating: bool = false
-
+	
 	func _init() -> void:
 		_option = OptionButton.new()
 		_option.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -18,10 +18,10 @@ class GdssModeProperty extends EditorProperty:
 		add_child(_option)
 		add_focusable(_option)
 		_option.item_selected.connect(_on_selected)
-
+	
 	func _ready() -> void:
 		_update_property.call_deferred()
-
+	
 	func _update_property() -> void:
 		var obj: Object = get_edited_object()
 		if obj == null:
@@ -54,7 +54,7 @@ class GdssModeProperty extends EditorProperty:
 					return ""
 			current = current.get_parent()
 		return "  (project default)"
-
+	
 	func _on_selected(index: int) -> void:
 		if _updating:
 			return
@@ -75,7 +75,7 @@ class GdssModeProperty extends EditorProperty:
 class GdssClassesProperty extends EditorProperty:
 	const PAGE_SIZE: int = 10
 	const CUSTOM_ID: int = -1
-
+	
 	var _rows: VBoxContainer
 	var _pager: HBoxContainer
 	var _page_label: Label
@@ -84,7 +84,7 @@ class GdssClassesProperty extends EditorProperty:
 	var _values: PackedStringArray = []
 	var _page: int = 0
 	var _updating: bool = false
-
+	
 	func _init() -> void:
 		var root: VBoxContainer = VBoxContainer.new()
 		root.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -115,7 +115,7 @@ class GdssClassesProperty extends EditorProperty:
 		_apply_icon(add_button, &"Add", "")
 		add_button.pressed.connect(_on_add)
 		root.add_child(add_button)
-
+	
 	func _apply_icon(button: Button, icon_name: StringName, fallback_text: String) -> void:
 		if Engine.is_editor_hint():
 			var theme: Theme = EditorInterface.get_editor_theme()
@@ -125,13 +125,13 @@ class GdssClassesProperty extends EditorProperty:
 				return
 		if button.text.is_empty():
 			button.text = fallback_text
-
+	
 	func _ready() -> void:
 		_sync.call_deferred()
-
+	
 	func _update_property() -> void:
 		_sync()
-
+	
 	func _sync() -> void:
 		var obj: Object = get_edited_object()
 		if obj == null:
@@ -140,10 +140,10 @@ class GdssClassesProperty extends EditorProperty:
 		_values = (obj.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray).duplicate()
 		_page = clampi(_page, 0, _page_count() - 1)
 		_rebuild()
-
+	
 	func _page_count() -> int:
 		return maxi(1, ceili(float(_values.size()) / PAGE_SIZE))
-
+	
 	func _rebuild() -> void:
 		if not is_inside_tree():
 			return
@@ -164,9 +164,9 @@ class GdssClassesProperty extends EditorProperty:
 		if paged:
 			_page_label.text = "Page %d / %d" % [_page + 1, _page_count()]
 		_updating = false
-
+	
 	func _make_row(index: int, existing: PackedStringArray) -> Control:
-		var value: String = _values[index]
+		var value: String = _values.get(index)
 		var row: HBoxContainer = HBoxContainer.new()
 		row.size_flags_horizontal = SIZE_EXPAND_FILL
 		var option: OptionButton = OptionButton.new()
@@ -220,50 +220,50 @@ class GdssClassesProperty extends EditorProperty:
 			return
 		line.visible = false
 		_set_value(row_index, option.get_item_text(item_index))
-
+	
 	func _commit_line(index: int, option: OptionButton, line: LineEdit) -> void:
 		if _updating or not is_instance_valid(option) or not is_instance_valid(line):
 			return
 		if option.get_selected_id() != CUSTOM_ID:
 			return
 		_set_value(index, line.text)
-
+	
 	func _set_value(index: int, text: String) -> void:
 		if _updating or index < 0 or index >= _values.size():
 			return
 		var trimmed: String = text.strip_edges()
-		if _values[index] == trimmed:
+		if _values.get(index) == trimmed:
 			return
-		_values[index] = trimmed
+		_values.set(index, trimmed)
 		_commit()
-
+	
 	func _on_add() -> void:
 		_values.append("")
 		_page = (_values.size() - 1) / PAGE_SIZE
 		_commit()
 		_rebuild.call_deferred()
-
+	
 	func _on_remove(index: int) -> void:
 		if index < 0 or index >= _values.size():
 			return
 		_values.remove_at(index)
 		_commit()
 		_rebuild.call_deferred()
-
+	
 	func _move(index: int, delta: int) -> void:
 		var target: int = index + delta
 		if index < 0 or target < 0 or index >= _values.size() or target >= _values.size():
 			return
-		var moved: String = _values[index]
-		_values[index] = _values[target]
-		_values[target] = moved
+		var moved: String = _values.get(index)
+		_values.set(index, _values.get(target))
+		_values.set(target, moved)
 		_commit()
 		_rebuild.call_deferred()
-
+	
 	func _change_page(delta: int) -> void:
 		_page = clampi(_page + delta, 0, _page_count() - 1)
 		_rebuild()
-
+	
 	func _commit() -> void:
 		var obj: Object = get_edited_object()
 		if obj == null:
@@ -284,7 +284,7 @@ class GdssOverridesProperty extends EditorProperty:
 	var _edit: TextEdit
 	var _status: Label
 	var _updating: bool = false
-
+	
 	func _init() -> void:
 		var root: VBoxContainer = VBoxContainer.new()
 		root.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -303,10 +303,10 @@ class GdssOverridesProperty extends EditorProperty:
 		root.add_child(_status)
 		_edit.focus_exited.connect(_commit)
 		_edit.text_changed.connect(_on_text_changed)
-
+	
 	func _ready() -> void:
 		_update_property.call_deferred()
-
+	
 	func _update_property() -> void:
 		var obj: Object = get_edited_object()
 		if obj == null:
@@ -323,11 +323,11 @@ class GdssOverridesProperty extends EditorProperty:
 				_edit.text = text
 			_validate(_edit.text)
 		_updating = false
-
+	
 	func _on_text_changed() -> void:
 		if not _updating:
 			_validate(_edit.text)
-
+	
 	func _validate(text: String) -> void:
 		var obj: Object = get_edited_object()
 		if obj == null or text.strip_edges().is_empty():
@@ -343,7 +343,7 @@ class GdssOverridesProperty extends EditorProperty:
 		for state_key: String in entry:
 			if state_key == "_classes" or state_key == "_variations":
 				continue
-			var state_dict: Variant = entry[state_key]
+			var state_dict: Variant = entry.get(state_key)
 			if not state_dict is Dictionary:
 				continue
 			for prop_name: String in (state_dict as Dictionary):
@@ -354,7 +354,7 @@ class GdssOverridesProperty extends EditorProperty:
 		else:
 			_status.text = "Unknown: %s" % ", ".join(unknown)
 			_status.visible = true
-
+	
 	func _commit() -> void:
 		if _updating:
 			return
@@ -377,7 +377,7 @@ class GdssOverridesProperty extends EditorProperty:
 
 class GdssPreviewProperty extends EditorProperty:
 	var _option: OptionButton
-
+	
 	func _init() -> void:
 		_option = OptionButton.new()
 		_option.size_flags_horizontal = SIZE_EXPAND_FILL
@@ -385,10 +385,10 @@ class GdssPreviewProperty extends EditorProperty:
 		add_child(_option)
 		add_focusable(_option)
 		_option.item_selected.connect(_on_selected)
-
+	
 	func _ready() -> void:
 		_update_property.call_deferred()
-
+	
 	func _update_property() -> void:
 		var obj: Object = get_edited_object()
 		if obj == null:
@@ -400,7 +400,7 @@ class GdssPreviewProperty extends EditorProperty:
 			for state: String in node_type.states:
 				_option.add_item(state)
 		_option.select(0)
-
+	
 	func _on_selected(index: int) -> void:
 		var obj: Object = get_edited_object()
 		if obj == null or not obj is CanvasItem:

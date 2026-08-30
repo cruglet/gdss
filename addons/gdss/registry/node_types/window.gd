@@ -7,8 +7,7 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 	return "embedded_border"
 
 
-# Only the embedded window border is GDSS-drawn (and only when the window is
-# embedded; native OS windows simply don't render it, so this no-ops gracefully).
+# Only the embedded window border is GDSS-drawn; native OS windows don't render it.
 func get_only_states() -> PackedStringArray:
 	return ["embedded_border"]
 

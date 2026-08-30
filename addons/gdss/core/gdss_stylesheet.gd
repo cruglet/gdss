@@ -42,7 +42,7 @@ static func get_class_names(node_type: String) -> PackedStringArray:
 	var names: PackedStringArray = []
 	if not parsed.has(node_type):
 		return names
-	_collect_class_names(parsed[node_type].get("_classes", {}), names)
+	_collect_class_names(parsed.get(node_type).get("_classes", {}), names)
 	names.sort()
 	return names
 
@@ -51,7 +51,7 @@ static func _collect_class_names(classes: Dictionary, names: PackedStringArray) 
 	for class_key: String in classes:
 		if not names.has(class_key):
 			names.append(class_key)
-		var entry: Variant = classes[class_key]
+		var entry: Variant = classes.get(class_key)
 		if entry is Dictionary:
 			_collect_class_names((entry as Dictionary).get("_classes", {}), names)
 
@@ -124,7 +124,7 @@ static func _strip_line_comment(s: String) -> String:
 	return s
 
 
-# Splits a line into statements on unquoted semicolons, treating ";" like a newline.
+# Splits on unquoted semicolons; ";" acts like a newline.
 static func _split_statements(line: String) -> PackedStringArray:
 	var result: PackedStringArray = []
 	var current: String = ""
@@ -194,10 +194,8 @@ static var COLOR_ALIASES: Dictionary = {
 	"TRANSPARENT_BLACK": Color(0, 0, 0, 0),
 	"TRANSPARENT_WHITE": Color(1, 1, 1, 0),
 }
-# Memoizes name -> Color (success) or name -> false (not a color), keyed by raw name.
-# parse_named_color is probed for every non-hex string value (cursors, enums, etc.),
-# so caching misses too avoids repeating to_upper()/from_string() on the hot path.
-# Bounded by the distinct string values in the stylesheet. Fallback is applied per call.
+# Memoizes name -> Color, or false for "not a color". Probed for every non-hex string
+# value, so caching misses too keeps to_upper()/from_string() off the hot path.
 static var _named_color_cache: Dictionary = {}
 
 
@@ -209,14 +207,14 @@ static func parse_named_color(name: String, fallback: Color) -> Color:
 		return cached if cached is Color else fallback
 	var alias: Variant = COLOR_ALIASES.get(name.to_upper())
 	if alias is Color:
-		_named_color_cache[name] = alias
+		_named_color_cache.set(name, alias)
 		return alias
 	const SENTINEL: Color = Color(-1, -1, -1, -1)
 	var resolved: Color = Color.from_string(name, SENTINEL)
 	if resolved != SENTINEL:
-		_named_color_cache[name] = resolved
+		_named_color_cache.set(name, resolved)
 		return resolved
-	_named_color_cache[name] = false
+	_named_color_cache.set(name, false)
 	return fallback
 
 
@@ -268,40 +266,40 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 	if not known_methods.has(method_name):
 		errors.append(["Unknown method '%s()'" % method_name, line])
 		return
-
-	var gdss_method: GdssMethod = known_methods[method_name]
-
+	
+	var gdss_method: GdssMethod = known_methods.get(method_name)
+	
 	if prop != null and not gdss_method.supported_prop_types.is_empty():
 		if not gdss_method.supported_prop_types.has(prop.type):
 			errors.append(["Method '%s()' cannot be used for property type '%s'" % [method_name, GDSS.Type.keys()[prop.type]], line])
-
+	
 	var args_start: int = value_str.find("(")
 	var args_end: int = value_str.rfind(")")
 	if args_start == -1 or args_end == -1 or args_end <= args_start:
 		errors.append(["Malformed method call '%s'" % value_str, line])
 		return
-
+	
 	var args_raw: String = value_str.substr(args_start + 1, args_end - args_start - 1).strip_edges()
 	var args: Array[String] = _split_top_level_args(args_raw)
-
+	
 	var required_count: int = 0
 	for param: GdssMethod.Param in gdss_method.parameters:
 		if not param.optional:
 			required_count += 1
 	var total_count: int = gdss_method.parameters.size()
-
+	
 	if args.size() < required_count or args.size() > total_count:
 		if required_count == total_count:
 			errors.append(["Method '%s()' expects %d argument(s), got %d" % [method_name, required_count, args.size()], line])
 		else:
 			errors.append(["Method '%s()' expects %d-%d argument(s), got %d" % [method_name, required_count, total_count, args.size()], line])
 		return
-
+	
 	for ai: int in args.size():
-		if args[ai].contains("("):
-			_check_method_call(args[ai], _method_name_of(args[ai]), null, known_methods, errors, line)
+		if args.get(ai).contains("("):
+			_check_method_call(args.get(ai), _method_name_of(args.get(ai)), null, known_methods, errors, line)
 		else:
-			_check_method_arg_type(args[ai], gdss_method.parameters[ai], method_name, errors, line)
+			_check_method_arg_type(args.get(ai), gdss_method.parameters.get(ai), method_name, errors, line)
 
 
 func _split_top_level_args(args_raw: String) -> Array[String]:
@@ -462,20 +460,20 @@ func check_errors(source: String) -> Array[Array]:
 	var declared_vars: Dictionary = {}
 	var declared_globals: Dictionary = {}
 	var declared_instances: Dictionary = {}
-
+	
 	var statements: Array[Array] = []
 	for line_idx: int in lines.size():
-		var line_text: String = _strip_line_comment(lines[line_idx].strip_edges())
+		var line_text: String = _strip_line_comment(lines.get(line_idx).strip_edges())
 		for raw_stmt: String in _split_statements(line_text):
 			statements.append([raw_stmt.strip_edges(), line_idx])
-
+	
 	for entry: Array in statements:
-		var stripped: String = entry[0]
-		var i: int = entry[1]
-
+		var stripped: String = entry.get(0)
+		var i: int = entry.get(1)
+		
 		if stripped.is_empty():
 			continue
-
+		
 		if stripped.begins_with("@global") or stripped.begins_with("@instance"):
 			var is_global: bool = stripped.begins_with("@global")
 			var rx: RegEx = _re_global if is_global else _re_instance
@@ -490,14 +488,14 @@ func check_errors(source: String) -> Array[Array]:
 				else:
 					if declared_vars.has(m.get_string(1)):
 						errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
-					declared_vars[m.get_string(1)] = true
+					declared_vars.set(m.get_string(1), true)
 					if is_global:
-						declared_globals[m.get_string(1)] = true
+						declared_globals.set(m.get_string(1), true)
 					if not _is_quoted_literal(val_str) and val_str.contains("("):
 						var method_name: String = _method_name_of(val_str)
 						_check_method_call(val_str, method_name, null, known_methods, errors, i)
 			continue
-
+		
 		if stripped.begins_with("var "):
 			var m: RegExMatch = _re_local.search(stripped)
 			if not m:
@@ -509,18 +507,18 @@ func check_errors(source: String) -> Array[Array]:
 				else:
 					if declared_vars.has(m.get_string(1)):
 						errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
-					declared_vars[m.get_string(1)] = true
+					declared_vars.set(m.get_string(1), true)
 					if not _is_quoted_literal(val_str) and val_str.contains("("):
 						var method_name: String = _method_name_of(val_str)
 						_check_method_call(val_str, method_name, null, known_methods, errors, i)
 			continue
-
+		
 		if stripped.begins_with("@"):
 			var am: RegExMatch = _re_bad_annotation.search(stripped)
 			var annotation_name: String = am.get_string(1) if am else stripped
 			errors.append(["Unknown annotation '@%s'" % annotation_name, i])
 			continue
-
+		
 		for ch: String in stripped:
 			if ch == "{":
 				brace_depth += 1
@@ -539,7 +537,7 @@ func check_errors(source: String) -> Array[Array]:
 						type_stack.pop_back()
 					if not event_stack.is_empty():
 						event_stack.pop_back()
-
+		
 		if stripped.ends_with("{"):
 			var selector_part: String = stripped.trim_suffix("{").strip_edges()
 			var colon_pos: int = -1
@@ -547,10 +545,10 @@ func check_errors(source: String) -> Array[Array]:
 				if selector_part[ci] == ":":
 					colon_pos = ci
 					break
-
+			
 			var base_part: String = selector_part.substr(0, colon_pos if colon_pos != -1 else selector_part.length()).strip_edges()
 			var state_part: String = selector_part.substr(colon_pos + 1).strip_edges().to_lower() if colon_pos != -1 else ""
-
+			
 			var frame_selector: String = ""
 			var has_selector: bool = false
 			for sel: String in base_part.split(","):
@@ -573,38 +571,38 @@ func check_errors(source: String) -> Array[Array]:
 				selector_stack.append(selector_stack.back() if not selector_stack.is_empty() else "")
 				type_stack.append(enclosing_type)
 				event_stack.append(event_stack.back() if not event_stack.is_empty() else false)
-
+			
 			for raw_state: String in state_part.split(",", false):
 				var state_name: String = raw_state.strip_edges().trim_prefix(":").strip_edges()
 				if not state_name.is_empty() and not known_states.has(state_name):
 					errors.append(["Unknown state ':%s'" % state_name, i])
 			continue
-
+		
 		if stripped == "}":
 			continue
-
+		
 		if brace_depth == 0:
 			errors.append(["Unexpected token outside of any block: '%s'" % stripped, i])
 			continue
-
+		
 		if stripped.contains(":"):
 			var colon_idx: int = stripped.find(":")
 			var prop_name: String = stripped.substr(0, colon_idx).strip_edges()
 			var value_str: String = stripped.substr(colon_idx + 1).strip_edges()
-
+			
 			if prop_name.is_empty():
 				errors.append(["Empty property name", i])
 				continue
-
+			
 			if value_str.is_empty():
 				errors.append(["Property '%s' has no value" % prop_name, i])
 				continue
-
+			
 			var current_selector: String = selector_stack.back() if not selector_stack.is_empty() else ""
 			var current_type: String = type_stack.back() if not type_stack.is_empty() else ""
 			var in_event: bool = event_stack.back() if not event_stack.is_empty() else false
 			var node_type: GdssNodeType = GDSS._get_node_types().get(current_type) if not current_type.is_empty() else null
-
+			
 			if node_type != null:
 				var all_props: Array[GdssProp] = node_type.get_enabled_props()
 				var matched_prop: GdssProp = null
@@ -612,10 +610,10 @@ func check_errors(source: String) -> Array[Array]:
 					if p.name == prop_name or p.composite_of.has(prop_name) or p.category_subproperties.has(prop_name):
 						matched_prop = p
 						break
-
+				
 				if matched_prop == null and in_event and prop_name.begins_with("transition_"):
 					matched_prop = GDSS.get_registry().property_list.get(prop_name)
-
+				
 				if matched_prop == null:
 					errors.append(["Unknown property '%s' for selector '%s'" % [prop_name, current_selector], i])
 				else:
@@ -637,16 +635,16 @@ func check_errors(source: String) -> Array[Array]:
 				errors.append(["Stray token '%s': expected a property or block" % stripped, i])
 			else:
 				errors.append(["Stray token '%s' in '%s': expected a property or block" % [stripped, stray_ctx], i])
-
+	
 	for line: int in brace_open_lines:
 		errors.append(["Unclosed brace '{'", line])
-
-	_check_annotation_blocks(pre["blocks"], declared_globals, declared_instances, errors)
+	
+	_check_annotation_blocks(pre.get("blocks"), declared_globals, declared_instances, errors)
 	for entry: Dictionary in _collect_imports(source):
-		var resolved: String = _resolve_import_path(entry["path"], GdssStorage.get_save_path().get_base_dir())
+		var resolved: String = _resolve_import_path(entry.get("path"), GdssStorage.get_save_path().get_base_dir())
 		if not FileAccess.file_exists(resolved):
 			errors.append(["Imported file not found: '%s'" % entry["path"], entry["line"]])
-
+	
 	return errors
 
 
@@ -701,7 +699,7 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 			if seen.has(current):
 				errors.append(["@scheme '%s' has a circular extends chain" % scheme_name, line])
 				break
-			seen[current] = true
+			seen.set(current, true)
 			current = str(scheme_parents.get(current))
 	if not default_scheme.is_empty() and not scheme_names.has(default_scheme):
 		errors.append(["@meta default_scheme '%s' is not a defined @scheme" % default_scheme, default_line])
@@ -758,17 +756,17 @@ func replace_meta_block(source: String, new_block: String) -> Dictionary:
 	var found: bool = false
 	var i: int = 0
 	while i < lines.size():
-		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+		var stripped: String = _strip_line_comment(lines.get(i).strip_edges())
 		if not found and _re_meta.search(stripped) != null and stripped.contains("{"):
 			out.append_array(new_block.split("\n"))
 			found = true
 			var depth: int = _brace_delta(stripped)
 			i += 1
 			while i < lines.size() and depth > 0:
-				depth += _brace_delta(_strip_line_comment(lines[i].strip_edges()))
+				depth += _brace_delta(_strip_line_comment(lines.get(i).strip_edges()))
 				i += 1
 			continue
-		out.append(lines[i])
+		out.append(lines.get(i))
 		i += 1
 	return {"found": found, "source": "\n".join(out)}
 
@@ -778,9 +776,9 @@ func strip_meta_blocks(source: String) -> String:
 	var out: PackedStringArray = []
 	var i: int = 0
 	while i < lines.size():
-		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+		var stripped: String = _strip_line_comment(lines.get(i).strip_edges())
 		if _re_meta.search(stripped) == null:
-			out.append(lines[i])
+			out.append(lines.get(i))
 			i += 1
 			continue
 		if not stripped.contains("{"):
@@ -789,7 +787,7 @@ func strip_meta_blocks(source: String) -> String:
 		var depth: int = _brace_delta(stripped)
 		i += 1
 		while i < lines.size() and depth > 0:
-			depth += _brace_delta(_strip_line_comment(lines[i].strip_edges()))
+			depth += _brace_delta(_strip_line_comment(lines.get(i).strip_edges()))
 			i += 1
 	return "\n".join(out)
 
@@ -866,7 +864,7 @@ static func parse_override_entry(text: String) -> Dictionary:
 	entry.erase("_variations")
 	if _override_entry_cache.size() > 512:
 		_override_entry_cache.clear()
-	_override_entry_cache[text] = entry
+	_override_entry_cache.set(text, entry)
 	return entry
 
 
@@ -877,7 +875,7 @@ static func _get_composite_map() -> Dictionary:
 		if not prop.is_composite():
 			continue
 		for i: int in prop.composite_of.size():
-			_composite_map[prop.composite_of[i]] = {"prop": prop.name, "index": i}
+			_composite_map.set(prop.composite_of.get(i), {"prop": prop.name, "index": i})
 	return _composite_map
 
 
@@ -914,10 +912,10 @@ static func _resolve_import_path(path: String, base_dir: String) -> String:
 static func _gather_import_sources(source: String, base_dir: String, seen: Dictionary) -> PackedStringArray:
 	var result: PackedStringArray = []
 	for entry: Dictionary in _collect_imports(source):
-		var resolved: String = _resolve_import_path(entry["path"], base_dir).simplify_path()
+		var resolved: String = _resolve_import_path(entry.get("path"), base_dir).simplify_path()
 		if resolved.is_empty() or seen.has(resolved) or not FileAccess.file_exists(resolved):
 			continue
-		seen[resolved] = true
+		seen.set(resolved, true)
 		var imported: String = GdssStorage.read_source(resolved)
 		result.append_array(_gather_import_sources(imported, resolved.get_base_dir(), seen))
 	result.append(source)
@@ -988,7 +986,7 @@ func _check_separator_mix(source: String, errors: Array[Array]) -> void:
 	var mix_line: int = -1
 	var lines: PackedStringArray = source.split("\n")
 	for i: int in lines.size():
-		for stmt: String in _split_statements(_strip_line_comment(lines[i].strip_edges())):
+		for stmt: String in _split_statements(_strip_line_comment(lines.get(i).strip_edges())):
 			var sep: String = _line_separator(stmt.strip_edges())
 			if sep == ":":
 				uses_colon = true
@@ -1045,9 +1043,9 @@ static func _accumulate_globals(source: String) -> Dictionary:
 			var raw: String = gm.get_string(2).strip_edges()
 			var tokens: Array[String] = _tokenize_value(raw)
 			var consumed: Array = _consume_value(tokens, 0, known_states)
-			var val: Variant = consumed[0]
-			globals[name] = val
-			_global_defaults[name] = val
+			var val: Variant = consumed.get(0)
+			globals.set(name, val)
+			_global_defaults.set(name, val)
 			continue
 		var im: RegExMatch = _re_instance.search(stripped)
 		if im:
@@ -1055,27 +1053,27 @@ static func _accumulate_globals(source: String) -> Dictionary:
 			var raw: String = im.get_string(2).strip_edges()
 			var tokens: Array[String] = _tokenize_value(raw)
 			var consumed: Array = _consume_value(tokens, 0, known_states)
-			_instance_defaults[name] = consumed[0]
+			_instance_defaults.set(name, consumed.get(0))
 			continue
 		var lm: RegExMatch = _re_local.search(stripped)
 		if lm:
 			var raw: String = lm.get_string(2).strip_edges()
 			var tokens: Array[String] = _tokenize_value(raw)
 			var consumed: Array = _consume_value(tokens, 0, known_states)
-			local_vars[lm.get_string(1)] = consumed[0]
-			_local_vars[lm.get_string(1)] = consumed[0]
+			local_vars.set(lm.get_string(1), consumed.get(0))
+			_local_vars.set(lm.get_string(1), consumed.get(0))
 	return local_vars
 
 
 static func resolve_scheme(name: String) -> Dictionary:
 	var result: Dictionary = _global_defaults.duplicate(true)
 	for key: String in _instance_scheme_base:
-		result[key] = _instance_scheme_base[key]
+		result.set(key, _instance_scheme_base.get(key))
 	for scheme_name: String in _scheme_chain(name):
 		var deltas: Dictionary = schemes.get(scheme_name, {})
 		for key: String in deltas:
 			if key != SCHEME_PARENT_KEY:
-				result[key] = deltas[key]
+				result.set(key, deltas.get(key))
 	return result
 
 
@@ -1092,9 +1090,9 @@ static func _scheme_chain(name: String) -> PackedStringArray:
 static func scheme_keys() -> PackedStringArray:
 	var keys: Dictionary = {}
 	for scheme_name: String in schemes:
-		for key: String in (schemes[scheme_name] as Dictionary):
+		for key: String in (schemes.get(scheme_name) as Dictionary):
 			if key != SCHEME_PARENT_KEY:
-				keys[key] = true
+				keys.set(key, true)
 	return PackedStringArray(keys.keys())
 
 
@@ -1124,7 +1122,7 @@ static func _strip_annotation_blocks(source: String) -> Dictionary:
 		if not stripped.contains("{"):
 			i += 1
 			while i < lines.size():
-				var look: String = _strip_line_comment(lines[i].strip_edges())
+				var look: String = _strip_line_comment(lines.get(i).strip_edges())
 				if look.is_empty() or look.begins_with("@"):
 					break
 				out_lines.append("")
@@ -1140,7 +1138,7 @@ static func _strip_annotation_blocks(source: String) -> Dictionary:
 			entries.append(head_entry)
 		i += 1
 		while i < lines.size() and depth > 0:
-			var body: String = _strip_line_comment(lines[i].strip_edges())
+			var body: String = _strip_line_comment(lines.get(i).strip_edges())
 			depth += _brace_delta(body)
 			var entry: Dictionary = _extract_block_entry(body, i)
 			if not entry.is_empty():
@@ -1265,14 +1263,14 @@ static func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -
 static func _collect_selector_group(tokens: Array[String], pos: int, known_states: PackedStringArray) -> Array:
 	var selectors: Array[String] = []
 	while pos < tokens.size():
-		var token: String = tokens[pos]
+		var token: String = tokens.get(pos)
 		if token == "{":
 			break
 		if token == ",":
 			pos += 1
 			continue
 		if token == ":":
-			var next: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
+			var next: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
 			selectors.append(":" + next)
 			pos += 2
 			continue
@@ -1319,29 +1317,28 @@ static func _tokenize(source: String) -> Array[String]:
 
 
 static func _ensure_selector(result: Dictionary, selector: String, _known_states: PackedStringArray) -> void:
-	# States are created lazily by _set_prop / _inherit as they're actually styled, so an
-	# entry no longer carries ~70 empty state dicts (smaller parsed data + far cheaper
-	# entry scans, e.g. the styled-prop set). Unstyled states resolve via "all"/default.
+	# States are created lazily by _set_prop / _inherit, so an entry no longer carries ~70
+	# empty state dicts. Unstyled states resolve via "all"/default.
 	if result.has(selector):
 		return
-	result[selector] = {"all": {}, "_classes": {}}
+	result.set(selector, {"all": {}, "_classes": {}})
 
 
 static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray, owner_is_base_type: bool = false) -> int:
 	while pos < tokens.size():
-		var token: String = tokens[pos]
+		var token: String = tokens.get(pos)
 		if token == "}":
 			return pos + 1
-
-		var next: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
-		var next2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
-
+		
+		var next: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
+		var next2: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
+		
 		var is_comma_group: bool = _has_comma_before_brace(tokens, pos)
-
+		
 		if is_comma_group:
 			var collected: Array = _collect_selector_group(tokens, pos, known_states)
-			var selectors: Array[String] = collected[0]
-			var block_start: int = collected[1] + 1
+			var selectors: Array[String] = collected.get(0)
+			var block_start: int = collected.get(1) + 1
 			var block_end: int = _find_block_end(tokens, block_start)
 			var block_tokens: Array[String] = tokens.slice(block_start, block_end - 1)
 			for raw_selector: String in selectors:
@@ -1354,25 +1351,24 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 					var child_container: Dictionary = _get_child_container(result, parent_selector)
 					_ensure_selector(child_container, raw_selector, known_states)
 					if not parent_selector.is_empty() and not owner_is_base_type:
-						_inherit(child_container, raw_selector, result[parent_selector])
+						_inherit(child_container, raw_selector, result.get(parent_selector))
 					_parse_block(block_tokens, 0, child_container, raw_selector, known_states, parent_selector.is_empty())
 			pos = block_end
 			continue
-
-		# Event block: name(...) { ... } e.g. on_show() { ... }. Distinct from states
-		# by the parens; stored under the (lowercased) event name as its own entry key.
+		
+		# Event block: name(...) { } - told from a state by the parens, keyed by event name.
 		if next == "(":
 			var close: int = pos + 2
-			while close < tokens.size() and tokens[close] != ")":
+			while close < tokens.size() and tokens.get(close) != ")":
 				close += 1
-			if not parent_selector.is_empty() and close + 1 < tokens.size() and tokens[close + 1] == "{":
+			if not parent_selector.is_empty() and close + 1 < tokens.size() and tokens.get(close + 1) == "{":
 				_ensure_selector(result, parent_selector, known_states)
 				pos = _parse_props_into(tokens, close + 2, result, parent_selector, token.to_lower(), known_states)
 			else:
 				pos = close + 1
 			continue
-
-		if next == ":" and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens[pos + 3] == "{":
+		
+		if next == ":" and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens.get(pos + 3) == "{":
 			# "%Variation" targets a node's theme_type_variation; a prefix-less name is a
 			# regular gdss class (applied via gdss_classes / GDSS.add_class).
 			var is_variation: bool = token.begins_with("%") and not parent_selector.is_empty()
@@ -1381,7 +1377,7 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 			_ensure_selector(child_container, child_name, known_states)
 			pos = _parse_props_into(tokens, pos + 4, child_container, child_name, next2.to_lower(), known_states)
 			continue
-
+		
 		if token == ":" and next2 == "{":
 			if not parent_selector.is_empty():
 				_ensure_selector(result, parent_selector, known_states)
@@ -1389,7 +1385,7 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 			else:
 				pos += 3
 			continue
-
+		
 		if next == "{":
 			# "%Variation" targets a node's theme_type_variation; a prefix-less name is a
 			# regular gdss class (applied via gdss_classes / GDSS.add_class).
@@ -1398,58 +1394,57 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 			var child_container: Dictionary = _get_variation_container(result, parent_selector) if is_variation else _get_child_container(result, parent_selector)
 			_ensure_selector(child_container, child_name, known_states)
 			if not parent_selector.is_empty() and not owner_is_base_type:
-				_inherit(child_container, child_name, result[parent_selector])
+				_inherit(child_container, child_name, result.get(parent_selector))
 			pos = _parse_block(tokens, pos + 2, child_container, child_name, known_states, parent_selector.is_empty())
 			continue
-
+		
 		if next == ":":
 			if not parent_selector.is_empty() and next2 != "" and next2 != "{":
 				_ensure_selector(result, parent_selector, known_states)
 				var consumed: Array = _consume_value(tokens, pos + 2, known_states)
-				_set_prop(result, parent_selector, "all", token, consumed[0])
-				pos = consumed[1]
+				_set_prop(result, parent_selector, "all", token, consumed.get(0))
+				pos = consumed.get(1)
 			else:
 				pos += 2
 			continue
-
+		
 		pos += 1
-
+	
 	return pos
 
 
 static func _get_child_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
-	if not result[parent_selector].has("_classes"):
-		result[parent_selector]["_classes"] = {}
-	return result[parent_selector]["_classes"]
+	if not result.get(parent_selector).has("_classes"):
+		result.get(parent_selector).set("_classes", {})
+	return result.get(parent_selector).get("_classes")
 
 
-# Container for theme-type-variation blocks ("/FlatButton { }"), kept separate
-# from "_classes" so variations are auto-applied from a node's theme_type_variation
-# rather than from explicit gdss_classes.
+# Container for theme-type-variation blocks ("/FlatButton { }"), separate from "_classes"
+# so variations auto-apply from a node's theme_type_variation.
 static func _get_variation_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
-	if not result[parent_selector].has("_variations"):
-		result[parent_selector]["_variations"] = {}
-	return result[parent_selector]["_variations"]
+	if not result.get(parent_selector).has("_variations"):
+		result.get(parent_selector).set("_variations", {})
+	return result.get(parent_selector).get("_variations")
 
 
 static func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
 	var i: int = pos
 	while i < tokens.size():
-		if tokens[i] == "{":
+		if tokens.get(i) == "{":
 			return false
-		if tokens[i] == "}":
+		if tokens.get(i) == "}":
 			return false
-		if tokens[i] == ":":
-			var after: String = tokens[i + 1] if i + 1 < tokens.size() else ""
+		if tokens.get(i) == ":":
+			var after: String = tokens.get(i + 1) if i + 1 < tokens.size() else ""
 			if after != "{" and after != "":
-				var after2: String = tokens[i + 2] if i + 2 < tokens.size() else ""
+				var after2: String = tokens.get(i + 2) if i + 2 < tokens.size() else ""
 				if after2 != "{" and after2 != ",":
 					return false
-		if tokens[i] == ",":
+		if tokens.get(i) == ",":
 			return true
 		i += 1
 	return false
@@ -1458,9 +1453,9 @@ static func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
 static func _find_block_end(tokens: Array[String], pos: int) -> int:
 	var depth: int = 1
 	while pos < tokens.size():
-		if tokens[pos] == "{":
+		if tokens.get(pos) == "{":
 			depth += 1
-		elif tokens[pos] == "}":
+		elif tokens.get(pos) == "}":
 			depth -= 1
 			if depth == 0:
 				return pos + 1
@@ -1470,39 +1465,38 @@ static func _find_block_end(tokens: Array[String], pos: int) -> int:
 
 static func _parse_props_into(tokens: Array[String], pos: int, result: Dictionary, selector: String, state: String, known_states: PackedStringArray) -> int:
 	while pos < tokens.size():
-		var token: String = tokens[pos]
+		var token: String = tokens.get(pos)
 		if token == "}":
 			return pos + 1
-
-		var next: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
-		var next2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
-
+		
+		var next: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
+		var next2: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
+		
 		if next == ":":
 			if next2 != "" and next2 != "{":
 				var consumed: Array = _consume_value(tokens, pos + 2, known_states)
-				_set_prop(result, selector, state, token, consumed[0])
-				pos = consumed[1]
+				_set_prop(result, selector, state, token, consumed.get(0))
+				pos = consumed.get(1)
 			else:
 				pos += 2
 			continue
-
+		
 		pos += 1
-
+	
 	return pos
 
 
 static func _consume_value(tokens: Array[String], pos: int, known_states: PackedStringArray) -> Array:
 	var parts: Array[String] = []
 	while pos < tokens.size():
-		var t: String = tokens[pos]
+		var t: String = tokens.get(pos)
 		if t == "{" or t == "}":
 			break
-		var lookahead: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
-		var lookahead2: String = tokens[pos + 2] if pos + 2 < tokens.size() else ""
+		var lookahead: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
+		var lookahead2: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
 		if lookahead == "(":
-			# "name(...)" is a method-call value only when it STARTS the value. After a
-			# value is already collected, a "name(" begins the next statement (e.g. an
-			# on_show()/on_hide() event block), so end this value here.
+			# "name(...)" is a method call only when it STARTS the value; later it begins the next
+			# statement (e.g. an on_show() block), so end this value here.
 			if parts.is_empty():
 				if t == "calc":
 					return _parse_calc(tokens, pos)
@@ -1524,12 +1518,12 @@ static func _consume_value(tokens: Array[String], pos: int, known_states: Packed
 
 
 static func _parse_method_call(tokens: Array[String], pos: int) -> Array:
-	var method_name: String = tokens[pos]
+	var method_name: String = tokens.get(pos)
 	pos += 2
 	var args: Array = []
 	var current_parts: Array[String] = []
 	while pos < tokens.size():
-		var tok: String = tokens[pos]
+		var tok: String = tokens.get(pos)
 		if tok == ")":
 			pos += 1
 			break
@@ -1539,11 +1533,11 @@ static func _parse_method_call(tokens: Array[String], pos: int) -> Array:
 				current_parts = []
 			pos += 1
 			continue
-		var nxt: String = tokens[pos + 1] if pos + 1 < tokens.size() else ""
+		var nxt: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
 		if nxt == "(":
 			var nested: Array = _parse_method_call(tokens, pos)
-			args.append(nested[0])
-			pos = nested[1]
+			args.append(nested.get(0))
+			pos = nested.get(1)
 			continue
 		current_parts.append(tok)
 		pos += 1
@@ -1556,9 +1550,9 @@ static func _parse_calc(tokens: Array[String], pos: int) -> Array:
 	var depth: int = 0
 	var close: int = pos + 1
 	while close < tokens.size():
-		if tokens[close] == "(":
+		if tokens.get(close) == "(":
 			depth += 1
-		elif tokens[close] == ")":
+		elif tokens.get(close) == ")":
 			depth -= 1
 			if depth == 0:
 				break
@@ -1594,12 +1588,12 @@ static func _calc_lex(raw: String) -> Array[String]:
 
 
 static func _calc_peek(state: Dictionary) -> String:
-	return state["toks"][state["i"]] if state["i"] < (state["toks"] as Array).size() else ""
+	return state.get("toks").get(state.get("i")) if state.get("i") < (state.get("toks") as Array).size() else ""
 
 
 static func _calc_advance(state: Dictionary) -> String:
 	var t: String = _calc_peek(state)
-	state["i"] = state["i"] + 1
+	state.set("i", state.get("i") + 1)
 	return t
 
 
@@ -1640,15 +1634,14 @@ static func _inherit(result: Dictionary, child: String, parent_data: Dictionary)
 	for state: String in parent_data:
 		if state == "_classes" or state == "_variations":
 			continue
-		if not parent_data[state] is Dictionary:
+		if not parent_data.get(state) is Dictionary:
 			continue
-		# States are no longer pre-created, so create the child's state on demand to keep
-		# inheriting the parent's styled states.
-		if not result[child].has(state):
-			result[child][state] = {}
-		for prop: String in parent_data[state]:
-			if not result[child][state].has(prop):
-				result[child][state][prop] = parent_data[state][prop]
+		# States aren't pre-created, so create the child's on demand to keep inheriting.
+		if not result.get(child).has(state):
+			result.get(child).set(state, {})
+		for prop: String in parent_data.get(state):
+			if not result.get(child).get(state).has(prop):
+				result.get(child).get(state).set(prop, parent_data.get(state).get(prop))
 
 
 static func _parse_value(parts: Array[String]) -> Variant:
@@ -1663,7 +1656,7 @@ static func _parse_value(parts: Array[String]) -> Variant:
 			if not p.is_valid_int() and not p.begins_with("__gdss_global__") and not p.begins_with("__gdss_local__") and not p.begins_with("__gdss_instance__"):
 				all_int_resolvable = false
 		if all_numeric:
-			return Vector4i(int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3]))
+			return Vector4i(int(parts.get(0)), int(parts.get(1)), int(parts.get(2)), int(parts.get(3)))
 		if all_int_resolvable:
 			return {"__gdss_composite4__": [parts[0], parts[1], parts[2], parts[3]]}
 	if parts.size() == 2:
@@ -1679,7 +1672,7 @@ static func _parse_value(parts: Array[String]) -> Variant:
 		if both_float_resolvable:
 			return {"__gdss_composite2__": [parts.front(), parts.back()]}
 	if parts.size() == 1:
-		var token: String = parts[0].trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+		var token: String = parts.get(0).trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 		if token.to_lower() == "true":
 			return true
 		if token.to_lower() == "false":
@@ -1697,12 +1690,12 @@ static func _parse_value(parts: Array[String]) -> Variant:
 static func _set_prop(result: Dictionary, selector: String, state: String, prop: String, value: Variant) -> void:
 	if not result.has(selector):
 		return
-	if not result[selector].has(state):
-		result[selector][state] = {}
+	if not result.get(selector).has(state):
+		result.get(selector).set(state, {})
 	var composite_map: Dictionary = _get_composite_map()
 	if composite_map.has(prop):
-		var info: Dictionary = composite_map[prop]
-		_fold_composite_component(result[selector][state], info["prop"], info["index"], value)
+		var info: Dictionary = composite_map.get(prop)
+		_fold_composite_component(result.get(selector).get(state), info.get("prop"), info.get("index"), value)
 		return
 	var registered: GdssProp = GDSS.get_registry().property_list.get(prop)
 	if registered != null:
@@ -1810,5 +1803,5 @@ static func _fold_state_patches(state_dict: Dictionary, base_all: Dictionary) ->
 		# Keyed by the real property name so the fold can still see the parent's type.
 		var scratch: Dictionary = {prop_name: base_val if not base_val is Dictionary else (base_val as Dictionary).duplicate(true)}
 		for index: Variant in patch:
-			_fold_composite_component(scratch, prop_name, int(index), patch[index])
-		state_dict[prop_name] = scratch.get(prop_name)
+			_fold_composite_component(scratch, prop_name, int(index), patch.get(index))
+		state_dict.set(prop_name, scratch.get(prop_name))

@@ -16,9 +16,9 @@ func _init() -> void:
 
 func call_method(args: Array[Variant], node_id: int = -1, state_key: String = "") -> Variant:
 	var blur: GdssBlur = GdssBlur.new()
-	blur.strength = maxf(float(args[0]), 0.0) if args.size() > 0 and args[0] != null else 4.0
-	var base: Color = args[1] if args.size() > 1 and args[1] is Color else Color.BLACK
-	var opacity: float = clampf(float(args[2]), 0.0, 1.0) if args.size() > 2 and args[2] != null else 0.2
+	blur.strength = maxf(float(args.get(0)), 0.0) if args.size() > 0 and args.get(0) != null else 4.0
+	var base: Color = args.get(1) if args.size() > 1 and args.get(1) is Color else Color.BLACK
+	var opacity: float = clampf(float(args.get(2)), 0.0, 1.0) if args.size() > 2 and args.get(2) != null else 0.2
 	blur.tint = Color(base.r, base.g, base.b, opacity)
 	blur.refraction = 0.0
 	blur.highlight = 0.0

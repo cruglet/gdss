@@ -2,12 +2,6 @@
 class_name GdssRegistry
 extends Resource
 
-## The GDSS registry: stylable node types, the styling properties/components, and the
-## methods. Built entirely in code (see [method build_code]) from ThemeDB plus the
-## GdssNodeType/GdssMethod subclasses, so the plugin ships no registry resources to load, keep in
-## sync, or repopulate. GDSS.get_registry() builds it once and caches it for the run.
-
-
 const _WINDOW_PANEL_NODE: GDScript = preload("res://addons/gdss/registry/node_types/window_panel.gd")
 
 @export_group("Lists")
@@ -18,18 +12,12 @@ const _WINDOW_PANEL_NODE: GDScript = preload("res://addons/gdss/registry/node_ty
 @export var boolean_overrides: Dictionary[String, bool]
 
 
-## Public rebuild entry point. GDSS.get_registry() builds via [method build_code]; this stays
-## for any caller that wants to force a rebuild (there are no registry resources to scan/save).
 func repopulate() -> void:
 	build_code()
 	for node: GdssNodeType in node_list.values():
 		node.invalidate_props_cache()
 
 
-# ===========================================================================
-# Code-built registry. Reconstructs the props/components/methods in code and derives
-# the node list from ThemeDB, replacing db.tres + the per-resource .tres files.
-# ===========================================================================
 func build_code() -> void:
 	node_list.clear()
 	property_list.clear()
@@ -51,7 +39,7 @@ func _make_prop(n: String, t: GDSS.Type, d: Variant, c: GdssProp.Category, comp:
 	if not comp.is_empty():
 		p.composite_of = comp # set after type so it overrides the auto _left/_right pattern
 	p.category_subproperties = sub
-	property_list[n] = p
+	property_list.set(n, p)
 
 
 func _build_properties_code() -> void:
@@ -89,7 +77,7 @@ func _build_properties_code() -> void:
 func _component_props(names: PackedStringArray) -> Array[GdssProp]:
 	var arr: Array[GdssProp] = []
 	for n: String in names:
-		arr.append(property_list[n])
+		arr.append(property_list.get(n))
 	return arr
 
 
@@ -148,9 +136,6 @@ func _instantiate_node_class(type: String) -> GdssNodeType:
 	return GdssNodeType_Fallback.new()
 
 
-# Per-type [is_static, stylebox_on, transitionable_on] for hand-configured types. Empty
-# array => auto type (GdssNodeType_Fallback, static, Transitionable off, Stylebox on iff the
-# type defines styleboxes).
 func _node_config(type: String) -> Array:
 	match type:
 		"Button", "CheckBox", "CheckButton", "ColorPickerButton", "MenuButton", "OptionButton":
@@ -181,14 +166,11 @@ func _build_nodes_code() -> void:
 	var types: Dictionary = {}
 	for t: String in theme.get_type_list():
 		if ClassDB.class_exists(t) and (t == "Control" or ClassDB.is_parent_class(StringName(t), &"Control")):
-			types[t] = true
-	# Window-derived nodes GDSS styles explicitly (not caught by the Control filter).
+			types.set(t, true)
 	for window_type: String in ["PopupMenu", "Window", "PopupPanel", "AcceptDialog", "ConfirmationDialog", "FileDialog"]:
-		types[window_type] = true
-	# Theme-item-less Controls: absent from the default theme's type list, styled purely
-	# through node properties (color/texture plus the shared transform/visual props).
-	types["TextureRect"] = true
-	types["ColorRect"] = true
+		types.set(window_type, true)
+	types.set("TextureRect", true)
+	types.set("ColorRect", true)
 	for type: String in types:
 		var node: GdssNodeType = _instantiate_node_class(type)
 		node.base_type = StringName(type)

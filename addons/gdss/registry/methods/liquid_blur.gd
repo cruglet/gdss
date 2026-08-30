@@ -21,12 +21,12 @@ func _init() -> void:
 
 func call_method(args: Array[Variant], node_id: int = -1, state_key: String = "") -> Variant:
 	var glass: GdssBlur = GdssBlur.new()
-	glass.strength = maxf(float(args[0]), 0.0) if args.size() > 0 and args[0] != null else 3.0
-	var base: Color = args[1] if args.size() > 1 and args[1] is Color else Color.WHITE
-	var opacity: float = clampf(float(args[2]), 0.0, 1.0) if args.size() > 2 and args[2] != null else 0.06
+	glass.strength = maxf(float(args.get(0)), 0.0) if args.size() > 0 and args.get(0) != null else 3.0
+	var base: Color = args.get(1) if args.size() > 1 and args.get(1) is Color else Color.WHITE
+	var opacity: float = clampf(float(args.get(2)), 0.0, 1.0) if args.size() > 2 and args.get(2) != null else 0.06
 	glass.tint = Color(base.r, base.g, base.b, opacity)
-	glass.refraction = maxf(float(args[3]), 0.0) if args.size() > 3 and args[3] != null else 1.0
-	glass.highlight = maxf(float(args[4]), 0.0) if args.size() > 4 and args[4] != null else 0.3
+	glass.refraction = maxf(float(args.get(3)), 0.0) if args.size() > 3 and args.get(3) != null else 1.0
+	glass.highlight = maxf(float(args.get(4)), 0.0) if args.size() > 4 and args.get(4) != null else 0.3
 	glass.saturation = 1.2
 	glass.strength_end = glass.strength
 	return glass

@@ -58,7 +58,7 @@ void fragment() {
 	vec2 half_size = u_size * 0.5 - vec2(u_pad.x + u_pad.y, u_pad.z + u_pad.w) * 0.5;
 	// Uneven padding pushes the panel off the quad's centre; p stays panel-relative.
 	vec2 p = (UV - 0.5) * u_size - vec2(u_pad.x - u_pad.y, u_pad.z - u_pad.w) * 0.5;
-
+	
 	vec2 full = half_size * 2.0;
 	vec4 cr = u_corner_radius;
 	float fit = min(1.0, min(
@@ -66,11 +66,11 @@ void fragment() {
 		min(full.x / max(cr.z + cr.w, EPS), full.y / max(cr.w + cr.x, EPS))));
 	cr *= fit;
 	vec4 ordered_radius = vec4(cr.z, cr.y, cr.w, cr.x);
-
+	
 	vec3 q_outer = box_q(p, half_size, ordered_radius);
 	float d_outer = sd_box(q_outer);
 	float aa = max(u_aa * fwidth(d_outer), EPS);
-
+	
 	vec2 inner_center = vec2((u_border_widths.x - u_border_widths.y) * 0.5,
 							 (u_border_widths.z - u_border_widths.w) * 0.5);
 	vec2 inner_half = max(half_size - vec2((u_border_widths.x + u_border_widths.y) * 0.5,
@@ -83,7 +83,7 @@ void fragment() {
 	icr *= ifit;
 	vec4 inner_radius = vec4(icr.z, icr.y, icr.w, icr.x);
 	float d_inner = sd_box(box_q(p - inner_center, inner_half, inner_radius));
-
+	
 	vec4 fill_col;
 	if (u_fill_mode == 1) {
 		vec2 dir = u_grad_p1 - u_grad_p0;
@@ -99,7 +99,7 @@ void fragment() {
 	} else {
 		fill_col = u_fill_a;
 	}
-
+	
 	vec4 border_col;
 	if (u_border_mode == 1) {
 		vec2 dir = u_border_p1 - u_border_p0;
@@ -113,11 +113,11 @@ void fragment() {
 	} else {
 		border_col = u_border_a;
 	}
-
+	
 	float fill_mask = 1.0 - smoothstep(-aa, aa, d_inner);
 	float panel_mask = 1.0 - smoothstep(-aa, aa, d_outer);
 	float border_mask = clamp(panel_mask - fill_mask, 0.0, 1.0);
-
+	
 	// Straight-alpha source-over throughout: the border sits on the fill, and both sit on
 	// the shadow. Blending the layers by coverage alone would tint a see-through panel
 	// with whatever is underneath it.
@@ -128,7 +128,7 @@ void fragment() {
 		? (border_col.rgb * border_a + fill_col.rgb * fill_a * (1.0 - border_a)) / panel_a
 		: fill_col.rgb;
 	vec4 col = vec4(panel_rgb, panel_a);
-
+	
 	if (max(max(u_shadow.x, u_shadow.y), max(u_shadow.z, u_shadow.w)) > 0.5) {
 		// The reach in the fragment's outward direction blends the two side extents that
 		// meet at that corner, weighted by the squared direction so an even shadow keeps
@@ -144,6 +144,6 @@ void fragment() {
 			? (col.rgb * col.a + u_shadow_color.rgb * shadow_alpha * (1.0 - col.a)) / out_a
 			: col.rgb, out_a);
 	}
-
+	
 	COLOR = col;
 }

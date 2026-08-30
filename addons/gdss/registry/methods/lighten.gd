@@ -16,6 +16,6 @@ func _init() -> void:
 func call_method(args: Array[Variant], node_id: int = -1, state_key: String = "") -> Variant:
 	if args.is_empty():
 		return Color.WHITE
-	var color: Color = args[0] if args[0] is Color else Color.WHITE
-	var amount: float = float(args[1]) if args.size() > 1 else 0.1
+	var color: Color = args.get(0) if args.get(0) is Color else Color.WHITE
+	var amount: float = float(args.get(1)) if args.size() > 1 else 0.1
 	return color.lightened(amount)

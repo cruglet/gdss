@@ -14,7 +14,7 @@ class Param:
 	var type: ParamType
 	var optional: bool
 	var default_value: Variant
-
+	
 	func _init(p_name: String, p_type: ParamType, p_optional: bool = false, p_default: Variant = null) -> void:
 		name = p_name
 		type = p_type
@@ -31,7 +31,7 @@ var parameters: Array[Param] = []
 func get_code_hint(active_param: int = -1) -> String:
 	var parts: PackedStringArray = []
 	for i: int in parameters.size():
-		var param: Param = parameters[i]
+		var param: Param = parameters.get(i)
 		var type_str: String = ParamType.keys()[param.type].to_lower()
 		if active_param == i:
 			var part: String = param.name + ": " + type_str

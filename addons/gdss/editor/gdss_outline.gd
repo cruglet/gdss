@@ -119,9 +119,9 @@ func _selector_icon(label: String) -> Texture2D:
 
 func _white_subclass_icon(base_selector: String) -> Texture2D:
 	if _white_icon_cache.has(base_selector):
-		return _white_icon_cache[base_selector]
+		return _white_icon_cache.get(base_selector)
 	var white: Texture2D = _to_white(_selector_icon(base_selector))
-	_white_icon_cache[base_selector] = white
+	_white_icon_cache.set(base_selector, white)
 	return white
 
 

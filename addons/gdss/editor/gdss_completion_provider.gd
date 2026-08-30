@@ -36,10 +36,9 @@ const BUILTIN_COLORS: Array[String] = [
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
 ]
 
-# Event blocks (on_show() { … }) map to the node signal that drives them at runtime
-# (see runtime.gd _EVENT_SIGNALS). Only the visibility events are completed: interaction
-# events (hover/press/focus/…) are expressed as state selectors (:hover, :pressed, :focus)
-# instead. Gated per-node on the signal, so it's skipped where unavailable (e.g. Windows).
+# Event blocks (on_show() { }) map to the node signal that drives them (see
+# gdss_runtime.gd _EVENT_SIGNALS). Only visibility events are completed; interaction
+# events are expressed as state selectors (:hover, :pressed, :focus) instead.
 const _EVENT_SIGNALS: Dictionary = {
 	"on_show": "visibility_changed",
 	"on_hide": "visibility_changed",
@@ -49,10 +48,9 @@ const _EVENT_SIGNALS: Dictionary = {
 func _ready() -> void:
 	gdss_editor = get_parent() as GdssEditor
 	_completion_color = EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/completion_font_color")
-	# CodeEdit keeps its own string/comment delimiters (separate from the syntax highlighter)
-	# to drive in-string detection for completion and auto-brace. Without registering "#",
-	# an apostrophe or quote inside a comment (e.g. "It's") opens a phantom string, so every
-	# following line reads as in-string and CodeEdit wraps completion candidates in quotes.
+	# CodeEdit keeps its own comment delimiters, separate from the highlighter. Without "#"
+	# registered, an apostrophe inside a comment (e.g. "It's") opens a phantom string and
+	# every following line reads as in-string, so completions get wrapped in quotes.
 	if not editor.has_comment_delimiter("#"):
 		editor.add_comment_delimiter("#", "")
 	_build_from_objects()
@@ -75,46 +73,46 @@ func _build_from_objects() -> void:
 	_property_meta.clear()
 	_methods.clear()
 	_events.clear()
-
+	
 	var prefixes: Array[String] = ["@", ":", "\t", "$"]
 	
 	for obj: GdssNodeType in GDSS._get_node_types().values():
 		var style_name: String = obj.style_name
 		_nodes.append(style_name)
-
+		
 		var props_dict: Dictionary = {}
 		for prop: GdssProp in obj.get_enabled_props():
-			props_dict[prop.name] = prop
-		_property_meta[style_name] = props_dict
-		_properties[style_name] = props_dict.keys()
-		_states[style_name] = obj.states
-
+			props_dict.set(prop.name, prop)
+		_property_meta.set(style_name, props_dict)
+		_properties.set(style_name, props_dict.keys())
+		_states.set(style_name, obj.states)
+		
 		var events: Array[String] = []
 		for event_name: String in _EVENT_SIGNALS:
-			if ClassDB.class_has_signal(obj.base_type, _EVENT_SIGNALS[event_name]):
+			if ClassDB.class_has_signal(obj.base_type, _EVENT_SIGNALS.get(event_name)):
 				events.append(event_name)
-		_events[style_name] = events
-
+		_events.set(style_name, events)
+		
 		if style_name.length() > 0 and not prefixes.has(style_name[0]):
 			prefixes.append(style_name[0])
-
+		
 		for key: String in props_dict.keys():
 			for l: int in range(1, min(4, key.length()) + 1):
 				var pre: String = key.substr(0, l)
 				if not prefixes.has(pre):
 					prefixes.append(pre)
-
+	
 	for event_name: String in _EVENT_SIGNALS:
 		for l: int in range(1, min(4, event_name.length()) + 1):
 			var pre: String = event_name.substr(0, l)
 			if not prefixes.has(pre):
 				prefixes.append(pre)
-
+	
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		_methods.append(method)
 		if method.method_name.length() > 0 and not prefixes.has(method.method_name[0]):
 			prefixes.append(method.method_name[0])
-
+	
 	editor.code_completion_prefixes = prefixes
 
 
@@ -213,8 +211,7 @@ func _show_composite_hint(line: String, col: int) -> bool:
 		return false
 	var prop_name: String = line.substr(0, colon).strip_edges()
 	var prop_def: GdssProp = GDSS.get_registry().property_list.get(prop_name)
-	# Only the packed numeric composites spell their components out on the shorthand line;
-	# a color shorthand still takes a single value.
+	# Only the packed numeric composites spell components out; a color takes one value.
 	if prop_def == null or (prop_def.type != GDSS.Type.COMPOSITE4 and prop_def.type != GDSS.Type.VECTOR2):
 		return false
 	var context_type: String = str(_get_context().get("type", ""))
@@ -228,7 +225,7 @@ func _show_composite_hint(line: String, col: int) -> bool:
 	active = clampi(active, 0, prop_def.composite_of.size() - 1)
 	var parts: PackedStringArray = []
 	for i: int in prop_def.composite_of.size():
-		var side: String = prop_def.composite_of[i].trim_prefix(prop_def.name + "_")
+		var side: String = prop_def.composite_of.get(i).trim_prefix(prop_def.name + "_")
 		parts.append("[" + side + "]" if i == active else side)
 	_show_hint(prop_def.name + ": " + "  ".join(parts))
 	return true
@@ -292,7 +289,7 @@ func _update_completions(word: String) -> void:
 		_complete_values(word, "", "")
 		editor.update_code_completion_options(true)
 		return
-
+	
 	var scheme_header: Dictionary = _scheme_header_mode()
 	var scheme_mode: String = scheme_header.get("mode", "")
 	if scheme_mode == "keyword":
@@ -307,14 +304,14 @@ func _update_completions(word: String) -> void:
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, scheme_name, scheme_name + " ", _completion_color, _get_icon(&"BlitMaterial"))
 		editor.update_code_completion_options(true)
 		return
-
+	
 	var context: Dictionary = _get_context()
 	
 	match context.get("type", "top_level"):
 		"top_level":
 			if ":" in word:
 				var parts: PackedStringArray = word.split(":")
-				_complete_node_states(parts[0], parts[1] if parts.size() > 1 else "")
+				_complete_node_states(parts.get(0), parts.get(1) if parts.size() > 1 else "")
 			else:
 				_complete_nodes(word)
 				_complete_at_directives(word)
@@ -353,30 +350,30 @@ func _complete_node_states(node: String, partial: String) -> void:
 
 func _complete_properties(word: String, style_name: String) -> void:
 	var props: Array[String] = []
-
+	
 	if style_name != "" and _properties.has(style_name):
-		props.assign(_properties[style_name])
+		props.assign(_properties.get(style_name))
 	else:
 		for key: String in _properties:
-			for p: String in _properties[key]:
+			for p: String in _properties.get(key):
 				if not props.has(p):
 					props.append(p)
-
+	
 	for prop: String in props:
 		var meta: Dictionary = _property_meta.get(style_name, {})
 		var prop_def: GdssProp = meta.get(prop, null)
 		var icon: Texture2D = _get_prop_icon(prop_def)
-
+		
 		if _matches(prop, word):
 			editor.add_code_completion_option(CodeEdit.KIND_MEMBER, prop, prop + ": ", _completion_color, icon)
-
+		
 		if prop_def == null or not prop_def.is_composite() or prop_def.type == GDSS.Type.COMPOSITE:
 			continue
 		var sub_icon: Texture2D = _get_prop_icon(prop_def) if prop_def.type == GDSS.Type.COLOR \
 			else (_get_icon(&"float") if prop_def.type == GDSS.Type.VECTOR2 else _get_icon(&"int"))
-
+		
 		for idx: int in range(prop_def.composite_of.size()):
-			var sub: String = prop_def.composite_of[idx]
+			var sub: String = prop_def.composite_of.get(idx)
 			if _matches(sub, word):
 				editor.add_code_completion_option(CodeEdit.KIND_MEMBER, sub, sub + ": ", _completion_color, sub_icon)
 
@@ -410,17 +407,17 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 	var meta: Dictionary = _property_meta.get(style_name, {})
 	if meta.is_empty():
 		for key: String in _property_meta:
-			var m: Dictionary = _property_meta[key]
+			var m: Dictionary = _property_meta.get(key)
 			if m.has(prop):
 				meta = m
 				break
-
+	
 	var prop_def: GdssProp = meta.get(prop, null)
 	var effective_type: GDSS.Type = GDSS.Type.INT
-
+	
 	if prop_def == null:
 		for key: String in meta:
-			var raw: Variant = meta[key]
+			var raw: Variant = meta.get(key)
 			if not raw is GdssProp:
 				continue
 			var pd: GdssProp = raw
@@ -438,7 +435,7 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 				var v2: Vector2 = raw_default
 				components = [v2.x, v2.y]
 			if idx < components.size():
-				var hint: String = str(components[idx])
+				var hint: String = str(components.get(idx))
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, hint, hint, _completion_color, _get_icon(&"MemberProperty"))
 			match pd.type:
 				GDSS.Type.COLOR: effective_type = GDSS.Type.COLOR
@@ -447,7 +444,7 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 			break
 	else:
 		effective_type = prop_def.type
-
+	
 	for method: GdssMethod in _methods:
 		if not method.supported_prop_types.has(effective_type):
 			continue
@@ -461,16 +458,16 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 				_completion_color,
 				_get_icon(&"MemberMethod")
 			)
-
+	
 	if effective_type == GDSS.Type.INT or effective_type == GDSS.Type.FLOAT or effective_type == GDSS.Type.COMPOSITE4:
 		if _matches("calc", word):
 			editor.add_code_completion_option(CodeEdit.KIND_FUNCTION, "calc(…)", "calc(", _completion_color, _get_icon(&"MemberMethod"))
-
+	
 	if prop_def == null:
 		if effective_type == GDSS.Type.COLOR:
 			_complete_named_colors(word)
 		return
-
+	
 	match prop_def.type:
 		GDSS.Type.COLOR:
 			_complete_named_colors(word)
@@ -573,7 +570,7 @@ func _get_context() -> Dictionary:
 				"in_variant": m.get_string(2) != ""
 			})
 			continue
-
+		
 		var vm: RegExMatch = _re_variant_open.search(line)
 		if vm:
 			var raw_variant: String = vm.get_string(1)
@@ -585,11 +582,10 @@ func _get_context() -> Dictionary:
 				"in_variant": true
 			})
 			continue
-
-		# Event blocks (on_show() { … }) use the call form, so they match neither selector
-		# regex above. Track them as a frame inheriting the enclosing style; otherwise the
-		# block's closing brace pops the parent selector and desyncs every following subclass,
-		# whose style then fails to resolve and falls back to a merged/top-level completion.
+		
+		# Event blocks use the call form, so they match neither selector regex. Track them as a
+		# frame inheriting the enclosing style; otherwise the closing brace pops the parent
+		# selector and desyncs every following subclass.
 		if line.ends_with("{"):
 			var head: String = line.substr(0, line.length() - 1).strip_edges()
 			var paren: int = head.find("(")
@@ -601,12 +597,12 @@ func _get_context() -> Dictionary:
 					"in_variant": true
 				})
 				continue
-
+		
 		if "}" in line:
 			if stack.size() > 0:
 				stack.pop_back()
 	
-	var caret_text: String = lines[caret_line] if caret_line < lines.size() else ""
+	var caret_text: String = lines.get(caret_line) if caret_line < lines.size() else ""
 	var stripped: String = caret_text.strip_edges()
 	var comment_idx: int = stripped.find("#")
 	if comment_idx != -1:
@@ -622,7 +618,7 @@ func _get_context() -> Dictionary:
 	
 	if not _property_meta.has(current_style):
 		for idx: int in range(stack.size() - 1, -1, -1):
-			var s: String = stack[idx].get("style", "")
+			var s: String = stack.get(idx).get("style", "")
 			if _property_meta.has(s):
 				current_style = s
 				break
@@ -736,9 +732,9 @@ func _hover_doc(word: String) -> String:
 	if method != null:
 		return method.get_code_hint()
 	for style_name: String in _property_meta:
-		var meta: Dictionary = _property_meta[style_name]
+		var meta: Dictionary = _property_meta.get(style_name)
 		if meta.has(word):
-			var prop: GdssProp = meta[word]
+			var prop: GdssProp = meta.get(word)
 			return "%s: %s" % [word, GDSS.Type.keys()[prop.type].to_lower()]
 	return ""
 
@@ -751,7 +747,7 @@ func _get_current_word() -> String:
 	var line: String = editor.get_line(editor.get_caret_line())
 	var col: int = editor.get_caret_column()
 	var word: String = ""
-
+	
 	for i: int in range(col - 1, -1, -1):
 		var c: String = line[i]
 		if c == " " or c == "\t" or c in ["{", "}", "\n", ","]:
@@ -770,7 +766,7 @@ func _get_current_word() -> String:
 				continue
 			break
 		word = c + word
-
+	
 	return word
 
 
@@ -807,7 +803,7 @@ func _annotation_block_context() -> String:
 	var depth: int = 0
 	var kind: String = ""
 	for i: int in mini(caret + 1, lines.size()):
-		var stripped: String = _strip_comment(lines[i]).strip_edges()
+		var stripped: String = _strip_comment(lines.get(i)).strip_edges()
 		if depth == 0:
 			if _re_scheme_open.search(stripped) != null and stripped.contains("{"):
 				kind = "scheme"

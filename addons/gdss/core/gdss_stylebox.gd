@@ -4,8 +4,8 @@ extends StyleBox
 
 static var _corner_start_angles: Array[float] = [PI, PI * 1.5, 0.0, PI * 0.5]
 const _DEFAULT_SHADOW_COLOR: Color = Color(0, 0, 0, 0.4)
-# How far past the panel a corner's taper can carry a neighbouring side's shadow, as a
-# share of that side's reach. The direction-weighted falloff peaks at 2/(3 * sqrt(3)).
+# Share of a side's reach its shadow carries around a corner; the direction-weighted
+# falloff peaks at 2/(3 * sqrt(3)).
 const _SHADOW_CORNER_SPILL: float = 0.4
 
 const _TRANSITION_FUNCS: Dictionary = {
@@ -33,7 +33,7 @@ static func _resolve_trans_val(raw: Variant) -> Tween.TransitionType:
 		var keys: Array = GDSS.TransitionFunc.keys()
 		var index: int = int(raw)
 		if index >= 0 and index < keys.size():
-			return _TRANSITION_FUNCS.get(keys[index], Tween.TRANS_LINEAR)
+			return _TRANSITION_FUNCS.get(keys.get(index), Tween.TRANS_LINEAR)
 		return Tween.TRANS_LINEAR
 	return _TRANSITION_FUNCS.get(raw, Tween.TRANS_LINEAR)
 
@@ -43,7 +43,7 @@ static func _resolve_ease_val(raw: Variant) -> Tween.EaseType:
 		var keys: Array = GDSS.TransitionType.keys()
 		var index: int = int(raw)
 		if index >= 0 and index < keys.size():
-			return _EASE_TYPES.get(keys[index], Tween.EASE_OUT)
+			return _EASE_TYPES.get(keys.get(index), Tween.EASE_OUT)
 		return Tween.EASE_OUT
 	return _EASE_TYPES.get(raw, Tween.EASE_OUT)
 
@@ -51,8 +51,7 @@ static func _resolve_ease_val(raw: Variant) -> Tween.EaseType:
 var _slot_state: String = ""
 
 var _ref_path: NodePath = NodePath()
-# Typed Node (not CanvasItem) so Window-derived styled nodes (PopupMenu, Window,
-# dialogs) can be handled alongside Controls. CanvasItem-only ops go through helpers.
+# Node, not CanvasItem, so Window-derived styled nodes are handled alongside Controls.
 var _ref_node: Node = null
 var _ref_node_rt: Node = null
 var _applying: bool = false
@@ -62,9 +61,8 @@ var _entry_cache_dirty: bool = true
 var _entry_cache_classes: PackedStringArray = []
 var _entry_cache_variation: String = ""
 var _entry_cache_overrides: Variant = null
-# Set of prop names present in ANY state of the resolved entry. Lets _apply_overrides
-# skip node properties the stylesheet never sets (e.g. the 8 offset_transform props on
-# nodes that don't use them) instead of resolving + control.get-checking each one.
+# Prop names present in ANY state of the resolved entry, so _apply_overrides can skip
+# node properties the stylesheet never sets instead of resolving each one.
 var _styled_props_cache: Dictionary = {}
 var _styled_props_dirty: bool = true
 
@@ -136,9 +134,8 @@ var ref: Node:
 		_connect_ref_signals(v)
 
 
-# When _seeding, the setter just records the state (direct backing write, no transition
-# or apply) so bind() can target a state inside its own bulk; reads stay direct field
-# access (no getter), keeping the per-frame _draw / _get_state path fast.
+# While _seeding the setter only records the state (no transition, no apply) so bind()
+# can target a state inside its own bulk.
 var _seeding: bool = false
 var current_state: String = "":
 	set(s):
@@ -203,8 +200,7 @@ func _connect_ref_signals(v: Node) -> void:
 		if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
 			interp.parsed_changed.connect(_on_parsed_changed)
 	else:
-		# Only tree_exiting matters at runtime (frees the GPU child item for reparent);
-		# the entered hook only refreshed the editor-only _ref_path, so it isn't connected.
+		# Only tree_exiting matters at runtime; the entered hook only refreshed _ref_path.
 		if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 
@@ -249,10 +245,10 @@ func _classify_nonstyle(node_type: GdssNodeType, entry: Dictionary, state: Strin
 	for source_state: String in [state, "all"]:
 		if not entry.has(source_state):
 			continue
-		for prop_name: String in entry[source_state]:
+		for prop_name: String in entry.get(source_state):
 			if seen.has(prop_name):
 				continue
-			seen[prop_name] = true
+			seen.set(prop_name, true)
 			var prop: GdssProp = prop_map.get(prop_name)
 			if prop == null or prop.category == GdssProp.Category.STYLE:
 				continue
@@ -278,11 +274,9 @@ func _on_ref_tree_exiting() -> void:
 
 
 func _on_ref_tree_exiting_rt() -> void:
-	# Reparent-safe: free the GPU child item (re-created on the next draw under the new
-	# canvas parent), but KEEP _ref_node_rt so the stylebox still resolves while detached
-	# and dead-stylebox pruning works. Authoritative teardown (registry slot, per-node
-	# caches, instance vars) happens via the runtime's tree_exited hook ->
-	# GdssNodeBinder.purge once the node is truly gone.
+	# Reparent-safe: free the GPU child item (re-created on the next draw), but KEEP
+	# _ref_node_rt so the stylebox still resolves while detached. Authoritative teardown
+	# runs from the runtime's tree_exited hook -> GdssNodeBinder.purge.
 	_free_gpu_ci()
 
 
@@ -385,17 +379,15 @@ func _apply_overrides(clear: bool = true) -> void:
 	if not GDSS.resolve_mode(node):
 		return
 	var control: Variant = node
-	# Batch every add/remove theme-override into a single theme-changed notification
-	# per node, instead of one propagation per override. Big win when many nodes bind
-	# at once (scene instantiate / re-enter), where per-override propagation is O(depth).
+	# One theme-changed notification per node instead of one per override. Big win when
+	# many nodes bind at once, where per-override propagation is O(depth).
 	control.begin_bulk_theme_override()
 	_apply_overrides_unwrapped(node_type, control, clear)
 	control.end_bulk_theme_override()
 
 
-# Core override application without the bulk wrapper, so bind() can fold the stylebox
-# adds and the value overrides for a node into one shared bulk (one theme-changed
-# notification per fresh bind). Callers guarantee ref / node_type / enabled mode.
+# Unwrapped so bind() can fold the stylebox adds and the value overrides into one
+# shared bulk. Callers guarantee ref / node_type / enabled mode.
 func _apply_overrides_unwrapped(node_type: GdssNodeType, control: Variant, clear: bool) -> void:
 	if _applying:
 		return
@@ -476,7 +468,7 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 				val = Vector2(float(val), float(val))
 			var def: Variant = prop.get_default_value()
 			if not (typeof(val) == typeof(def) and val == def):
-				_applied_node_props[prop.name] = true
+				_applied_node_props.set(prop.name, true)
 			if prop.type == GDSS.Type.CURSOR:
 				control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
 				return
@@ -487,8 +479,7 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 					mod.a = alpha
 					control.modulate = mod
 				return
-			# GDSS exposes the 4.7 Control transforms as "transform_*"; the real node
-			# property is "offset_transform_*".
+			# GDSS's "transform_*" maps to the real "offset_transform_*" node property.
 			var node_prop: String = "offset_" + prop.name if prop.name.begins_with("transform_") else prop.name
 			var current: Variant = control.get(node_prop)
 			if typeof(current) != typeof(val) or current != val:
@@ -598,7 +589,7 @@ func _get_animatable_props() -> Dictionary:
 	for prop: GdssProp in node_type.get_enabled_props():
 		match prop.type:
 			GDSS.Type.COLOR, GDSS.Type.COMPOSITE4, GDSS.Type.FLOAT, GDSS.Type.INT, GDSS.Type.VECTOR2:
-				_animatable_cache[prop.name] = prop
+				_animatable_cache.set(prop.name, prop)
 	_animatable_dirty = false
 	return _animatable_cache
 
@@ -673,7 +664,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					var interp_args: Array[Variant] = captured_method.interpolate_args(from_args, to_args, t)
 					var result: Variant = captured_method.call_method(interp_args, node_id, "tween:" + captured_prop)
 					if result != null:
-						_tweened_values[captured_prop] = result
+						_tweened_values.set(captured_prop, result)
 					_safe_redraw()
 				, 0.0, 1.0, transition_time)
 				tweener_count += 1
@@ -690,12 +681,12 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					if sides_from == sides_to:
 						continue
 					var captured_sides: String = prop_name
-					_tweened_values[captured_sides] = sides_from
+					_tweened_values.set(captured_sides, sides_from)
 					pending_tween.tween_method(func(t: float) -> void:
 						var lerped: Array = []
 						for side: int in 4:
 							lerped.append((sides_from.get(side) as Color).lerp(sides_to.get(side), t))
-						_tweened_values[captured_sides] = lerped
+						_tweened_values.set(captured_sides, lerped)
 						_safe_redraw()
 					, 0.0, 1.0, transition_time)
 					tweener_count += 1
@@ -708,9 +699,9 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					continue
 				var captured: String = prop_name
 				var captured_prop: GdssProp = prop
-				_tweened_values[captured] = from
+				_tweened_values.set(captured, from)
 				pending_tween.tween_method(func(v: Color) -> void:
-					_tweened_values[captured] = v
+					_tweened_values.set(captured, v)
 					if is_style:
 						_safe_redraw()
 					else:
@@ -727,16 +718,16 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					continue
 				var captured: String = prop_name
 				var captured_prop: GdssProp = prop
-				_tweened_values[captured] = from
+				_tweened_values.set(captured, from)
 				pending_tween.tween_method(func(v: Vector4) -> void:
-					_tweened_values[captured] = v
+					_tweened_values.set(captured, v)
 					if is_style:
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, v)
 				, from, to, transition_time)
 				tweener_count += 1
-
+			
 			GDSS.Type.VECTOR2:
 				var fallback: Vector2 = prop.get_default_value() if prop.get_default_value() is Vector2 else Vector2.ZERO
 				var from_val: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
@@ -753,16 +744,16 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					continue
 				var captured: String = prop_name
 				var captured_prop: GdssProp = prop
-				_tweened_values[captured] = from
+				_tweened_values.set(captured, from)
 				pending_tween.tween_method(func(v: Vector2) -> void:
-					_tweened_values[captured] = v
+					_tweened_values.set(captured, v)
 					if is_style:
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, v)
 				, from, to, transition_time)
 				tweener_count += 1
-
+			
 			GDSS.Type.FLOAT:
 				var fallback: float = float(prop.get_default_value())
 				var from: float = float(_tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback)))
@@ -771,16 +762,16 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					continue
 				var captured: String = prop_name
 				var captured_prop: GdssProp = prop
-				_tweened_values[captured] = from
+				_tweened_values.set(captured, from)
 				pending_tween.tween_method(func(v: float) -> void:
-					_tweened_values[captured] = v
+					_tweened_values.set(captured, v)
 					if is_style:
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, v)
 				, from, to, transition_time)
 				tweener_count += 1
-
+			
 			GDSS.Type.INT:
 				var fallback: int = int(prop.get_default_value())
 				var from: int = int(_tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback)))
@@ -789,23 +780,23 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					continue
 				var captured: String = prop_name
 				var captured_prop: GdssProp = prop
-				_tweened_values[captured] = from
+				_tweened_values.set(captured, from)
 				pending_tween.tween_method(func(v: float) -> void:
-					_tweened_values[captured] = int(v)
+					_tweened_values.set(captured, int(v))
 					if is_style:
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, int(v))
 				, float(from), float(to), transition_time)
 				tweener_count += 1
-
-
+	
+	
 	if tweener_count == 0:
 		pending_tween.kill()
 		if on_finished.is_valid():
 			on_finished.call()
 		return
-
+	
 	if _tween:
 		_tween.kill()
 	_tween = pending_tween
@@ -821,8 +812,8 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	)
 
 
-# The visual state the node settles into after an enter animation / animates out of
-# before an exit: the bound slot for static nodes, else the active interaction state.
+# The state the node settles into after an enter animation: the bound slot for static
+# nodes, else the active interaction state.
 func _resting_state(node_type: GdssNodeType, node: Node) -> String:
 	if not _slot_state.is_empty():
 		return _slot_state
@@ -830,10 +821,9 @@ func _resting_state(node_type: GdssNodeType, node: Node) -> String:
 		var active: String = node_type.get_active_state(node as CanvasItem)
 		if not active.is_empty():
 			return active
-	return node_type.states[0] if not node_type.states.is_empty() else "all"
+	return node_type.states.get(0) if not node_type.states.is_empty() else "all"
 
 
-# Runtime hook (connected to the node's visibility_changed via the runtime autoload).
 func _on_node_visibility_changed() -> void:
 	if _self_toggle:
 		_self_toggle = false
@@ -851,7 +841,6 @@ func _on_node_visibility_changed() -> void:
 		_play_hide()
 
 
-# Snap to the on_show() values, then animate to the resting state.
 func _play_show() -> void:
 	_play_event("on_show")
 
@@ -883,7 +872,6 @@ func _play_hide() -> void:
 		return
 	var node_type: GdssNodeType = _resolve_gdss_node()
 	if node_type == null or not _resolve_entry().has("on_hide") or not node.is_inside_tree():
-		# No exit animation: make sure the node ends up hidden.
 		if node != null and node.visible:
 			_self_toggle = true
 			node.visible = false
@@ -898,8 +886,7 @@ func _play_hide() -> void:
 	)
 
 
-# Interrupt-safe programmatic visibility (GDSS.show/hide/set_visible). Because intent
-# is explicit we don't depend on the visibility_changed signal to detect it.
+# Explicit programmatic visibility, so we don't rely on visibility_changed to detect it.
 func _request_visible(want_visible: bool) -> void:
 	var node: Control = ref as Control
 	if node == null:
@@ -917,12 +904,11 @@ func _request_visible(want_visible: bool) -> void:
 		_play_hide()
 
 
-# Recursively searches a _classes tree for a given name, returning the entry or {}.
 func _find_class_in_tree(classes: Dictionary, name: String) -> Dictionary:
 	if classes.has(name):
-		return classes[name]
+		return classes.get(name)
 	for key: String in classes:
-		var nested: Dictionary = classes[key].get("_classes", {})
+		var nested: Dictionary = classes.get(key).get("_classes", {})
 		if nested.is_empty():
 			continue
 		var found: Dictionary = _find_class_in_tree(nested, name)
@@ -931,34 +917,27 @@ func _find_class_in_tree(classes: Dictionary, name: String) -> Dictionary:
 	return {}
 
 
-# Merges override state dicts on top of base, skipping "_classes".
 func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
 	var merged: Dictionary = {}
 	for state: String in base:
 		if state == "_classes":
 			continue
-		merged[state] = base[state].duplicate() if base[state] is Dictionary else base[state]
+		merged.set(state, base.get(state).duplicate() if base.get(state) is Dictionary else base.get(state))
 	for state: String in override:
 		if state == "_classes":
 			continue
 		if not merged.has(state):
-			merged[state] = override[state].duplicate() if override[state] is Dictionary else override[state]
+			merged.set(state, override.get(state).duplicate() if override.get(state) is Dictionary else override.get(state))
 			continue
-		if override[state] is Dictionary:
-			for key: String in override[state]:
-				merged[state][key] = override[state][key]
+		if override.get(state) is Dictionary:
+			for key: String in override.get(state):
+				merged.get(state).set(key, override.get(state).get(key))
 		else:
-			merged[state] = override[state]
-	merged["_classes"] = override.get("_classes", {})
+			merged.set(state, override.get(state))
+	merged.set("_classes", override.get("_classes", {}))
 	return merged
 
 
-# Builds a merged entry dict by starting from parsed[ref.get_class()] and then
-# layering each gdss_class in order (lowest to highest priority).
-# Each name is looked up in the current entry's "_classes", allowing nesting.
-## Set of prop names appearing in any state of the resolved entry (cached). A prop
-## styled in ANY state stays in the set, so state-transition resets still run; only
-## properties the stylesheet never sets are skipped by _apply_overrides.
 func _entry_styled_props(entry: Dictionary) -> Dictionary:
 	if not _styled_props_dirty:
 		return _styled_props_cache
@@ -966,10 +945,10 @@ func _entry_styled_props(entry: Dictionary) -> Dictionary:
 	for key: String in entry:
 		if key == "_classes" or key == "_variations":
 			continue
-		var sd: Variant = entry[key]
+		var sd: Variant = entry.get(key)
 		if sd is Dictionary:
 			for prop_name: String in (sd as Dictionary):
-				_styled_props_cache[prop_name] = true
+				_styled_props_cache.set(prop_name, true)
 	_styled_props_dirty = false
 	return _styled_props_cache
 
@@ -998,10 +977,9 @@ func _resolve_entry() -> Dictionary:
 		_entry_cache_overrides = override_meta
 		_entry_cache_dirty = false
 		return entry
-	# Layer order (lowest to highest priority): base type -> theme_type_variation
-	# -> explicit gdss_classes. Classes win because they're the explicit runtime layer.
+	# Layer order, lowest to highest: base type -> theme_type_variation -> gdss_classes.
 	if has_variation:
-		entry = _merge_entries(entry, _resolve_override_patches(entry, variations[variation]))
+		entry = _merge_entries(entry, _resolve_override_patches(entry, variations.get(variation)))
 	for gdss_class_name: String in current_classes:
 		var override: Dictionary = _find_class_in_tree((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name)
 		if not override.is_empty():
@@ -1016,11 +994,11 @@ func _resolve_entry() -> Dictionary:
 					continue
 				if (override_entry as Dictionary).has(state_key):
 					continue
-				var state_dict: Variant = entry[state_key]
+				var state_dict: Variant = entry.get(state_key)
 				if not state_dict is Dictionary:
 					continue
 				for prop_name: String in (all_overrides as Dictionary):
-					(state_dict as Dictionary)[prop_name] = (all_overrides as Dictionary)[prop_name]
+					(state_dict as Dictionary).set(prop_name, (all_overrides as Dictionary).get(prop_name))
 	_entry_cache = entry
 	_entry_cache_classes = current_classes
 	_entry_cache_variation = variation
@@ -1168,7 +1146,7 @@ func _resolve_composite_part_f(part: String) -> float:
 
 
 func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Array[Variant]:
-	var method_name: String = descriptor["__gdss_method__"]
+	var method_name: String = descriptor.get("__gdss_method__")
 	var raw_args: Array = descriptor.get("args", [])
 	var has_live_ref: bool = false
 	for raw: Variant in raw_args:
@@ -1183,32 +1161,32 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 	if not has_live_ref:
 		cache_key = method_name + "\n" + "\n".join(PackedStringArray(raw_args))
 		if _method_args_cache.has(cache_key):
-			return _method_args_cache[cache_key]
+			return _method_args_cache.get(cache_key)
 	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
 	var resolved: Array[Variant] = []
 	for arg_index: int in raw_args.size():
-		var param: GdssMethod.Param = method.parameters[arg_index] if method != null and arg_index < method.parameters.size() else null
-		if raw_args[arg_index] is Dictionary:
-			resolved.append(_resolve_value(raw_args[arg_index], null, state_key))
+		var param: GdssMethod.Param = method.parameters.get(arg_index) if method != null and arg_index < method.parameters.size() else null
+		if raw_args.get(arg_index) is Dictionary:
+			resolved.append(_resolve_value(raw_args.get(arg_index), null, state_key))
 			continue
-		var stripped: String = (raw_args[arg_index] as String).strip_edges()
+		var stripped: String = (raw_args.get(arg_index) as String).strip_edges()
 		if stripped == "pass":
-			resolved.append(method.parameters[arg_index].default_value if method != null and arg_index < method.parameters.size() else null)
+			resolved.append(method.parameters.get(arg_index).default_value if method != null and arg_index < method.parameters.size() else null)
 		elif stripped.begins_with("__gdss_global__"):
 			var key: String = stripped.substr("__gdss_global__".length())
 			resolved.append(GdssStylesheet.globals.get(key, null))
 		elif stripped.begins_with("__gdss_instance__"):
 			var key: String = stripped.substr("__gdss_instance__".length())
 			if ref != null and GdssStylesheet._instance_vars.has(ref.get_instance_id()):
-				resolved.append(GdssStylesheet._instance_vars[ref.get_instance_id()].get(key, null))
+				resolved.append(GdssStylesheet._instance_vars.get(ref.get_instance_id()).get(key, null))
 			else:
 				resolved.append(GdssStylesheet._instance_defaults.get(key, null))
 		elif stripped.begins_with("$"):
 			var key: String = stripped.substr(1)
 			if GdssStylesheet.globals.has(key):
-				resolved.append(GdssStylesheet.globals[key])
+				resolved.append(GdssStylesheet.globals.get(key))
 			elif ref != null and GdssStylesheet._instance_vars.has(ref.get_instance_id()):
-				resolved.append(GdssStylesheet._instance_vars[ref.get_instance_id()].get(key, null))
+				resolved.append(GdssStylesheet._instance_vars.get(ref.get_instance_id()).get(key, null))
 			else:
 				resolved.append(GdssStylesheet._instance_defaults.get(key, null))
 		else:
@@ -1220,12 +1198,12 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 					resolved_arg = named
 			resolved.append(resolved_arg)
 	if not has_live_ref:
-		_method_args_cache[cache_key] = resolved
+		_method_args_cache.set(cache_key, resolved)
 	return resolved
 
 
 func _call_method(descriptor: Dictionary, fallback: Variant, state_key: String = "") -> Variant:
-	var name: String = descriptor["__gdss_method__"]
+	var name: String = descriptor.get("__gdss_method__")
 	var method: GdssMethod = GDSS._get_gdss_methods().get(name)
 	if method == null:
 		return fallback
@@ -1260,7 +1238,7 @@ func _get_state() -> String:
 		return current_state
 	var node_type: GdssNodeType = _resolve_gdss_node()
 	if node_type and not node_type.states.is_empty():
-		return node_type.states[0]
+		return node_type.states.get(0)
 	return "all"
 
 
@@ -1273,28 +1251,28 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 	if s.begins_with("__gdss_global__"):
 		var name: String = s.substr("__gdss_global__".length())
 		if GdssStylesheet.globals.has(name):
-			return GdssStylesheet.globals[name]
+			return GdssStylesheet.globals.get(name)
 		if GdssStylesheet._global_defaults.has(name):
-			return GdssStylesheet._global_defaults[name]
+			return GdssStylesheet._global_defaults.get(name)
 		return fallback
 	if s.begins_with("__gdss_instance__"):
 		var name: String = s.substr("__gdss_instance__".length())
 		if ref != null:
 			var id: int = ref.get_instance_id()
-			if GdssStylesheet._instance_vars.has(id) and GdssStylesheet._instance_vars[id].has(name):
-				return GdssStylesheet._instance_vars[id][name]
+			if GdssStylesheet._instance_vars.has(id) and GdssStylesheet._instance_vars.get(id).has(name):
+				return GdssStylesheet._instance_vars.get(id).get(name)
 		if GdssStylesheet._instance_defaults.has(name):
-			return GdssStylesheet._instance_defaults[name]
+			return GdssStylesheet._instance_defaults.get(name)
 		return fallback
 	if s.begins_with("__gdss_local__"):
 		var name: String = s.substr("__gdss_local__".length())
 		if GdssStylesheet._local_vars.has(name):
-			return GdssStylesheet._local_vars[name]
+			return GdssStylesheet._local_vars.get(name)
 		return fallback
 	if s.begins_with("__gdss_local_method__"):
 		var name: String = s.substr("__gdss_local_method__".length())
 		if GdssStylesheet._local_vars.has(name):
-			return GdssStylesheet._local_vars[name]
+			return GdssStylesheet._local_vars.get(name)
 		return fallback
 	return raw
 
@@ -1303,17 +1281,16 @@ func _get_val(key: String, fallback: Variant = null) -> Variant:
 	if ref == null:
 		return fallback
 	if _tweened_values.has(key):
-		return _tweened_values[key]
+		return _tweened_values.get(key)
 	return _get_val_cached(key, _resolve_entry(), _get_state(), fallback)
 
 
 func _get_val_cached(key: String, entry: Dictionary, state: String, fallback: Variant) -> Variant:
 	if _tweened_values.has(key):
-		return _tweened_values[key]
+		return _tweened_values.get(key)
 	if entry.is_empty():
 		return fallback
-	# Parsed raw values are never null, so null unambiguously means "key absent",
-	# which lets us probe each dict once instead of has()+[].
+	# Parsed raw values are never null, so null means "key absent" - one probe per dict.
 	var raw: Variant = null
 	var sd: Variant = entry.get(state)
 	if sd is Dictionary:
@@ -1332,10 +1309,10 @@ func _get_raw_parsed_val(key: String, state: String) -> Variant:
 	if entry.is_empty():
 		return null
 	var raw: Variant = null
-	if entry.has(state) and entry[state].has(key):
-		raw = entry[state][key]
-	elif entry.has("all") and entry["all"].has(key):
-		raw = entry["all"][key]
+	if entry.has(state) and entry.get(state).has(key):
+		raw = entry.get(state).get(key)
+	elif entry.has("all") and entry.get("all").has(key):
+		raw = entry.get("all").get(key)
 	else:
 		return null
 	raw = _resolve_sentinel(raw, null)
@@ -1354,16 +1331,16 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 			_style_dynamic_tween.clear()
 			for prop: GdssProp in node_type.get_style_props():
 				var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-				_style_vals_tween[prop.name] = fv if fv != null else prop.get_default_value()
+				_style_vals_tween.set(prop.name, fv if fv != null else prop.get_default_value())
 				if _is_dynamic_raw(_raw_entry_val(entry, state, prop.name)):
 					_style_dynamic_tween.append(prop)
 			return _style_vals_tween
 		for prop: GdssProp in _style_dynamic_tween:
 			var dv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-			_style_vals_tween[prop.name] = dv if dv != null else prop.get_default_value()
+			_style_vals_tween.set(prop.name, dv if dv != null else prop.get_default_value())
 		for key: String in _tweened_values:
 			if _style_vals_tween.has(key):
-				_style_vals_tween[key] = _tweened_values[key]
+				_style_vals_tween.set(key, _tweened_values.get(key))
 		return _style_vals_tween
 	if _style_vals_state != state:
 		_style_vals_cache.clear()
@@ -1371,13 +1348,13 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 		_style_vals_state = state
 		for prop: GdssProp in node_type.get_style_props():
 			var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-			_style_vals_cache[prop.name] = rv if rv != null else prop.get_default_value()
+			_style_vals_cache.set(prop.name, rv if rv != null else prop.get_default_value())
 			if _is_dynamic_raw(_raw_entry_val(entry, state, prop.name)):
 				_style_dynamic.append(prop)
 		return _style_vals_cache
 	for prop: GdssProp in _style_dynamic:
 		var dv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-		_style_vals_cache[prop.name] = dv if dv != null else prop.get_default_value()
+		_style_vals_cache.set(prop.name, dv if dv != null else prop.get_default_value())
 	return _style_vals_cache
 
 
@@ -1407,12 +1384,12 @@ func _is_dynamic_raw(raw: Variant) -> bool:
 					return true
 			return false
 		if d.has(GdssStylesheet.COLOR4_KEY):
-			for side: Variant in d[GdssStylesheet.COLOR4_KEY]:
+			for side: Variant in d.get(GdssStylesheet.COLOR4_KEY):
 				if _is_dynamic_raw(side):
 					return true
 			return false
 		if d.has("__gdss_calc__"):
-			return _calc_has_dynamic_ref(d["__gdss_calc__"])
+			return _calc_has_dynamic_ref(d.get("__gdss_calc__"))
 		if not d.has("__gdss_method__"):
 			return false
 		for arg: Variant in d.get("args", []):
@@ -1429,12 +1406,12 @@ func _calc_has_dynamic_ref(node: Variant) -> bool:
 		return false
 	var d: Dictionary = node as Dictionary
 	if d.has("calc_ref"):
-		var r: String = d["calc_ref"]
+		var r: String = d.get("calc_ref")
 		return r.begins_with("__gdss_global__") or r.begins_with("__gdss_instance__") or r.begins_with("$")
 	if d.has("calc_neg"):
-		return _calc_has_dynamic_ref(d["calc_neg"])
+		return _calc_has_dynamic_ref(d.get("calc_neg"))
 	if d.has("calc_op"):
-		return _calc_has_dynamic_ref(d["l"]) or _calc_has_dynamic_ref(d["r"])
+		return _calc_has_dynamic_ref(d.get("l")) or _calc_has_dynamic_ref(d.get("r"))
 	return false
 
 
@@ -1517,8 +1494,7 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 				_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_src as Color, aa_size, detail, skew_x, skew_y)
 
 
-# A per-side color value as four colors, so a state that only styles the shorthand can
-# still tween against one that styles the sides.
+# Four colors, so a state styling only the shorthand can tween against one styling sides.
 func _side_colors(src: Variant, fallback: Color) -> Array:
 	var sides: Array = src as Array if src is Array else [src, src, src, src]
 	var result: Array = []
@@ -1527,10 +1503,9 @@ func _side_colors(src: Variant, fallback: Color) -> Array:
 	return result
 
 
-# border_color resolves to a four-entry array (left, right, top, bottom) as soon as the
-# sheet names any border_color_<side>. Only plain colors can differ per side, so a
-# gradient/blur/texture anywhere in the mix drives the whole border, and four equal
-# colors stay on the cheaper single-ring path.
+# border_color becomes a four-entry array (left, right, top, bottom) as soon as the sheet
+# names any border_color_<side>. Only plain colors can differ per side, so a gradient,
+# blur or texture anywhere drives the whole border.
 func _border_side_colors(src: Variant) -> Array:
 	if not src is Array:
 		return []
@@ -1544,8 +1519,7 @@ func _border_side_colors(src: Variant) -> Array:
 	return [] if uniform else sides
 
 
-# The value the whole border falls back to: the plain shorthand, or - once sides are in
-# play - the one source that cannot be drawn per side.
+# What the whole border falls back to: the shorthand, or the one non-per-side source.
 func _border_base(src: Variant) -> Variant:
 	if not src is Array:
 		return src
@@ -1580,13 +1554,10 @@ func _ensure_gpu_ci(to_canvas_item: RID, want_blur: bool = false) -> void:
 		_gpu_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
 		RenderingServer.canvas_item_set_material(_gpu_ci, _gpu_material.get_rid())
 		RenderingServer.canvas_item_set_draw_behind_parent(_gpu_ci, true)
-		# Godot captures the screen texture only once per frame, before the FIRST item
-		# that reads it - every later glass panel would sample that same stale snapshot,
-		# missing anything drawn in between (and the capture point moves with culling,
-		# so it varied with scroll/zoom). Requesting an explicit full-screen backbuffer
-		# copy on this item refreshes the capture right before each glass panel draws.
-		# Region-limited copies land misplaced on the compatibility renderer, so the
-		# copy stays full-screen; its cost scales with the number of visible glass panels.
+		# Godot captures the screen texture once per frame, before the FIRST item that reads it,
+		# so every later glass panel would sample that stale snapshot. An explicit full-screen
+		# backbuffer copy on this item refreshes the capture right before each glass panel draws
+		# (region-limited copies land misplaced on the compatibility renderer).
 		RenderingServer.canvas_item_set_copy_to_backbuffer(_gpu_ci, want_blur, Rect2())
 		_gpu_parent = RID()
 	elif _gpu_is_blur != want_blur:
@@ -1736,8 +1707,7 @@ func _skew_transform(rect: Rect2, skew_x: float, skew_y: float) -> Transform2D:
 	var center: Vector2 = rect.position + rect.size * 0.5
 	var bx: Vector2 = Vector2(1.0, skew_y)
 	var by: Vector2 = Vector2(skew_x, 1.0)
-	# translate(center) * shear * translate(-center) folded into one transform:
-	# result(p) = M*p + (center - M*center), with basis M = (bx, by).
+	# translate(center) * shear * translate(-center) folded: M*p + (center - M*center).
 	return Transform2D(bx, by, center - (bx * center.x + by * center.y))
 
 
@@ -1752,8 +1722,8 @@ func _draw_texture_in_rect(to_canvas_item: RID, tex: Texture2D, rect: Rect2, cor
 	var uvs: PackedVector2Array
 	uvs.resize(n)
 	for i: int in n:
-		var local: Vector2 = (points[i] - rect.position) / rect.size
-		uvs[i] = uv_offset + local * uv_scale
+		var local: Vector2 = (points.get(i) - rect.position) / rect.size
+		uvs.set(i, uv_offset + local * uv_scale)
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [Color.WHITE], uvs, tex.get_rid())
 
 
@@ -1768,10 +1738,10 @@ func _draw_textured_ring(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rec
 		var i1: int = (i + 1) % inner_points.size()
 		var o0: int = i % outer_points.size()
 		var o1: int = (i + 1) % outer_points.size()
-		var p0: Vector2 = inner_points[i0]
-		var p1: Vector2 = outer_points[o0]
-		var p2: Vector2 = outer_points[o1]
-		var p3: Vector2 = inner_points[i1]
+		var p0: Vector2 = inner_points.get(i0)
+		var p1: Vector2 = outer_points.get(o0)
+		var p2: Vector2 = outer_points.get(o1)
+		var p3: Vector2 = inner_points.get(i1)
 		if p0.is_equal_approx(p1) or p0.is_equal_approx(p3) or p1.is_equal_approx(p2) or p2.is_equal_approx(p3) or p0.is_equal_approx(p2) or p1.is_equal_approx(p3):
 			continue
 		var quad: PackedVector2Array = PackedVector2Array([p0, p1, p2, p3])
@@ -1780,9 +1750,9 @@ func _draw_textured_ring(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rec
 		var colors: PackedColorArray
 		colors.resize(4)
 		for j: int in 4:
-			uvs[j] = (quad[j] - outer_rect.position) / outer_rect.size
+			uvs.set(j, (quad.get(j) - outer_rect.position) / outer_rect.size)
 			var is_outer: bool = j == 1 or j == 2
-			colors[j] = Color(1, 1, 1, 0.0 if (fade and is_outer) else 1.0)
+			colors.set(j, Color(1, 1, 1, 0.0 if (fade and is_outer) else 1.0))
 		RenderingServer.canvas_item_add_polygon(to_canvas_item, quad, colors, uvs, tex.get_rid())
 
 
@@ -1800,9 +1770,9 @@ func _draw_linear_gradient_rect(to_canvas_item: RID, grad: GdssGradient, rect: R
 	var colors: PackedColorArray
 	colors.resize(points.size())
 	for i: int in points.size():
-		var p: Vector2 = points[i]
+		var p: Vector2 = points.get(i)
 		var t: float = ((p - rect.position) / rect.size).dot(dir) * 0.5 + 0.5
-		colors[i] = _sample_grad(c1, c2, grad.offsets, t)
+		colors.set(i, _sample_grad(c1, c2, grad.offsets, t))
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, colors)
 
 
@@ -1818,12 +1788,12 @@ func _draw_radial_gradient_rect(to_canvas_item: RID, grad: GdssGradient, rect: R
 	var indices: PackedInt32Array
 	verts.resize(n + 1)
 	cols.resize(n + 1)
-	verts[0] = center
-	cols[0] = _sample_grad(grad.color_a, grad.color_b, grad.offsets, 0.0)
+	verts.set(0, center)
+	cols.set(0, _sample_grad(grad.color_a, grad.color_b, grad.offsets, 0.0))
 	for i: int in n:
-		verts[i + 1] = perimeter[i]
-		var uv: Vector2 = (perimeter[i] - rect.position) / rect.size
-		cols[i + 1] = _sample_grad(grad.color_a, grad.color_b, grad.offsets, (uv - grad.p0).length() / radius)
+		verts.set(i + 1, perimeter.get(i))
+		var uv: Vector2 = (perimeter.get(i) - rect.position) / rect.size
+		cols.set(i + 1, _sample_grad(grad.color_a, grad.color_b, grad.offsets, (uv - grad.p0).length() / radius))
 	for i: int in n:
 		indices.append_array([0, i + 1, (i + 1) % n + 1])
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, verts, cols)
@@ -1844,21 +1814,21 @@ func _draw_linear_gradient_ring(to_canvas_item: RID, grad: GdssGradient, inner_r
 		var i1: int = (i + 1) % inner_points.size()
 		var o0: int = i % outer_points.size()
 		var o1: int = (i + 1) % outer_points.size()
-		var p0: Vector2 = inner_points[i0]
-		var p1: Vector2 = outer_points[o0]
-		var p2: Vector2 = outer_points[o1]
-		var p3: Vector2 = inner_points[i1]
+		var p0: Vector2 = inner_points.get(i0)
+		var p1: Vector2 = outer_points.get(o0)
+		var p2: Vector2 = outer_points.get(o1)
+		var p3: Vector2 = inner_points.get(i1)
 		var quad: PackedVector2Array = PackedVector2Array([p0, p1, p2, p3])
 		var quad_colors: PackedColorArray
 		quad_colors.resize(4)
 		for j: int in 4:
-			var p: Vector2 = quad[j]
+			var p: Vector2 = quad.get(j)
 			var t: float = ((p - outer_rect.position) / outer_rect.size).dot(dir) * 0.5 + 0.5
 			var col: Color = _sample_grad(c1, c2, grad.offsets, t)
 			var is_outer: bool = j == 1 or j == 2
 			if fade and is_outer:
 				col.a = 0.0
-			quad_colors[j] = col
+			quad_colors.set(j, col)
 		RenderingServer.canvas_item_add_polygon(to_canvas_item, quad, quad_colors)
 
 
@@ -1867,16 +1837,16 @@ func _draw_rect(to_canvas_item: RID, rect: Rect2, color: Color, corner_radii: Ve
 		var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, corner_radii, detail), rect, skew_x, skew_y)
 		RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [color])
 		return
-
+	
 	var fitted: Vector4 = _fit_corners(corner_radii, rect)
-
+	
 	if aa > 0.0:
 		var inner_rect: Rect2 = rect.grow(-aa)
 		var inner_fitted: Vector4 = _fit_corners(corner_radii, inner_rect)
 		_draw_ring_raw(to_canvas_item, inner_rect, rect, inner_fitted, fitted, color, true, detail, skew_x, skew_y)
 		rect = inner_rect
 		fitted = inner_fitted
-
+	
 	var points: PackedVector2Array = _apply_skew(_get_rounded_rect(rect, fitted, detail), rect, skew_x, skew_y)
 	RenderingServer.canvas_item_add_polygon(to_canvas_item, points, [color])
 
@@ -1892,23 +1862,22 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 	var outer_points: PackedVector2Array = _apply_skew(_get_rounded_rect(outer_rect, outer_radii, detail), outer_rect, skew_x, skew_y)
 	var all_points: PackedVector2Array = inner_points + outer_points
 	var indices: PackedInt32Array = _triangulate_ring(inner_points.size(), outer_points.size())
-
+	
 	var colors: PackedColorArray
 	if fade:
 		colors.resize(all_points.size())
 		for i: int in inner_points.size():
-			colors[i] = color
+			colors.set(i, color)
 		for i: int in outer_points.size():
-			colors[inner_points.size() + i] = Color(color.r, color.g, color.b, 0.0)
+			colors.set(inner_points.size() + i, Color(color.r, color.g, color.b, 0.0))
 	else:
 		colors = [color]
-
+	
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, all_points, colors)
 
 
-# Per-side border colors. Each side owns its straight edge plus the half of each
-# neighbouring corner arc up to the 45-degree split, so two colors meet on the corner
-# diagonal the way a mitred frame does.
+# Each side owns its straight edge plus half of each neighbouring corner arc, so two
+# colors meet on the corner diagonal like a mitred frame.
 func _draw_ring_sides(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, corner_radii: Vector4, colors: Array, detail: int, skew_x: float, skew_y: float) -> void:
 	var outer_fitted: Vector4 = _fit_corners(corner_radii, outer_rect)
 	var inner_fitted: Vector4 = _match_corner_counts(_fit_corners(corner_radii, inner_rect), outer_fitted)
@@ -1918,13 +1887,12 @@ func _draw_ring_sides(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2,
 	if inner_points.size() != count:
 		return
 	var splits: PackedInt32Array = _corner_splits(outer_fitted, detail)
-	# Spans in the composite's side order: left wraps the array end, from the bottom-left
-	# split round to the top-left one, and the rest follow clockwise.
+	# Composite side order: left wraps the array end (bottom-left split round to top-left).
 	var spans: Array[Vector2i] = [
-		Vector2i(splits[3], splits[0]),
-		Vector2i(splits[1], splits[2]),
-		Vector2i(splits[0], splits[1]),
-		Vector2i(splits[2], splits[3]),
+		Vector2i(splits.get(3), splits.get(0)),
+		Vector2i(splits.get(1), splits.get(2)),
+		Vector2i(splits.get(0), splits.get(1)),
+		Vector2i(splits.get(2), splits.get(3)),
 	]
 	for side: int in 4:
 		var color: Color = colors.get(side)
@@ -1948,9 +1916,8 @@ func _draw_ring_span(to_canvas_item: RID, inner_points: PackedVector2Array, oute
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, verts, PackedColorArray([color]))
 
 
-# Vertex index of the 45-degree split inside each corner arc, where one side's span hands
-# over to the next. _get_rounded_rect walks the corners clockwise from the top-left,
-# emitting a single point for a square corner and detail + 1 for a rounded one.
+# Vertex index of the 45-degree split in each corner arc, where one side hands over to
+# the next. _get_rounded_rect walks the corners clockwise from the top-left.
 func _corner_splits(radii: Vector4, detail: int) -> PackedInt32Array:
 	var splits: PackedInt32Array
 	var index: int = 0
@@ -1961,9 +1928,8 @@ func _corner_splits(radii: Vector4, detail: int) -> PackedInt32Array:
 	return splits
 
 
-# A corner that survives the outer fit but collapses on the inner one would pair a single
-# point against a whole arc and break the side spans. Keep it at a hairline radius: the
-# arc keeps its vertex count, just gathered on the corner.
+# A corner that survives the outer fit but collapses on the inner one would pair a point
+# against a whole arc. Keep it at a hairline radius so the arc keeps its vertex count.
 func _match_corner_counts(inner: Vector4, outer: Vector4) -> Vector4:
 	return Vector4(
 		maxf(inner.x, 0.001) if outer.x > 0.0 else 0.0,
@@ -1976,7 +1942,7 @@ func _match_corner_counts(inner: Vector4, outer: Vector4) -> Vector4:
 func _triangulate_ring(inner_size: int, outer_size: int) -> PackedInt32Array:
 	var key: int = inner_size * 100003 + outer_size
 	if _tri_cache.has(key):
-		return _tri_cache[key]
+		return _tri_cache.get(key)
 	var indices: PackedInt32Array
 	var total: int = max(inner_size, outer_size)
 	for i: int in total:
@@ -1985,7 +1951,7 @@ func _triangulate_ring(inner_size: int, outer_size: int) -> PackedInt32Array:
 		var o0: int = i % outer_size + inner_size
 		var o1: int = (i + 1) % outer_size + inner_size
 		indices.append_array([i0, o0, o1, i0, o1, i1])
-	_tri_cache[key] = indices
+	_tri_cache.set(key, indices)
 	return indices
 
 
@@ -2000,14 +1966,14 @@ func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 8) -> P
 	key = key * 92821 + int(corner_radii.w * 100.0)
 	key = key * 92821 + detail
 	if _rr_cache.has(key):
-		return _rr_cache[key]
+		return _rr_cache.get(key)
 	var corner_centers: Array[Vector2] = [
 		rect.position + Vector2(corner_radii[0], corner_radii[0]),
 		Vector2(rect.end.x, rect.position.y) + Vector2(-corner_radii[1], corner_radii[1]),
 		rect.end + Vector2(-corner_radii[2], -corner_radii[2]),
 		Vector2(rect.position.x, rect.end.y) + Vector2(corner_radii[3], -corner_radii[3]),
 	]
-
+	
 	var points: PackedVector2Array
 	for corner_idx: int in 4:
 		var radius: float = corner_radii[corner_idx]
@@ -2019,11 +1985,11 @@ func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 8) -> P
 				3: points.append(Vector2(rect.position.x, rect.end.y))
 		else:
 			for i: int in range(detail + 1):
-				var theta: float = _corner_start_angles[corner_idx] + (PI * 0.5) * i / detail
-				points.append(corner_centers[corner_idx] + Vector2(cos(theta), sin(theta)) * radius)
+				var theta: float = _corner_start_angles.get(corner_idx) + (PI * 0.5) * i / detail
+				points.append(corner_centers.get(corner_idx) + Vector2(cos(theta), sin(theta)) * radius)
 	if _rr_cache.size() > 2048:
 		_rr_cache.clear()
-	_rr_cache[key] = points
+	_rr_cache.set(key, points)
 	return points
 
 
@@ -2032,12 +1998,12 @@ func _apply_skew(points: PackedVector2Array, rect: Rect2, skew_x: float, skew_y:
 		return points
 	var result: PackedVector2Array = points
 	for i: int in result.size():
-		var p: Vector2 = result[i]
+		var p: Vector2 = result.get(i)
 		var t: Vector2 = (p - rect.position) / rect.size
-		result[i] = Vector2(
+		result.set(i, Vector2(
 			p.x + skew_x * (t.y - 0.5) * rect.size.y,
 			p.y + skew_y * (t.x - 0.5) * rect.size.x
-		)
+		))
 	return result
 
 

@@ -267,7 +267,7 @@ func _setup_chunk_tabs() -> void:
 	inner_box.move_child(bar, split.get_index())
 	if _chunks.is_empty():
 		_chunks = _parse_chunks(code_edit.text)
-		code_edit.text = _chunks[_active_chunk]["content"]
+		code_edit.text = _chunks.get(_active_chunk).get("content")
 	_rebuild_chunk_tabs()
 	_chunk_tabs.tab_selected.connect(_on_chunk_selected)
 	_chunk_tabs.tab_close_pressed.connect(_on_chunk_closed)
@@ -279,7 +279,7 @@ func _setup_chunk_tabs() -> void:
 func set_full_source(source: String) -> void:
 	_chunks = _parse_chunks(source)
 	_active_chunk = clampi(_active_chunk, 0, _chunks.size() - 1)
-	code_edit.text = _chunks[_active_chunk]["content"]
+	code_edit.text = _chunks.get(_active_chunk).get("content")
 	if _chunk_tabs != null:
 		_rebuild_chunk_tabs()
 
@@ -289,14 +289,14 @@ func get_full_source() -> String:
 	_chunk_offsets = PackedInt32Array()
 	if _chunks.size() <= 1:
 		_chunk_offsets.append(0)
-		return _chunks[0]["content"] if not _chunks.is_empty() else code_edit.text
+		return _chunks.get(0).get("content") if not _chunks.is_empty() else code_edit.text
 	var parts: PackedStringArray = []
 	var line_cursor: int = 0
 	for chunk: Dictionary in _chunks:
-		parts.append("# @chunk " + str(chunk["name"]))
+		parts.append("# @chunk " + str(chunk.get("name")))
 		line_cursor += 1
 		_chunk_offsets.append(line_cursor)
-		var content: String = chunk["content"]
+		var content: String = chunk.get("content")
 		parts.append(content)
 		line_cursor += content.split("\n").size()
 	return "\n".join(parts)
@@ -342,7 +342,7 @@ func _on_chunk_selected(idx: int) -> void:
 	_sync_active_chunk()
 	_active_chunk = idx
 	_suppress_dirty = true
-	code_edit.text = _chunks[idx]["content"]
+	code_edit.text = _chunks.get(idx).get("content")
 	if _chunk_tabs != null and _chunk_tabs.current_tab != idx:
 		_chunk_tabs.current_tab = idx
 	code_edit.text_changed.emit()
@@ -386,12 +386,12 @@ func _create_chunk(chunk_name: String) -> void:
 func _on_chunk_closed(idx: int) -> void:
 	if _chunks.size() <= 1 or idx < 0 or idx >= _chunks.size():
 		return
-	if str(_chunks[idx]["content"]).strip_edges().is_empty():
+	if str(_chunks.get(idx).get("content")).strip_edges().is_empty():
 		_delete_chunk(idx)
 		return
 	var dialog: ConfirmationDialog = ConfirmationDialog.new()
 	dialog.title = "Delete Chunk"
-	dialog.dialog_text = "Delete chunk '%s'? Its contents will be removed.\nThe change is only applied once you save (Ctrl+S)." % _chunks[idx]["name"]
+	dialog.dialog_text = "Delete chunk '%s'? Its contents will be removed.\nThe change is only applied once you save (Ctrl+S)." % _chunks.get(idx).get("name")
 	dialog.ok_button_text = "Delete"
 	dialog.confirmed.connect(_delete_chunk.bind(idx))
 	dialog.confirmed.connect(dialog.queue_free)
@@ -408,28 +408,28 @@ func _delete_chunk(idx: int) -> void:
 	if _active_chunk > idx:
 		_active_chunk -= 1
 	_active_chunk = clampi(_active_chunk, 0, _chunks.size() - 1)
-	code_edit.text = _chunks[_active_chunk]["content"]
+	code_edit.text = _chunks.get(_active_chunk).get("content")
 	_rebuild_chunk_tabs()
 	code_edit.text_changed.emit()
 
 
 func _on_chunk_rearranged(_idx_to: int) -> void:
 	_sync_active_chunk()
-	var active_name: String = str(_chunks[_active_chunk]["name"])
+	var active_name: String = str(_chunks.get(_active_chunk).get("name"))
 	var pool: Array[Dictionary] = _chunks.duplicate()
 	var reordered: Array[Dictionary] = []
 	for tab_index: int in _chunk_tabs.get_tab_count():
 		var tab_name: String = _chunk_tabs.get_tab_title(tab_index)
 		for pool_index: int in pool.size():
-			if str(pool[pool_index]["name"]) == tab_name:
-				reordered.append(pool[pool_index])
+			if str(pool.get(pool_index).get("name")) == tab_name:
+				reordered.append(pool.get(pool_index))
 				pool.remove_at(pool_index)
 				break
 	if reordered.size() != _chunks.size():
 		return
 	_chunks = reordered
 	for chunk_index: int in _chunks.size():
-		if str(_chunks[chunk_index]["name"]) == active_name:
+		if str(_chunks.get(chunk_index).get("name")) == active_name:
 			_active_chunk = chunk_index
 			break
 	_prompt_save()
@@ -440,7 +440,7 @@ func goto_full_source_line(full_line: int) -> void:
 	var chunk: int = _chunk_for_line(full_line)
 	if chunk != _active_chunk:
 		_on_chunk_selected(chunk)
-	var chunk_start: int = _chunk_offsets[chunk] if chunk < _chunk_offsets.size() else 0
+	var chunk_start: int = _chunk_offsets.get(chunk) if chunk < _chunk_offsets.size() else 0
 	var local_line: int = full_line - chunk_start
 	if local_line >= 0 and local_line < code_edit.get_line_count():
 		code_edit.set_caret_line(local_line)
@@ -454,14 +454,14 @@ func _on_chunk_rename(idx: int) -> void:
 	var dialog: AcceptDialog = AcceptDialog.new()
 	dialog.title = "Rename Chunk"
 	var line: LineEdit = LineEdit.new()
-	line.text = str(_chunks[idx]["name"])
+	line.text = str(_chunks.get(idx).get("name"))
 	line.custom_minimum_size = Vector2(220, 0)
 	dialog.add_child(line)
 	dialog.register_text_enter(line)
 	dialog.confirmed.connect(func() -> void:
 		var new_name: String = line.text.strip_edges()
 		if not new_name.is_empty():
-			_chunks[idx]["name"] = new_name
+			_chunks.get(idx).set("name", new_name)
 			_rebuild_chunk_tabs()
 			GdssStylesheet.get_instance().save_current(get_full_source())
 	)
@@ -475,7 +475,7 @@ func _on_chunk_rename(idx: int) -> void:
 func _unique_chunk_name(base: String) -> String:
 	var taken: PackedStringArray = []
 	for chunk: Dictionary in _chunks:
-		taken.append(str(chunk["name"]))
+		taken.append(str(chunk.get("name")))
 	var candidate: String = base
 	var suffix: int = 2
 	while Array(taken).has(candidate):
@@ -494,27 +494,27 @@ func display_errors(errors: Array) -> void:
 	if errors.is_empty():
 		show_error("", -1)
 		return
-	var active_start: int = _chunk_offsets[_active_chunk] if _active_chunk < _chunk_offsets.size() else 0
+	var active_start: int = _chunk_offsets.get(_active_chunk) if _active_chunk < _chunk_offsets.size() else 0
 	var active_end: int = active_start + code_edit.get_line_count()
 	for err: Array in errors:
-		var full_line: int = err[1]
+		var full_line: int = err.get(1)
 		if full_line >= active_start and full_line < active_end:
 			var local_line: int = full_line - active_start
 			if local_line >= 0 and local_line < code_edit.get_line_count():
 				code_edit.set_line_background_color(local_line, _error_bg)
 				_highlighted_lines.append(local_line)
-	var first: Array = errors[0]
-	_error_target_chunk = _chunk_for_line(first[1])
-	var chunk_start: int = _chunk_offsets[_error_target_chunk] if _error_target_chunk < _chunk_offsets.size() else 0
-	_error_target_line = first[1] - chunk_start
-	var message: String = str(first[0]) if _error_target_chunk == _active_chunk else "[%s] %s" % [_chunks[_error_target_chunk]["name"], first[0]]
+	var first: Array = errors.get(0)
+	_error_target_chunk = _chunk_for_line(first.get(1))
+	var chunk_start: int = _chunk_offsets.get(_error_target_chunk) if _error_target_chunk < _chunk_offsets.size() else 0
+	_error_target_line = first.get(1) - chunk_start
+	var message: String = str(first.get(0)) if _error_target_chunk == _active_chunk else "[%s] %s" % [_chunks[_error_target_chunk]["name"], first[0]]
 	show_error(message, _error_target_line, errors.size())
 
 
 func _chunk_for_line(full_line: int) -> int:
 	var result: int = 0
 	for i: int in _chunk_offsets.size():
-		if full_line >= _chunk_offsets[i]:
+		if full_line >= _chunk_offsets.get(i):
 			result = i
 	return result
 
@@ -585,10 +585,10 @@ func _goto_error(direction: int) -> void:
 		_error_cursor = 0 if direction > 0 else _all_errors.size() - 1
 	else:
 		_error_cursor = wrapi(_error_cursor + direction, 0, _all_errors.size())
-	var err: Array = _all_errors[_error_cursor]
-	goto_full_source_line(int(err[1]))
-	var chunk_start: int = _chunk_offsets[_active_chunk] if _active_chunk < _chunk_offsets.size() else 0
-	show_error(str(err[0]), int(err[1]) - chunk_start, _all_errors.size(), _error_cursor)
+	var err: Array = _all_errors.get(_error_cursor)
+	goto_full_source_line(int(err.get(1)))
+	var chunk_start: int = _chunk_offsets.get(_active_chunk) if _active_chunk < _chunk_offsets.size() else 0
+	show_error(str(err.get(0)), int(err.get(1)) - chunk_start, _all_errors.size(), _error_cursor)
 
 
 func show_error(message: String, line_num: int, total_errors: int = 1, current_index: int = -1) -> void:
@@ -598,7 +598,7 @@ func show_error(message: String, line_num: int, total_errors: int = 1, current_i
 		error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		copy_button.disabled = true
 		return
-
+	
 	var more_suffix: String = ""
 	if current_index >= 0 and total_errors > 1:
 		more_suffix = "  (%d/%d)" % [current_index + 1, total_errors]
@@ -688,8 +688,7 @@ func _setup_menu_bar() -> void:
 		return
 	var menu_bar: MenuBar = MenuBar.new()
 	menu_bar.flat = true
-	# Render the menu inside the editor panel instead of the OS-native global menu
-	# (otherwise on macOS the File/Edit/Help menus hijack the system menu bar).
+	# Keep the menu in the editor panel; the native global menu hijacks macOS's menu bar.
 	menu_bar.prefer_global_menu = false
 	_file_menu = PopupMenu.new()
 	_file_menu.name = "File"
@@ -943,7 +942,7 @@ func _rebuild_matches() -> void:
 	var lower_needle: String = needle.to_lower()
 	var lines: PackedStringArray = code_edit.text.split("\n")
 	for line_idx: int in lines.size():
-		var hay: String = lines[line_idx].to_lower()
+		var hay: String = lines.get(line_idx).to_lower()
 		var from: int = 0
 		while true:
 			var found: int = hay.find(lower_needle, from)
@@ -964,7 +963,7 @@ func _nearest_match_index() -> int:
 		line = code_edit.get_selection_from_line()
 		col = code_edit.get_selection_from_column()
 	for i: int in _search_matches.size():
-		var m: Vector2i = _search_matches[i]
+		var m: Vector2i = _search_matches.get(i)
 		if m.y > line or (m.y == line and m.x >= col):
 			return i
 	return 0
@@ -987,7 +986,7 @@ func _focus_match(index: int) -> void:
 	if index < 0 or index >= _search_matches.size():
 		_update_search_label()
 		return
-	var m: Vector2i = _search_matches[index]
+	var m: Vector2i = _search_matches.get(index)
 	var length: int = _search_field.text.length()
 	code_edit.remove_secondary_carets()
 	code_edit.set_caret_line(m.y)
@@ -1024,7 +1023,7 @@ func _replace_all() -> void:
 	code_edit.remove_secondary_carets()
 	code_edit.begin_complex_operation()
 	for idx: int in range(_search_matches.size() - 1, -1, -1):
-		var m: Vector2i = _search_matches[idx]
+		var m: Vector2i = _search_matches.get(idx)
 		code_edit.select(m.y, m.x, m.y, m.x + needle.length())
 		code_edit.delete_selection()
 		code_edit.set_caret_line(m.y)
@@ -1064,7 +1063,7 @@ func load_file(path: String) -> void:
 		return
 	_current_file_path = path
 	if data.has("source"):
-		code_edit.text = data["source"]
+		code_edit.text = data.get("source")
 	_user_saved(false)
 
 
@@ -1123,9 +1122,9 @@ func _on_copy_button_pressed() -> void:
 	if Input.is_key_pressed(KEY_SHIFT) and not _all_errors.is_empty():
 		var formatted: PackedStringArray = []
 		for err: Array in _all_errors:
-			var chunk: int = _chunk_for_line(err[1])
-			var chunk_start: int = _chunk_offsets[chunk] if chunk < _chunk_offsets.size() else 0
-			var line_label: String = str(err[1] - chunk_start + 1)
+			var chunk: int = _chunk_for_line(err.get(1))
+			var chunk_start: int = _chunk_offsets.get(chunk) if chunk < _chunk_offsets.size() else 0
+			var line_label: String = str(err.get(1) - chunk_start + 1)
 			if _chunks.size() > 1:
 				line_label = "%s:%s" % [_chunks[chunk]["name"], line_label]
 			formatted.append("[%s] %s" % [line_label, err[0]])
@@ -1188,15 +1187,15 @@ func upsert_meta_block(block_text: String) -> void:
 	_sync_active_chunk()
 	var replaced: bool = false
 	for chunk: Dictionary in _chunks:
-		var outcome: Dictionary = stylesheet.replace_meta_block(str(chunk["content"]), block_text)
-		if outcome["found"]:
-			chunk["content"] = outcome["source"]
+		var outcome: Dictionary = stylesheet.replace_meta_block(str(chunk.get("content")), block_text)
+		if outcome.get("found"):
+			chunk.set("content", outcome.get("source"))
 			replaced = true
 			break
 	if not replaced:
-		_chunks[0]["content"] = _insert_meta_at_top(str(_chunks[0]["content"]), block_text)
+		_chunks.get(0).set("content", _insert_meta_at_top(str(_chunks.get(0).get("content")), block_text))
 	_suppress_dirty = true
-	code_edit.text = _chunks[_active_chunk]["content"]
+	code_edit.text = _chunks.get(_active_chunk).get("content")
 	_clear_suppress_dirty.call_deferred()
 	stylesheet.save_current(get_full_source())
 
@@ -1205,7 +1204,7 @@ func _insert_meta_at_top(content: String, block_text: String) -> String:
 	var lines: PackedStringArray = content.split("\n")
 	var insert_at: int = 0
 	for i: int in lines.size():
-		var stripped: String = lines[i].strip_edges()
+		var stripped: String = lines.get(i).strip_edges()
 		if stripped.is_empty() or stripped.begins_with("#"):
 			insert_at = i + 1
 		else:
@@ -1550,8 +1549,8 @@ func _draw_color_swatches() -> void:
 		for hit: Dictionary in colors:
 			var swatch: Rect2 = Rect2(cursor_x, swatch_y, swatch_size, swatch_size)
 			code_edit.draw_rect(swatch, Color(0, 0, 0, 0.6))
-			code_edit.draw_rect(swatch.grow(-1.0), hit["color"])
-			_swatch_hitboxes.append({"rect": swatch, "line": line, "from": hit["from"], "to": hit["to"]})
+			code_edit.draw_rect(swatch.grow(-1.0), hit.get("color"))
+			_swatch_hitboxes.append({"rect": swatch, "line": line, "from": hit.get("from"), "to": hit.get("to")})
 			cursor_x += swatch_size + 4.0
 
 

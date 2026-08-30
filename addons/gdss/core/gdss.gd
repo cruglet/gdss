@@ -102,7 +102,7 @@ static func get_global_var(name: String, fallback: Variant = null) -> Variant:
 ## GDSS.set_global_var("player_score", 100)
 ## [/codeblock]
 static func set_global_var(name: String, value: Variant) -> void:
-	GdssStylesheet.globals[name] = value
+	GdssStylesheet.globals.set(name, value)
 	_schedule_global_refresh()
 
 
@@ -113,7 +113,7 @@ static func set_global_var(name: String, value: Variant) -> void:
 ## [/codeblock]
 static func reset_global_var(name: String) -> void:
 	if GdssStylesheet._global_defaults.has(name):
-		GdssStylesheet.globals[name] = GdssStylesheet._global_defaults.get(name)
+		GdssStylesheet.globals.set(name, GdssStylesheet._global_defaults.get(name))
 	else:
 		GdssStylesheet.globals.erase(name)
 	_schedule_global_refresh()
@@ -140,7 +140,7 @@ static func get_global_vars() -> Dictionary:
 ## [/codeblock]
 static func set_global_vars(values: Dictionary) -> void:
 	for key: String in values:
-		GdssStylesheet.globals[key] = values[key]
+		GdssStylesheet.globals.set(key, values.get(key))
 	_schedule_global_refresh()
 
 
@@ -315,9 +315,9 @@ static func _is_instance_scheme_key(key: String) -> bool:
 
 static func _apply_scheme_value(key: String, value: Variant) -> void:
 	if _is_instance_scheme_key(key):
-		GdssStylesheet._instance_defaults[key] = value
+		GdssStylesheet._instance_defaults.set(key, value)
 	else:
-		GdssStylesheet.globals[key] = value
+		GdssStylesheet.globals.set(key, value)
 
 
 static func _scheme_value(key: String) -> Variant:
@@ -337,8 +337,8 @@ static func _scheme_value(key: String) -> Variant:
 static func set_instance_var(node: Node, name: String, value: Variant) -> void:
 	var id: int = node.get_instance_id()
 	if not GdssStylesheet._instance_vars.has(id):
-		GdssStylesheet._instance_vars[id] = {}
-	GdssStylesheet._instance_vars[id][name] = value
+		GdssStylesheet._instance_vars.set(id, {})
+	GdssStylesheet._instance_vars.get(id).set(name, value)
 	if node is CanvasItem:
 		GdssNodeBinder.refresh_vars(node as CanvasItem)
 
@@ -354,7 +354,7 @@ static func set_instance_var(node: Node, name: String, value: Variant) -> void:
 static func get_instance_var(node: Node, name: String, fallback: Variant = null) -> Variant:
 	var id: int = node.get_instance_id()
 	if GdssStylesheet._instance_vars.has(id):
-		return GdssStylesheet._instance_vars[id].get(name, fallback)
+		return GdssStylesheet._instance_vars.get(id).get(name, fallback)
 	return GdssStylesheet._instance_defaults.get(name, fallback)
 
 
@@ -563,7 +563,7 @@ static func set_prop_override(node: Node, prop: String, value: Variant) -> void:
 		push_warning("[GDSS] %s has text-form overrides; clear them before using set_prop_override." % node)
 		return
 	var overrides: Dictionary = (raw as Dictionary).duplicate() if raw is Dictionary else {}
-	overrides[prop] = value
+	overrides.set(prop, value)
 	node.set_meta(OVERRIDES_META, overrides)
 	if node is CanvasItem or node is Window:
 		GdssNodeBinder.refresh(node)

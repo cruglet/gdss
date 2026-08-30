@@ -13,7 +13,7 @@ static func get_stylebox(canvas_item: Node, state: String = "") -> GdssStylebox:
 	var id: int = canvas_item.get_instance_id()
 	if not _registry.has(id):
 		return null
-	return _registry[id].get(state)
+	return _registry.get(id).get(state)
 
 
 static func get_all_styleboxes() -> Array[GdssStylebox]:
@@ -25,9 +25,9 @@ static func get_all_styleboxes() -> Array[GdssStylebox]:
 		if not is_instance_valid(instance_from_id(id)):
 			dead.append(id)
 			continue
-		var slots: Dictionary = _registry[id]
+		var slots: Dictionary = _registry.get(id)
 		for state: String in slots:
-			var stylebox: GdssStylebox = slots[state]
+			var stylebox: GdssStylebox = slots.get(state)
 			if stylebox != null:
 				_all_cache.append(stylebox)
 	for id: int in dead:
@@ -36,19 +36,16 @@ static func get_all_styleboxes() -> Array[GdssStylebox]:
 	return _all_cache
 
 
-## Marks the cached stylebox array as stale so the next call to [method
-## get_all_styleboxes] rebuilds it (and prunes any dead entries).
+## Marks the cached stylebox array stale so [method get_all_styleboxes] rebuilds it.
 static func mark_dirty() -> void:
 	_all_dirty = true
 
 
-## Releases everything GDSS holds for the node whose instance id is [param id].
-## Erases its registry slot (freeing the styleboxes, and with them their GPU
-## resources), purges per-node method caches, and drops any instance variables.
-## Idempotent: safe to call for an id that was already purged.
+## Releases everything GDSS holds for the node with instance id [param id]: registry
+## slot, method caches and instance variables. Idempotent.
 static func purge(id: int) -> void:
 	if _registry.has(id):
-		for stylebox: GdssStylebox in (_registry[id] as Dictionary).values():
+		for stylebox: GdssStylebox in (_registry.get(id) as Dictionary).values():
 			if stylebox != null:
 				stylebox._kill_tween()
 				stylebox._free_gpu_ci()
@@ -60,9 +57,8 @@ static func purge(id: int) -> void:
 	GdssStylesheet._instance_vars.erase(id)
 
 
-## Deferred teardown guard: purges the node's GDSS state only if the instance is
-## genuinely gone. Routed through [code]call_deferred[/code] from tree-exit hooks
-## so a reparent (remove-then-readd in the same frame) does not tear anything down.
+## Purges only if the instance is genuinely gone. Deferred from tree-exit hooks so a
+## reparent (remove-then-readd in one frame) tears nothing down.
 static func _check_purge(id: int) -> void:
 	if is_instance_valid(instance_from_id(id)):
 		return
@@ -80,26 +76,24 @@ static func get_styleboxes(canvas_item: Node) -> Array[GdssStylebox]:
 	return result
 
 
-## Returns the live {state -> stylebox} slots dict for a node WITHOUT copying it
-## (unlike get_styleboxes, which allocates an Array). Hot-path callers iterate this
-## directly; they must not mutate the returned dict.
+## The live {state -> stylebox} slots dict, uncopied (unlike get_styleboxes). Hot-path
+## callers iterate it directly and must not mutate it.
 static func get_slots(canvas_item: Node) -> Dictionary:
 	if canvas_item == null:
 		return {}
 	return _registry.get(canvas_item.get_instance_id(), {})
 
 
-## Returns the one stylebox that owns node-level concerns (e.g. on_show/on_hide
-## visibility events): the unslotted stylebox for stateful nodes, else the first
-## slot for static nodes. Null if the node has no styleboxes.
+## The stylebox that owns node-level concerns (on_show/on_hide): the unslotted one for
+## stateful nodes, else the first slot. Null if the node has none.
 static func get_primary_stylebox(canvas_item: Node) -> GdssStylebox:
 	if canvas_item == null:
 		return null
 	var slots: Dictionary = _registry.get(canvas_item.get_instance_id(), {})
 	if slots.has(""):
-		return slots[""]
+		return slots.get("")
 	for state: String in slots:
-		return slots[state]
+		return slots.get(state)
 	return null
 
 
@@ -116,31 +110,29 @@ static func refresh(canvas_item: Node) -> void:
 		return
 	var slots: Dictionary = get_slots(canvas_item)
 	for state: String in slots:
-		var stylebox: GdssStylebox = slots[state]
+		var stylebox: GdssStylebox = slots.get(state)
 		if stylebox != null:
 			stylebox.reapply()
-	# Window-derived nodes have no queue_redraw; reapply() already fired emit_changed()
-	# on each stylebox, which notifies the window to re-render.
+	# Window-derived nodes have no queue_redraw; reapply() already emitted changed.
 	if canvas_item is CanvasItem:
 		(canvas_item as CanvasItem).queue_redraw()
 
 
 ## Lightweight refresh for an instance-variable change: re-applies only the node's
-## dynamic non-style overrides (same work the coalesced global-var flush does) and
-## queues a redraw so style props re-resolve, instead of a full invalidate + reapply.
+## dynamic non-style overrides and queues a redraw.
 static func refresh_vars(canvas_item: Node) -> void:
 	if canvas_item == null:
 		return
 	var slots: Dictionary = get_slots(canvas_item)
 	for state: String in slots:
-		var stylebox: GdssStylebox = slots[state]
+		var stylebox: GdssStylebox = slots.get(state)
 		if stylebox != null:
 			stylebox.refresh_globals()
 	if canvas_item is CanvasItem:
 		(canvas_item as CanvasItem).queue_redraw()
 	else:
 		for state: String in slots:
-			var stylebox: GdssStylebox = slots[state]
+			var stylebox: GdssStylebox = slots.get(state)
 			if stylebox != null:
 				stylebox.emit_changed()
 
@@ -235,8 +227,7 @@ static func _migrate_legacy(canvas_item: CanvasItem) -> void:
 
 
 static func bind(canvas_item: Node, apply: bool = true, node_type: GdssNodeType = null) -> void:
-	# node_type may be passed by the caller (e.g. runtime._try_bind already looked it
-	# up) to avoid a redundant class->node dictionary fetch per bound node.
+	# node_type may be passed in (runtime._try_bind already looked it up) to skip a fetch.
 	if node_type == null:
 		node_type = GDSS._get_node_types().get(canvas_item.get_class())
 	if node_type == null:
@@ -245,9 +236,8 @@ static func bind(canvas_item: Node, apply: bool = true, node_type: GdssNodeType 
 	if not (canvas_item is Control or canvas_item is Window):
 		return
 	var control: Variant = canvas_item
-	# One bulk-override region wraps the stylebox adds (a Button binds the same stylebox to
-	# ~9 state slots) and, for stateful nodes, the value overrides too - so a fresh bind
-	# costs a single theme-changed notification instead of one per override group.
+	# One bulk region wraps the stylebox adds (a Button binds the same stylebox to ~9 slots)
+	# and the value overrides, so a fresh bind costs one theme-changed notification.
 	control.begin_bulk_theme_override()
 	var styleboxes: Array[GdssStylebox] = []
 	if node_type.is_static:
@@ -260,15 +250,14 @@ static func bind(canvas_item: Node, apply: bool = true, node_type: GdssNodeType 
 				styleboxes.append(stylebox)
 	else:
 		var states: PackedStringArray = node_type.states
-		var first_slot: String = states[0] if not states.is_empty() else ""
+		var first_slot: String = states.get(0) if not states.is_empty() else ""
 		var stylebox: GdssStylebox = _obtain(canvas_item, control, "", first_slot)
 		for state: String in states:
 			if not control.has_theme_stylebox_override(state) or control.get_theme_stylebox(state) != stylebox:
 				control.add_theme_stylebox_override(state, stylebox)
 		styleboxes.append(stylebox)
-		# Seed the resting interaction state (without firing the setter) and apply in this
-		# same bulk. The caller's follow-up update_state then no-ops; a reparent, where the
-		# state is unchanged and the overrides are intact, skips the re-apply entirely.
+		# Seed the resting state without firing the setter and apply in this same bulk, so the
+		# caller's update_state no-ops and an unchanged reparent skips the re-apply.
 		if apply and canvas_item is CanvasItem:
 			var active: String = node_type.get_active_state(canvas_item as CanvasItem)
 			if stylebox.current_state != active:
@@ -299,7 +288,7 @@ static func _obtain(canvas_item: Node, control: Variant, state: String, slot: St
 		stylebox = GdssStylebox.new()
 	if slots.get(state) != stylebox:
 		_all_dirty = true
-	slots[state] = stylebox
+	slots.set(state, stylebox)
 	stylebox.ref = canvas_item
 	if not slot.is_empty() and (not control.has_theme_stylebox_override(slot) or control.get_theme_stylebox(slot) != stylebox):
 		control.add_theme_stylebox_override(slot, stylebox)

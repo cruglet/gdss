@@ -66,11 +66,11 @@ func _on_editor_saved() -> void:
 
 func _load_bundle() -> Dictionary:
 	var compiled: Dictionary = GdssStorage.load_compiled()
-	if compiled.has("data") and compiled["data"] is Dictionary and not (compiled["data"] as Dictionary).is_empty():
+	if compiled.has("data") and compiled.get("data") is Dictionary and not (compiled.get("data") as Dictionary).is_empty():
 		var source_modified: int = GdssStorage.get_latest_modified()
 		var compiled_modified: int = compiled.get("source_modified", 0)
 		if source_modified == 0 or compiled_modified >= source_modified:
-			return compiled["data"]
+			return compiled.get("data")
 	var data: Dictionary = GdssStorage.load_data()
 	if data.get("parsed") is Dictionary and not (data.get("parsed") as Dictionary).is_empty():
 		return data
@@ -221,8 +221,7 @@ func _try_bind(canvas_item: Node) -> void:
 	var exit_cb: Callable = _on_styled_node_exited.bind(canvas_item.get_instance_id())
 	if not canvas_item.tree_exited.is_connected(exit_cb):
 		canvas_item.tree_exited.connect(exit_cb)
-	# on_show/on_hide events drive off visibility_changed (CanvasItem; not all Windows
-	# expose it). has_signal keeps the connect safe for Window-derived nodes.
+	# Not all Windows expose visibility_changed, so has_signal keeps the connect safe.
 	if canvas_item.has_signal(&"visibility_changed"):
 		var vis_cb: Callable = _on_styled_visibility_changed.bind(canvas_item)
 		if not canvas_item.visibility_changed.is_connected(vis_cb):
@@ -251,9 +250,9 @@ func _connect_event_signals(canvas_item: Node) -> void:
 	for sig: String in _EVENT_SIGNALS:
 		if not canvas_item.has_signal(sig):
 			continue
-		var info: Array = _EVENT_SIGNALS[sig]
-		var cb: Callable = Callable(primary, info[1])
-		var want: bool = not entry.is_empty() and entry.has(info[0])
+		var info: Array = _EVENT_SIGNALS.get(sig)
+		var cb: Callable = Callable(primary, info.get(1))
+		var want: bool = not entry.is_empty() and entry.has(info.get(0))
 		var connected: bool = canvas_item.is_connected(sig, cb)
 		if want and not connected:
 			canvas_item.connect(sig, cb)
@@ -272,21 +271,17 @@ func _disconnect_node_signals(canvas_item: Node) -> void:
 	for sig: String in _EVENT_SIGNALS:
 		if not canvas_item.has_signal(sig):
 			continue
-		var info: Array = _EVENT_SIGNALS[sig]
-		var cb: Callable = Callable(primary, info[1])
+		var info: Array = _EVENT_SIGNALS.get(sig)
+		var cb: Callable = Callable(primary, info.get(1))
 		if canvas_item.is_connected(sig, cb):
 			canvas_item.disconnect(sig, cb)
 
 
-# Runtime teardown counterpart to _on_node_added: a styled node that leaves the
-# tree for good must drop its registry slot, or GdssNodeBinder._registry (and
-# every stylebox it holds) grows without bound. tree_exited also fires on
-# a plain remove or a reparent, so we only purge when the node is actually being
-# destroyed; an ambiguous removal is re-checked over the next few frames, after which
-# a reparented node is still valid and a freed one is gone. The re-check cannot ride
-# call_deferred: change_scene_to_file emits tree_exited for the outgoing scene while
-# its nodes are still valid and unqueued, and they only become invalid two frames
-# later, so a single deferred check kept every slot of every scene ever left.
+# A styled node that leaves the tree for good must drop its registry slot, or
+# GdssNodeBinder._registry grows without bound. tree_exited also fires on a plain remove
+# or a reparent, so purge only when the node is really being destroyed; an ambiguous
+# removal is re-checked over the next few frames. One call_deferred check is not enough:
+# change_scene_to_file emits tree_exited while the outgoing nodes are still valid.
 func _on_styled_node_exited(id: int) -> void:
 	var obj: Object = instance_from_id(id)
 	if not is_instance_valid(obj):
