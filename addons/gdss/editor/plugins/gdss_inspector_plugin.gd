@@ -34,13 +34,19 @@ class GdssModeProperty extends EditorProperty:
 		elif node.is_in_group(GdssNodeBinder.GROUP):
 			mode = GDSS.GdssMode.ENABLE
 		_option.select(_option.get_item_index(mode))
+		var styleable: bool = GDSS._get_node_types().has(node.get_class())
+		_option.set_item_disabled(_option.get_item_index(GDSS.GdssMode.ENABLE_SELF), not styleable)
+		_option.set_item_disabled(_option.get_item_index(GDSS.GdssMode.DISABLE_SELF), not styleable)
 		_option.tooltip_text = _effective_text(node)
 		_updating = false
-
+	
 	func _effective_text(node: Node) -> String:
 		var enabled: bool = GDSS.resolve_mode(node)
-		return "Effective: %s%s" % ["Enabled" if enabled else "Disabled", _resolve_source(node)]
-
+		var text: String = "Effective: %s%s" % ["Enabled" if enabled else "Disabled", _resolve_source(node)]
+		if not GDSS._get_node_types().has(node.get_class()):
+			text += "\n%s has nothing to style, so this only drives its children." % node.get_class()
+		return text
+	
 	func _resolve_source(node: Node) -> String:
 		if node.is_in_group(GdssNodeBinder.GROUP) and GDSS.get_gdss_mode(node) == GDSS.GdssMode.INHERIT:
 			return ""
@@ -416,35 +422,40 @@ class GdssPreviewProperty extends EditorProperty:
 			stylebox.current_state = state
 
 
+## Any Control or Window takes part, styleable or not: an unstyleable one still carries a
+## GDSS mode so that the subtree under it can inherit.
+static func handles(object: Object) -> bool:
+	return object is Control or object is Window
+
+
 func _can_handle(object: Object) -> bool:
-	return object is Control and GDSS._get_node_types().has(object.get_class())
+	return handles(object)
 
 
 func _parse_property(object: Object, type: Variant.Type, name: String, hint_type: PropertyHint, hint_string: String, usage_flags: int, wide: bool) -> bool:
 	var is_enabled: bool = GDSS.resolve_mode(object as Node)
-
+	var node_type: GdssNodeType = GDSS._get_node_types().get((object as Node).get_class())
+	
 	if name == "theme":
 		var mode_prop: GdssModeProperty = GdssModeProperty.new()
 		mode_prop.set_label("GDSS")
 		add_custom_control(mode_prop)
-		if is_enabled:
+		if is_enabled and node_type != null:
 			var classes_prop: GdssClassesProperty = GdssClassesProperty.new()
 			classes_prop.set_label("Classes")
 			add_custom_control(classes_prop)
 			var overrides_prop: GdssOverridesProperty = GdssOverridesProperty.new()
 			overrides_prop.set_label("Overrides")
 			add_custom_control(overrides_prop)
-			var node_type: GdssNodeType = GDSS._get_node_types().get((object as Node).get_class())
-			if node_type != null and not node_type.is_static and node_type.states.size() > 1:
+			if not node_type.is_static and node_type.states.size() > 1:
 				var preview_prop: GdssPreviewProperty = GdssPreviewProperty.new()
 				preview_prop.set_label("Preview State")
 				add_custom_control(preview_prop)
 			return true
-
-	if is_enabled:
-		# theme_type_variation stays visible: GDSS now targets it via "/Variation { }"
-		# selectors, so users need to be able to set it.
+	
+	if is_enabled and node_type != null:
+		# theme_type_variation stays visible: GDSS targets it via "/Variation { }" selectors.
 		if name.begins_with("theme_override") and not GDSS.DEBUG_MODE:
 			return true
-
+	
 	return false
