@@ -76,6 +76,84 @@ enum TransitionFunc {
 	SPRING
 }
 
+enum BlurQuality {
+	HIGH,
+	LOW,
+	OFF,
+}
+
+## Every runtime setting an [code]@config[/code] block may set, and the kind of value it takes.
+const CONFIG_KEYS: Dictionary = {
+	"animations_enabled": "bool",
+	"animation_speed_scale": "float",
+	"blur_quality": "BlurQuality",
+	"transforms_enabled": "bool",
+	"gpu_panels": "bool",
+	"sfx_enabled": "bool",
+	"sfx_bus": "string",
+}
+
+## When [code]false[/code] every transition applies instantly: state changes, event
+## blocks, [method set_scheme] and [method tween_global_vars] all snap to their target,
+## and anything mid-flight settles at once.
+## [codeblock]
+## GDSS.animations_enabled = false
+## [/codeblock]
+static var animations_enabled: bool = true:
+	set(value):
+		if animations_enabled == value:
+			return
+		animations_enabled = value
+		_restyle_all()
+
+## Multiplies every GDSS transition duration. [code]0.5[/code] plays everything twice as
+## fast, [code]2.0[/code] half as fast, [code]0.0[/code] is instant. Clamped at zero.
+static var animation_speed_scale: float = 1.0:
+	set(value):
+		var scaled: float = maxf(value, 0.0)
+		if is_equal_approx(animation_speed_scale, scaled):
+			return
+		animation_speed_scale = scaled
+		_restyle_all()
+
+## Detail level for [code]blur()[/code] and [code]liquid_blur()[/code] backdrops.
+## [br][br]
+## [code]HIGH[/code] draws them as authored. [code]LOW[/code] drops the refraction and
+## edge highlight, so [code]liquid_blur()[/code] renders as a plain blur.
+## [code]OFF[/code] skips the backdrop copy altogether and fills with the tint colour
+## alone, which is what the CPU fallback already does.
+## [codeblock]
+## GDSS.blur_quality = GDSS.BlurQuality.LOW
+## [/codeblock]
+static var blur_quality: BlurQuality = BlurQuality.HIGH:
+	set(value):
+		if blur_quality == value:
+			return
+		blur_quality = value
+		_redraw_all()
+
+## When [code]false[/code] the [code]transform_*[/code] properties are ignored and nodes
+## keep their untransformed position and scale: a reduce-motion switch that leaves colour
+## and size transitions alone.
+static var transforms_enabled: bool = true:
+	set(value):
+		if transforms_enabled == value:
+			return
+		transforms_enabled = value
+		_restyle_all()
+
+## Runtime switch for the GPU panel shader, initialised from the
+## [code]gdss/rendering/gpu_panels[/code] project setting. Turn it off to draw panels with
+## the CPU geometry fallback instead.
+static var gpu_panels: bool:
+	get():
+		return gpu_panels_enabled()
+	set(value):
+		if gpu_panels_enabled() == value:
+			return
+		_gpu_panels = 1 if value else 0
+		_redraw_all()
+
 static var _db: GdssRegistry
 static var _global_flush_scheduled: bool = false
 static var _gpu_panels: int = -1
@@ -154,20 +232,21 @@ static func reset_global_vars() -> void:
 ## Animates several global variables to new values over [param tween_time] seconds
 ## in one tween. Tweenable values interpolate; anything else snaps.
 static func tween_global_vars(values: Dictionary, tween_time: float = 0.0, trans: TransitionFunc = TransitionFunc.SINE, ease: TransitionType = TransitionType.EASE_OUT) -> void:
-	if tween_time <= 0.0 or Engine.get_main_loop() == null:
+	var duration: float = scaled_duration(tween_time)
+	if duration <= 0.0 or Engine.get_main_loop() == null:
 		set_global_vars(values)
 		return
 	var from: Dictionary = {}
 	for key: String in values:
-		from[key] = GdssStylesheet.globals.get(key, values[key])
+		from.set(key, GdssStylesheet.globals.get(key, values.get(key)))
 	var tween: Tween = (Engine.get_main_loop() as SceneTree).create_tween()
 	tween.set_trans(GdssStylebox.tween_trans(trans))
 	tween.set_ease(GdssStylebox.tween_ease(ease))
 	tween.tween_method(func(t: float) -> void:
 		for key: String in values:
-			GdssStylesheet.globals[key] = _lerp_value(from[key], values[key], t)
+			GdssStylesheet.globals.set(key, _lerp_value(from.get(key), values.get(key), t))
 		_flush_global_refresh()
-	, 0.0, 1.0, tween_time)
+	, 0.0, 1.0, duration)
 
 
 ## Switches the active [b]scheme[/b], applying every variable it defines.
@@ -190,27 +269,28 @@ static func set_scheme(name: String, tween_time: float = 0.0, trans: TransitionF
 	if _scheme_tween != null and _scheme_tween.is_valid():
 		_scheme_tween.kill()
 		_scheme_tween = null
-	if tween_time <= 0.0 or Engine.get_main_loop() == null:
+	var duration: float = scaled_duration(tween_time)
+	if duration <= 0.0 or Engine.get_main_loop() == null:
 		for key: String in keys:
-			_apply_scheme_value(key, target[key])
+			_apply_scheme_value(key, target.get(key))
 		_schedule_global_refresh()
 		_emit_scheme_changed(name)
 		return
 	var from: Dictionary = {}
 	for key: String in keys:
 		var current: Variant = _scheme_value(key)
-		from[key] = current if current != null else target[key]
+		from.set(key, current if current != null else target.get(key))
 	_scheme_tween = (Engine.get_main_loop() as SceneTree).create_tween()
 	_scheme_tween.set_trans(GdssStylebox.tween_trans(trans))
 	_scheme_tween.set_ease(GdssStylebox.tween_ease(ease))
 	_scheme_tween.tween_method(func(t: float) -> void:
 		for key: String in keys:
-			_apply_scheme_value(key, _lerp_value(from[key], target[key], t))
+			_apply_scheme_value(key, _lerp_value(from.get(key), target.get(key), t))
 		_flush_global_refresh()
-	, 0.0, 1.0, tween_time)
+	, 0.0, 1.0, duration)
 	_scheme_tween.finished.connect(func() -> void:
 		for key: String in keys:
-			_apply_scheme_value(key, target[key])
+			_apply_scheme_value(key, target.get(key))
 		_flush_global_refresh()
 		_scheme_tween = null
 	)
@@ -692,6 +772,27 @@ static func gpu_panels_enabled() -> bool:
 			ProjectSettings.set_setting("gdss/rendering/gpu_panels", true)
 		_gpu_panels = 1 if ProjectSettings.get_setting("gdss/rendering/gpu_panels", true) else 0
 	return _gpu_panels == 1
+
+
+## Returns [param seconds] scaled by [member animation_speed_scale], or [code]0.0[/code]
+## when [member animations_enabled] is off. Every GDSS transition runs through this, so
+## tweens written by hand can follow the same settings.
+static func scaled_duration(seconds: float) -> float:
+	if not animations_enabled:
+		return 0.0
+	return maxf(seconds, 0.0) * animation_speed_scale
+
+
+static func _redraw_all() -> void:
+	for stylebox: GdssStylebox in GdssNodeBinder.get_all_styleboxes():
+		stylebox._safe_redraw()
+
+
+static func _restyle_all() -> void:
+	for stylebox: GdssStylebox in GdssNodeBinder.get_all_styleboxes():
+		if stylebox.ref != null:
+			stylebox.reapply()
+	_redraw_all()
 
 
 static func _flush_global_refresh() -> void:

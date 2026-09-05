@@ -462,8 +462,9 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 					return
 				control.add_theme_icon_override(prop.name, val)
 		GdssProp.Category.NODE_PROPERTY:
-			# A $variable holding a single number can reach a Vector2 prop; splat it
-			# like the parse-time single-value shorthand.
+			if not GDSS.transforms_enabled and prop.name.begins_with("transform_"):
+				val = prop.get_default_value()
+			# A $variable holding one number can reach a Vector2 prop; splat it.
 			if prop.type == GDSS.Type.VECTOR2 and (val is int or val is float):
 				val = Vector2(float(val), float(val))
 			var def: Variant = prop.get_default_value()
@@ -617,42 +618,41 @@ func _sync_active_state() -> void:
 
 func _start_transition(from_state: String, to_state: String, timing_state: String = "", on_finished: Callable = Callable()) -> void:
 	# timing_state selects which block supplies transition_time/func/type (defaults to
-	# to_state; on_show/on_hide events pass their own key). on_finished fires after the
-	# tween completes (or immediately if there's nothing to tween) - used to hide on on_hide.
+	# to_state). on_finished fires after the tween - used to hide on on_hide.
 	var ts: String = timing_state if not timing_state.is_empty() else to_state
-	var transition_time: float = _get_parsed_val("transition_time", ts, 0.0)
+	var transition_time: float = GDSS.scaled_duration(float(_get_parsed_val("transition_time", ts, 0.0)))
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
 		_tweened_values.clear()
 		if on_finished.is_valid():
 			on_finished.call()
 		return
-
+	
 	var node_type: GdssNodeType = _resolve_gdss_node()
-	var default_state: String = node_type.states[0] if node_type and not node_type.states.is_empty() else "all"
+	var default_state: String = node_type.states.get(0) if node_type and not node_type.states.is_empty() else "all"
 	var resolved_from: String = from_state if not from_state.is_empty() else default_state
-
+	
 	var trans: Tween.TransitionType = _resolve_trans_val(_get_parsed_val("transition_func", ts, "LINEAR"))
 	var ease: Tween.EaseType = _resolve_ease_val(_get_parsed_val("transition_type", ts, "EASE_OUT"))
-
+	
 	var tweener_count: int = 0
 	var pending_tween: Tween = (Engine.get_main_loop() as SceneTree).create_tween()
 	pending_tween.set_parallel(true)
 	pending_tween.set_trans(trans)
 	pending_tween.set_ease(ease)
-
+	
 	var animatable: Dictionary = _get_animatable_props()
-
+	
 	for prop_name: String in animatable:
-		var prop: GdssProp = animatable[prop_name]
+		var prop: GdssProp = animatable.get(prop_name)
 		var is_style: bool = prop.category == GdssProp.Category.STYLE
-
+		
 		var from_raw: Variant = _get_raw_parsed_val(prop_name, resolved_from)
 		var to_raw: Variant = _get_raw_parsed_val(prop_name, to_state)
-
+		
 		if from_raw is Dictionary and (from_raw as Dictionary).has("__gdss_method__") and \
 		   to_raw is Dictionary and (to_raw as Dictionary).has("__gdss_method__") and \
-		   (from_raw as Dictionary)["__gdss_method__"] == (to_raw as Dictionary)["__gdss_method__"]:
-			var mn: String = (from_raw as Dictionary)["__gdss_method__"]
+		   (from_raw as Dictionary).get("__gdss_method__") == (to_raw as Dictionary).get("__gdss_method__"):
+			var mn: String = (from_raw as Dictionary).get("__gdss_method__")
 			var method: GdssMethod = GDSS._get_gdss_methods().get(mn)
 			if method != null and not method.get_tweenable_args().is_empty():
 				var from_args: Array[Variant] = _resolve_method_args(from_raw as Dictionary)
@@ -1583,20 +1583,19 @@ func _free_gpu_ci() -> void:
 func _set_param(key: StringName, value: Variant) -> void:
 	if _gpu_last.get(key) == value and _gpu_last.has(key):
 		return
-	_gpu_last[key] = value
+	_gpu_last.set(key, value)
 	_gpu_material.set_shader_parameter(key, value)
 
 
 func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
-	var bg: Variant = vals.get("bg_color", Color.TRANSPARENT)
+	var bg: Variant = _at_blur_quality(vals.get("bg_color", Color.TRANSPARENT))
 	var border_raw: Variant = vals.get("border_color", Color.TRANSPARENT)
-	var border_src: Variant = _border_base(border_raw)
+	var border_src: Variant = _at_blur_quality(_border_base(border_raw))
 	var border_sides: Array = _border_side_colors(border_raw)
 	_ensure_gpu_ci(to_canvas_item, bg is GdssBlur or border_src is GdssBlur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
-	# Every side pads the quad by its own reach plus a slice of slack for the falloff's
-	# antialiasing. A shadow tapering around a corner still spills a little past the panel
-	# on the quiet side, so each side also keeps room for its neighbours' share.
+	# Every side pads the quad by its own reach plus slack for the falloff's antialiasing,
+	# and keeps room for its neighbours' share where a shadow tapers round a corner.
 	var pad: Vector4 = Vector4.ZERO
 	if _max_side(shadow) > 0.5:
 		var spill_x: float = maxf(shadow.z, shadow.w) * _SHADOW_CORNER_SPILL
@@ -1629,6 +1628,17 @@ func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 		RenderingServer.canvas_item_clear(_gpu_ci)
 		RenderingServer.canvas_item_set_transform(_gpu_ci, xform)
 		RenderingServer.canvas_item_add_rect(_gpu_ci, quad, Color.WHITE)
+
+
+static func _at_blur_quality(value: Variant) -> Variant:
+	if not value is GdssBlur:
+		return value
+	match GDSS.blur_quality:
+		GDSS.BlurQuality.OFF:
+			return (value as GdssBlur).tint
+		GDSS.BlurQuality.LOW:
+			return (value as GdssBlur).to_plain()
+	return value
 
 
 func _push_fill(bg: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
