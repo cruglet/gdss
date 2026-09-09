@@ -152,6 +152,7 @@ var current_state: String = "":
 		var previous: String = current_state
 		if not previous.is_empty():
 			_start_transition(previous, s)
+			_play_sfx(s)
 		current_state = s
 		_apply_overrides(not previous.is_empty())
 		if ref != null:
@@ -853,7 +854,19 @@ func _play_event(event_key: String) -> void:
 	if node_type == null or not _resolve_entry().has(event_key):
 		return
 	_start_transition(event_key, _resting_state(node_type, node), event_key)
+	_play_sfx(event_key)
 	_apply_overrides(false)
+
+
+func _play_sfx(state_key: String) -> void:
+	if not GDSS.sfx_enabled:
+		return
+	var state_dict: Variant = _resolve_entry().get(state_key)
+	if not state_dict is Dictionary or not (state_dict as Dictionary).has("sfx"):
+		return
+	var stream: Variant = _get_parsed_val("sfx", state_key, null)
+	if stream is AudioStream:
+		GDSS.play_sfx(stream as AudioStream)
 
 
 func _ev_pressed() -> void: _play_event("on_pressed")

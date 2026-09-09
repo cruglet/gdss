@@ -31,6 +31,7 @@ enum Type {
 	ICON,
 	FONT,
 	VECTOR2,
+	AUDIO,
 }
 
 enum CursorType {
@@ -141,6 +142,14 @@ static var transforms_enabled: bool = true:
 			return
 		transforms_enabled = value
 		_restyle_all()
+
+## When [code]false[/code] no [code]sfx[/code] property plays. UI sound is suppressed in
+## the editor regardless, so hovering a styled node while editing stays silent.
+static var sfx_enabled: bool = true
+
+## The audio bus every [code]sfx[/code] plays on. Point it at your own "UI" bus to give the
+## player a volume slider for it. Unknown bus names fall back to the default bus.
+static var sfx_bus: StringName = &"Master"
 
 ## Runtime switch for the GPU panel shader, initialised from the
 ## [code]gdss/rendering/gpu_panels[/code] project setting. Turn it off to draw panels with
@@ -781,6 +790,18 @@ static func scaled_duration(seconds: float) -> float:
 	if not animations_enabled:
 		return 0.0
 	return maxf(seconds, 0.0) * animation_speed_scale
+
+
+## Plays a one-shot UI sound through GDSS's voice pool, the same way an [code]sfx[/code]
+## property does. Honours [member sfx_enabled] and [member sfx_bus].
+## [codeblock]
+## GDSS.play_sfx(GDSS.get_resource("SFX_CLICK"))
+## [/codeblock]
+static func play_sfx(stream: AudioStream) -> void:
+	if stream == null or not sfx_enabled or Engine.is_editor_hint():
+		return
+	if _runtime != null:
+		_runtime.play_sfx(stream)
 
 
 static func _redraw_all() -> void:

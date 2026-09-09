@@ -55,12 +55,10 @@ func _build_properties_code() -> void:
 	_make_prop("icon_color", GDSS.Type.COLOR, Color(1, 1, 1, 1), GdssProp.Category.COLOR, PackedStringArray(), PackedStringArray(["icon_hover_color", "icon_pressed_color", "icon_focus_color", "icon_disabled_color", "icon_uneditable_color", "icon_selected_color", "icon_readonly_color", "icon_unselected_color", "icon_hovered_color", "icon_hover_pressed_color", "icon_hovered_selected_color", "icon_normal_color"]))
 	_make_prop("padding", GDSS.Type.COMPOSITE4, Vector4i.ZERO, GdssProp.Category.STYLE, PackedStringArray(["padding_left", "padding_right", "padding_top", "padding_bottom"]))
 	_make_prop("shadow", GDSS.Type.COMPOSITE4, Vector4i.ZERO, GdssProp.Category.STYLE, PackedStringArray(["shadow_left", "shadow_right", "shadow_top", "shadow_bottom"]))
+	_make_prop("sfx", GDSS.Type.AUDIO, null, GdssProp.Category.STYLE)
 	_make_prop("shadow_color", GDSS.Type.COLOR, Color(0, 0, 0, 1), GdssProp.Category.STYLE)
 	_make_prop("skew_x", GDSS.Type.FLOAT, 0.0, GdssProp.Category.STYLE)
 	_make_prop("skew_y", GDSS.Type.FLOAT, 0.0, GdssProp.Category.STYLE)
-	# Godot 4.7 Control offset-transform properties, exposed under the shorter
-	# "transform_" prefix. Registered here (not just on the nodes) so the composite
-	# machinery - per-component keys, single-value splat, override patches - sees them.
 	_make_prop("transform_enabled", GDSS.Type.BOOLEAN, false, GdssProp.Category.NODE_PROPERTY)
 	_make_prop("transform_pivot", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY)
 	_make_prop("transform_pivot_ratio", GDSS.Type.VECTOR2, Vector2(0.5, 0.5), GdssProp.Category.NODE_PROPERTY)
@@ -86,12 +84,17 @@ func _build_components_code() -> void:
 	stylebox.component_name = "Stylebox"
 	stylebox.default_state = true
 	stylebox.properties = _component_props(PackedStringArray(["anti_aliasing", "bg_color", "border", "border_color", "corner_detail", "corner_radius", "cursor", "expand", "font_color", "padding", "shadow", "shadow_color", "skew_x", "skew_y"]))
-	component_list["Stylebox"] = stylebox
+	component_list.set("Stylebox", stylebox)
 	var trans: GdssComponent = GdssComponent.new()
 	trans.component_name = "Transitionable"
 	trans.default_state = true
 	trans.properties = _component_props(PackedStringArray(["transition_time", "transition_func", "transition_type"]))
-	component_list["Transitionable"] = trans
+	component_list.set("Transitionable", trans)
+	var audible: GdssComponent = GdssComponent.new()
+	audible.component_name = "Audible"
+	audible.default_state = true
+	audible.properties = _component_props(PackedStringArray(["sfx"]))
+	component_list.set("Audible", audible)
 
 
 func _build_methods_code() -> void:
@@ -103,16 +106,13 @@ func _build_methods_code() -> void:
 		GdssMethod_HsvShift.new(), GdssMethod_Invert.new(), GdssMethod_Lighten.new(),
 		GdssMethod_LinearBlurGradient.new(), GdssMethod_LinearGradient.new(),
 		GdssMethod_LiquidBlur.new(), GdssMethod_Mix.new(),
-		GdssMethod_RadialGradient.new(), GdssMethod_Rgba.new(), GdssMethod_Saturate.new(),
+		GdssMethod_RadialGradient.new(), GdssMethod_Rgba.new(), GdssMethod_Saturate.new(), GdssMethod_Sound.new(),
 		GdssMethod_Texture.new(),
 	]
 	for m: GdssMethod in methods:
-		method_list[m.method_name] = m
+		method_list.set(m.method_name, m)
 
 
-# Godot class -> the GdssNodeType subclass that styles it. Unlisted Control types use
-# GdssNodeType_Fallback. (Button-family share GdssNodeType_Button, TextEdit/CodeEdit share
-# GdssNodeType_TextEdit, Panel/PanelContainer share GdssNodeType_Panel.)
 func _instantiate_node_class(type: String) -> GdssNodeType:
 	match type:
 		"Button", "CheckBox", "CheckButton", "ColorPickerButton", "LinkButton", "MenuButton", "OptionButton":
@@ -180,17 +180,17 @@ func _build_nodes_code() -> void:
 				node.unique_properties.append(GdssProp.create("color", GDSS.Type.COLOR, Color.WHITE, GdssProp.Category.NODE_PROPERTY))
 			"TextureRect":
 				node.unique_properties.append(GdssProp.create("texture", GDSS.Type.ICON, null, GdssProp.Category.NODE_PROPERTY))
-		var ec: Dictionary[String, bool] = {}
+		var ec: Dictionary[String, bool] = {"Audible": true}
 		var cfg: Array = _node_config(type)
 		if cfg.is_empty():
 			node.is_static = true
-			ec["Stylebox"] = not theme.get_stylebox_list(type).is_empty()
-			ec["Transitionable"] = false
+			ec.set("Stylebox", not theme.get_stylebox_list(type).is_empty())
+			ec.set("Transitionable", false)
 		else:
-			node.is_static = cfg[0]
-			ec["Stylebox"] = cfg[1]
-			ec["Transitionable"] = cfg[2]
+			node.is_static = cfg.get(0)
+			ec.set("Stylebox", cfg.get(1))
+			ec.set("Transitionable", cfg.get(2))
 		node.enabled_components = ec
 		node.invalidate_theme_cache()
 		node.invalidate_props_cache()
-		node_list[type] = node
+		node_list.set(type, node)

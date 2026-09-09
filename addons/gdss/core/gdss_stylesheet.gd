@@ -436,6 +436,8 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		GDSS.Type.FLOAT:
 			if not value_str.is_valid_float():
 				errors.append(["Property '%s' expects a float value, got '%s'" % [prop_name, value_str], line])
+		GDSS.Type.AUDIO:
+			errors.append(["Property '%s' expects sound(\"res://...\") or a $resource, got '%s'" % [prop_name, value_str], line])
 		GDSS.Type.BOOLEAN:
 			if value_str.to_lower() not in ["true", "false", "1", "0"]:
 				errors.append(["Property '%s' expects a boolean (true/false), got '%s'" % [prop_name, value_str], line])

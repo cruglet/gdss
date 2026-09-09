@@ -1,0 +1,32 @@
+@tool
+class_name GdssMethod_Sound
+extends GdssMethod
+
+static var _cache: Dictionary = {}
+
+
+func _init() -> void:
+	method_name = "sound"
+	supported_prop_types = [GDSS.Type.AUDIO]
+	parameters = [
+		Param.new("path", ParamType.STRING, true, ""),
+	]
+
+
+func call_method(args: Array[Variant], node_id: int = -1, state_key: String = "") -> Variant:
+	if args.is_empty() or str(args.get(0)).is_empty():
+		return null
+	var path: String = str(args.get(0))
+	if _cache.has(path):
+		return _cache.get(path)
+	if not ResourceLoader.exists(path):
+		return null
+	var stream: AudioStream = load(path) as AudioStream
+	if stream == null:
+		return null
+	_cache.set(path, stream)
+	return stream
+
+
+func clear_live_textures() -> void:
+	_cache.clear()

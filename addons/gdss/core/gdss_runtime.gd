@@ -4,14 +4,15 @@ signal scheme_changed(scheme_name: String)
 signal globals_changed
 signal parsed_reloaded
 
-# How many frames an ambiguous tree-exit is re-checked before the node is assumed to
-# be deliberately detached rather than on its way out.
+# Frames an ambiguous tree-exit is re-checked before the node is assumed detached.
 const PURGE_GRACE_FRAMES: int = 4
+const SFX_VOICES: int = 8
 
 var _last_modified: int = 0
-# Nodes whose tree-exit was ambiguous, mapped to how many frames they have been waited
-# on. See _on_styled_node_exited.
+# Ambiguous tree-exits -> frames waited. See _on_styled_node_exited.
 var _pending_purge: Dictionary[int, int] = {}
+var _sfx_players: Array[AudioStreamPlayer] = []
+var _sfx_next: int = 0
 
 
 func _process(_delta: float) -> void:
@@ -170,27 +171,50 @@ func _ensure_parsed() -> void:
 	var data: Dictionary = _load_bundle()
 	if not data.has("parsed"):
 		return
-	var raw: Variant = data["parsed"]
+	var raw: Variant = data.get("parsed")
 	if not raw is Dictionary:
 		return
 	for key: String in (raw as Dictionary):
-		var val: Variant = (raw as Dictionary)[key]
+		var val: Variant = (raw as Dictionary).get(key)
 		if val is Dictionary:
-			GdssStylesheet.parsed[key] = val
-	if data.has("global_defaults") and data["global_defaults"] is Dictionary:
-		for key: String in (data["global_defaults"] as Dictionary):
-			var val: Variant = (data["global_defaults"] as Dictionary)[key]
-			GdssStylesheet._global_defaults[key] = val
+			GdssStylesheet.parsed.set(key, val)
+	if data.has("global_defaults") and data.get("global_defaults") is Dictionary:
+		for key: String in (data.get("global_defaults") as Dictionary):
+			var val: Variant = (data.get("global_defaults") as Dictionary).get(key)
+			GdssStylesheet._global_defaults.set(key, val)
 			if not GdssStylesheet.globals.has(key):
-				GdssStylesheet.globals[key] = val
-	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
-		for key: String in (data["instance_defaults"] as Dictionary):
-			GdssStylesheet._instance_defaults[key] = (data["instance_defaults"] as Dictionary)[key]
+				GdssStylesheet.globals.set(key, val)
+	if data.has("instance_defaults") and data.get("instance_defaults") is Dictionary:
+		for key: String in (data.get("instance_defaults") as Dictionary):
+			GdssStylesheet._instance_defaults.set(key, (data.get("instance_defaults") as Dictionary).get(key))
 		GdssStylesheet._instance_scheme_base = GdssStylesheet._instance_defaults.duplicate(true)
-	if data.has("local_vars") and data["local_vars"] is Dictionary:
-		for key: String in (data["local_vars"] as Dictionary):
-			GdssStylesheet._local_vars[key] = (data["local_vars"] as Dictionary)[key]
+	if data.has("local_vars") and data.get("local_vars") is Dictionary:
+		for key: String in (data.get("local_vars") as Dictionary):
+			GdssStylesheet._local_vars.set(key, (data.get("local_vars") as Dictionary).get(key))
 	_apply_scheme_meta(data)
+
+
+func play_sfx(stream: AudioStream) -> void:
+	var player: AudioStreamPlayer = _free_sfx_player()
+	if player == null:
+		return
+	player.bus = GDSS.sfx_bus if AudioServer.get_bus_index(GDSS.sfx_bus) != -1 else &"Master"
+	player.stream = stream
+	player.play()
+
+
+func _free_sfx_player() -> AudioStreamPlayer:
+	for player: AudioStreamPlayer in _sfx_players:
+		if not player.playing:
+			return player
+	if _sfx_players.size() < SFX_VOICES:
+		var created: AudioStreamPlayer = AudioStreamPlayer.new()
+		add_child(created)
+		_sfx_players.append(created)
+		return created
+	var reused: AudioStreamPlayer = _sfx_players.get(_sfx_next)
+	_sfx_next = wrapi(_sfx_next + 1, 0, _sfx_players.size())
+	return reused
 
 
 func _bind_tree(node: Node) -> void:
