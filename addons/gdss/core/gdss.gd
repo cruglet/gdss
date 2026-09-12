@@ -792,6 +792,55 @@ static func scaled_duration(seconds: float) -> float:
 	return maxf(seconds, 0.0) * animation_speed_scale
 
 
+## Applies the stylesheet's [code]@config[/code] entries on top of whatever the settings are
+## now. Keys the block leaves out are untouched.
+static func apply_config(values: Dictionary) -> void:
+	for key: String in values:
+		var raw: String = str(values.get(key))
+		match key:
+			"animations_enabled":
+				animations_enabled = config_bool(raw)
+			"animation_speed_scale":
+				animation_speed_scale = float(config_string(raw))
+			"blur_quality":
+				blur_quality = config_blur_quality(raw)
+			"transforms_enabled":
+				transforms_enabled = config_bool(raw)
+			"gpu_panels":
+				gpu_panels = config_bool(raw)
+			"sfx_enabled":
+				sfx_enabled = config_bool(raw)
+			"sfx_bus":
+				sfx_bus = StringName(config_string(raw))
+
+
+## Restores every runtime setting to its built-in default and then re-applies the stylesheet's
+## [code]@config[/code] block, which is the state GDSS starts a run in. Use it for an options
+## menu's "reset to defaults".
+static func reset_config() -> void:
+	animations_enabled = true
+	animation_speed_scale = 1.0
+	blur_quality = BlurQuality.HIGH
+	transforms_enabled = true
+	sfx_enabled = true
+	sfx_bus = &"Master"
+	_gpu_panels = -1
+	apply_config(GdssStylesheet.config)
+
+
+static func config_bool(raw: String) -> bool:
+	return ["true", "1"].has(config_string(raw).to_lower())
+
+
+static func config_string(raw: String) -> String:
+	return raw.strip_edges().trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
+
+
+static func config_blur_quality(raw: String) -> BlurQuality:
+	var index: int = BlurQuality.keys().find(config_string(raw).to_upper())
+	return (index if index != -1 else BlurQuality.HIGH) as BlurQuality
+
+
 ## Plays a one-shot UI sound through GDSS's voice pool, the same way an [code]sfx[/code]
 ## property does. Honours [member sfx_enabled] and [member sfx_bus].
 ## [codeblock]
@@ -802,6 +851,22 @@ static func play_sfx(stream: AudioStream) -> void:
 		return
 	if _runtime != null:
 		_runtime.play_sfx(stream)
+
+
+## Returns the resource a [code]@resources[/code] key points at, or [code]null[/code] when
+## the key is unknown or its file is missing.
+## [codeblock]
+## var logo: Texture2D = GDSS.get_resource("LOGO")
+## [/codeblock]
+static func get_resource(key: String) -> Resource:
+	var entry: Variant = GdssStylesheet.resources.get(key)
+	if not entry is Dictionary:
+		return null
+	var method: GdssMethod = _get_gdss_methods().get((entry as Dictionary).get("method"))
+	if method == null:
+		return null
+	var args: Array[Variant] = [(entry as Dictionary).get("path")]
+	return method.call_method(args) as Resource
 
 
 static func _redraw_all() -> void:

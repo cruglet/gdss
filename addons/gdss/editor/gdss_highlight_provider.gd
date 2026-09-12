@@ -10,6 +10,8 @@ var gdss_editor: GdssEditor
 static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*[:=]")
 static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*[:=]")
 static var _re_local: RegEx = RegEx.create_from_string(r"(?:^|\s)var\s+(\w+)\s*[:=]")
+static var _re_resources: RegEx = RegEx.create_from_string(r"^@resources\b")
+static var _re_entry: RegEx = RegEx.create_from_string(r"^(\w+)\s*[:=]")
 
 var _highlighter: GdssCodeHighlighter
 var _nodes: Array[String] = []
@@ -19,6 +21,7 @@ var _property_meta: Dictionary = {}
 var _global_variables: Array[String] = []
 var _local_variables: Array[String] = []
 var _instance_variables: Array[String] = []
+var _resource_variables: Array[String] = []
 var _builtin_colors: Array[String] = [
 	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
@@ -91,10 +94,11 @@ func _setup_highlighter() -> void:
 	_highlighter.global_variables = _global_variables
 	_highlighter.local_variables = _local_variables
 	_highlighter.instance_variables = _instance_variables
+	_highlighter.resource_variables = _resource_variables
 	_highlighter.enum_values = _enum_values
 	_highlighter._node_states = {}
 	for obj: GdssNodeType in GDSS._get_node_types().values():
-		_highlighter._node_states[obj.style_name] = obj.states
+		_highlighter._node_states.set(obj.style_name, obj.states)
 	_highlighter.refresh_colors()
 	editor.syntax_highlighter = _highlighter
 	_highlighter.clear_highlighting_cache()
@@ -111,6 +115,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 	var _annotation_cache: Array[int] = []
 	var _cache_dirty: bool = true
 	var value_functions: Array[String] = []
+	var resource_variables: Array[String] = []
 	var col_variable: Color
 	var col_function: Color
 	var col_event: Color
@@ -271,14 +276,16 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				while i < line_length and _is_word_char(text[i]):
 					i += 1
 				var var_name: String = text.substr(start + 1, i - start - 1)
-				if global_variables.has(var_name):
-					result[start] = {"color": col_global}
+				if resource_variables.has(var_name):
+					result.set(start, {"color": col_function})
+				elif global_variables.has(var_name):
+					result.set(start, {"color": col_global})
 				elif instance_variables.has(var_name):
-					result[start] = {"color": col_instance}
+					result.set(start, {"color": col_instance})
 				elif local_variables.has(var_name):
-					result[start] = {"color": col_variable}
+					result.set(start, {"color": col_variable})
 				else:
-					result[start] = {"color": col_default}
+					result.set(start, {"color": col_default})
 				continue
 			
 			if c == "@":
@@ -449,6 +456,7 @@ func _on_text_changed() -> void:
 	_highlighter.global_variables = _global_variables
 	_highlighter.local_variables = _local_variables
 	_highlighter.instance_variables = _instance_variables
+	_highlighter.resource_variables = _resource_variables
 	_highlighter.clear_highlighting_cache()
 	_highlighter.invalidate_cache()
 
@@ -457,9 +465,22 @@ func _parse_user_variables() -> void:
 	_global_variables.clear()
 	_local_variables.clear()
 	_instance_variables.clear()
+	_resource_variables.clear()
 	var source: String = gdss_editor.get_full_source() if gdss_editor != null else editor.text
+	var in_resources: bool = false
 	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
+		if in_resources:
+			if stripped.begins_with("}"):
+				in_resources = false
+				continue
+			var entry: RegExMatch = _re_entry.search(stripped)
+			if entry:
+				_resource_variables.append(entry.get_string(1))
+			continue
+		if _re_resources.search(stripped) != null:
+			in_resources = true
+			continue
 		var gm: RegExMatch = _re_global.search(stripped)
 		if gm:
 			_global_variables.append(gm.get_string(1))

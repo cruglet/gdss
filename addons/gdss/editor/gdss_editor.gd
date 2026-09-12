@@ -1594,4 +1594,12 @@ func _apply_swatch_color(color: Color, state: Dictionary) -> void:
 		return
 	var literal: String = "\"#%s\"" % color.to_html(color.a < 1.0)
 	code_edit.set_line(line, text.substr(0, from) + literal + text.substr(to))
+static func first_icon(names: Array[String]) -> Texture2D:
+	var editor_theme: Theme = EditorInterface.get_editor_theme()
+	for icon_name: String in names:
+		if editor_theme.has_icon(icon_name, &"EditorIcons"):
+			return editor_theme.get_icon(icon_name, &"EditorIcons")
+	return null
+
+
 	state["to"] = from + literal.length()

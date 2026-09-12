@@ -14,10 +14,13 @@ static var _instance_defaults: Dictionary = {}
 static var _instance_scheme_base: Dictionary = {}
 static var _local_vars: Dictionary = {}
 static var schemes: Dictionary[String, Dictionary] = {}
+static var resources: Dictionary[String, Dictionary] = {}
+static var config: Dictionary = {}
 static var meta: Dictionary = {}
 static var current_scheme: String = ""
 var _last_modified: int = 0
 var _saving: bool = false
+var _check_resources: Dictionary = {}
 static var _cached_states: PackedStringArray = []
 static var _composite_map: Dictionary = {}
 static var _inst: GdssStylesheet
@@ -33,6 +36,10 @@ static var _re_bad_annotation: RegEx = RegEx.create_from_string(r"^@(\w+)")
 static var _re_scheme: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)(?:\s+extends\s+(\w+))?")
 static var _re_meta: RegEx = RegEx.create_from_string(r"^@meta\b")
 static var _re_import: RegEx = RegEx.create_from_string(r"^@import\s+([\"'])(.+?)\1")
+static var _re_resources: RegEx = RegEx.create_from_string(r"^@resources\b")
+static var _re_config: RegEx = RegEx.create_from_string(r"^@config\b")
+static var _re_resource_value: RegEx = RegEx.create_from_string(r"^(\w+)\s*\(\s*[\"'](.*?)[\"']\s*\)$")
+
 
 static func get_instance() -> GdssStylesheet:
 	return _inst
@@ -157,6 +164,8 @@ func _is_quoted_literal(s: String) -> bool:
 
 
 func _is_undefined_var(var_name: String, declared_vars: Dictionary) -> bool:
+	if resources.has(var_name) or _check_resources.has(var_name):
+		return false
 	return not declared_vars.has(var_name) and not _global_defaults.has(var_name) and not _instance_defaults.has(var_name)
 
 
@@ -373,10 +382,102 @@ func _check_calc_value(value_str: String, declared_vars: Dictionary, errors: Arr
 		errors.append(["calc() expression is incomplete", line])
 
 
+func _collect_check_resources(blocks: Array) -> void:
+	_check_resources.clear()
+	for block: Dictionary in blocks:
+		if block.get("kind") != "resources" or block.get("malformed"):
+			continue
+		for entry: Dictionary in block.get("entries"):
+			var value: RegExMatch = _re_resource_value.search(str(entry.get("value_str")).strip_edges())
+			if value != null:
+				_check_resources.set(entry.get("key"), {"method": value.get_string(1), "path": value.get_string(2)})
+
+
+func _check_config_entries(block: Dictionary, errors: Array[Array]) -> void:
+	var seen: Dictionary = {}
+	for entry: Dictionary in block.get("entries"):
+		var key: String = entry.get("key")
+		var line: int = entry.get("line")
+		var raw: String = str(entry.get("value_str")).strip_edges()
+		var kind: String = GDSS.CONFIG_KEYS.get(key, "")
+		if kind.is_empty():
+			errors.append(["Unknown @config key '%s'. Expected one of: %s" % [key, ", ".join(GDSS.CONFIG_KEYS.keys())], line])
+			continue
+		if seen.has(key):
+			errors.append(["@config key '%s' is set more than once" % key, line])
+		seen.set(key, true)
+		if raw.is_empty():
+			errors.append(["@config key '%s' has no value" % key, line])
+			continue
+		match kind:
+			"bool":
+				if not ["true", "false", "1", "0"].has(raw.to_lower()):
+					errors.append(["@config '%s' expects true or false, got '%s'" % [key, raw], line])
+			"float":
+				if not GDSS.config_string(raw).is_valid_float():
+					errors.append(["@config '%s' expects a number, got '%s'" % [key, raw], line])
+			"BlurQuality":
+				if not GDSS.BlurQuality.keys().has(GDSS.config_string(raw).to_upper()):
+					errors.append(["@config '%s' expects one of: %s" % [key, ", ".join(GDSS.BlurQuality.keys())], line])
+
+
+func _check_resource_entries(block: Dictionary, errors: Array[Array]) -> void:
+	var methods: PackedStringArray = resource_methods()
+	var seen: Dictionary = {}
+	for entry: Dictionary in block.get("entries"):
+		var key: String = entry.get("key")
+		var line: int = entry.get("line")
+		var raw_value: String = str(entry.get("value_str")).strip_edges()
+		if not key.is_valid_identifier():
+			errors.append(["'%s' is not a valid resource key" % key, line])
+			continue
+		if seen.has(key):
+			errors.append(["Resource '%s' is already declared" % key, line])
+		seen.set(key, true)
+		if raw_value.is_empty():
+			errors.append(["Resource '%s' has no value. Expected: %s: font(\"res://...\")" % [key, key], line])
+			continue
+		var value: RegExMatch = _re_resource_value.search(raw_value)
+		if value == null:
+			errors.append(["Resource '%s' expects a loader call, like font(\"res://...\")" % key, line])
+			continue
+		var method_name: String = value.get_string(1)
+		var path: String = value.get_string(2)
+		if not methods.has(method_name):
+			errors.append(["'%s()' does not load a resource. Expected one of: %s" % [method_name, ", ".join(methods)], line])
+			continue
+		if path.is_empty():
+			errors.append(["Resource '%s' has no path" % key, line])
+		elif not ResourceLoader.exists(path):
+			errors.append(["Resource '%s' points at a missing file: %s" % [key, path], line])
+		elif not _loads_as(path, method_name):
+			errors.append(["Resource '%s' is not a valid %s(): %s" % [key, method_name, path], line])
+
+
+func _loads_as(path: String, method_name: String) -> bool:
+	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
+	if method == null:
+		return false
+	var args: Array[Variant] = [path]
+	return method.call_method(args) != null
+
+
+func _resource_entry(name: String) -> Dictionary:
+	if _check_resources.has(name):
+		return _check_resources.get(name)
+	return resources.get(name, {})
+
+
+func _check_resource_use(name: String, entry: Dictionary, prop_name: String, actual_type: GDSS.Type, known_methods: Dictionary, errors: Array[Array], line: int) -> void:
+	var method: GdssMethod = known_methods.get(entry.get("method"))
+	if method == null or method.supported_prop_types.has(actual_type):
+		return
+	errors.append(["Resource '$%s' is a %s(), which property '%s' cannot take" % [name, method.method_name, prop_name], line])
+
+
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
 	var is_component: bool = prop.composite_of.has(prop_name)
-	# A per-side color holds a whole color, so it takes the same methods the shorthand
-	# does; the numeric composites only ever hold a plain number.
+	# Per-side colors take the shorthand's methods; numeric composites only hold numbers.
 	var is_color_component: bool = is_component and prop.type == GDSS.Type.COLOR
 	if not _is_quoted_literal(value_str) and value_str.contains("("):
 		if is_component and not is_color_component:
@@ -401,7 +502,9 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		for part: String in parts:
 			if part.begins_with("$"):
 				var var_name: String = part.substr(1)
-				if _is_undefined_var(var_name, declared_vars):
+				if not _resource_entry(var_name).is_empty():
+					errors.append(["Resource '$%s' cannot be a component of '%s'" % [var_name, prop_name], line])
+				elif _is_undefined_var(var_name, declared_vars):
 					errors.append(["Undefined variable '$%s'" % var_name, line])
 			elif not part.is_valid_int():
 				errors.append(["Property '%s' expects all integer components, got '%s'" % [prop_name, part], line])
@@ -415,7 +518,9 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 		for part: String in parts:
 			if part.begins_with("$"):
 				var var_name: String = part.substr(1)
-				if _is_undefined_var(var_name, declared_vars):
+				if not _resource_entry(var_name).is_empty():
+					errors.append(["Resource '$%s' cannot be a component of '%s'" % [var_name, prop_name], line])
+				elif _is_undefined_var(var_name, declared_vars):
 					errors.append(["Undefined variable '$%s'" % var_name, line])
 			elif not part.is_valid_float():
 				errors.append(["Property '%s' expects numeric components, got '%s'" % [prop_name, part], line])
@@ -423,6 +528,10 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 	
 	if value_str.begins_with("$"):
 		var var_name: String = value_str.substr(1)
+		var entry: Dictionary = _resource_entry(var_name)
+		if not entry.is_empty():
+			_check_resource_use(var_name, entry, prop_name, actual_type, known_methods, errors, line)
+			return
 		if _is_undefined_var(var_name, declared_vars):
 			errors.append(["Undefined variable '$%s'" % var_name, line])
 		return
@@ -450,7 +559,8 @@ func check_errors(source: String) -> Array[Array]:
 	var errors: Array[Array] = []
 	_check_separator_mix(_strip_annotation_blocks(source)["cleaned"], errors)
 	var pre: Dictionary = _strip_annotation_blocks(_normalize_separators(source))
-	var lines: PackedStringArray = (pre["cleaned"] as String).split("\n")
+	_collect_check_resources(pre.get("blocks"))
+	var lines: PackedStringArray = (pre.get("cleaned") as String).split("\n")
 	var known_selectors: Array = GDSS._get_node_types().keys()
 	var known_states: PackedStringArray = _get_known_states()
 	var known_methods: Dictionary = GDSS._get_gdss_methods()
@@ -657,35 +767,41 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 	var default_scheme: String = ""
 	var default_line: int = -1
 	for block: Dictionary in blocks:
-		var label: String = "@scheme" if block["kind"] == "scheme" else "@meta"
-		if block["malformed"]:
+		var label: String = "@" + str(block.get("kind")) if block.get("kind") != "meta" else "@meta"
+		if block.get("malformed"):
 			errors.append(["Expected '{' on the same line as %s" % label, block["header_line"]])
 			continue
 		if block.get("unterminated", false):
 			errors.append(["Unclosed brace '{' on %s block" % label, block["header_line"]])
 			continue
-		if block["kind"] == "scheme":
-			scheme_names[block["name"]] = true
+		if block.get("kind") == "config":
+			_check_config_entries(block, errors)
+			continue
+		if block.get("kind") == "resources":
+			_check_resource_entries(block, errors)
+			continue
+		if block.get("kind") == "scheme":
+			scheme_names.set(block.get("name"), true)
 			var block_parent: String = str(block.get("parent", ""))
 			if not block_parent.is_empty():
-				scheme_parents[block["name"]] = block_parent
-				scheme_lines[block["name"]] = block["header_line"]
-			for entry: Dictionary in block["entries"]:
-				var value_str: String = entry["value_str"]
+				scheme_parents.set(block.get("name"), block_parent)
+				scheme_lines.set(block.get("name"), block.get("header_line"))
+			for entry: Dictionary in block.get("entries"):
+				var value_str: String = entry.get("value_str")
 				if value_str.is_empty():
 					errors.append(["Scheme variable '%s' has no value" % entry["key"], entry["line"]])
 					continue
-				if not declared_globals.has(entry["key"]) and not declared_instances.has(entry["key"]) and not _global_defaults.has(entry["key"]) and not _instance_defaults.has(entry["key"]):
+				if not declared_globals.has(entry.get("key")) and not declared_instances.has(entry.get("key")) and not _global_defaults.has(entry.get("key")) and not _instance_defaults.has(entry.get("key")):
 					errors.append(["Scheme '%s' overrides '%s', which is not an @global or @instance var." % [block["name"], entry["key"]], entry["line"]])
 				if value_str.begins_with("$"):
 					errors.append(["Scheme value for '%s' must be a literal; variable references aren't supported inside schemes." % entry["key"], entry["line"]])
 		else:
-			for entry: Dictionary in block["entries"]:
-				if (entry["value_str"] as String).is_empty():
+			for entry: Dictionary in block.get("entries"):
+				if (entry.get("value_str") as String).is_empty():
 					errors.append(["Metadata key '%s' has no value" % entry["key"], entry["line"]])
-				elif entry["key"] == "default_scheme":
-					default_scheme = _parse_meta_value(entry["value_str"])
-					default_line = entry["line"]
+				elif entry.get("key") == "default_scheme":
+					default_scheme = _parse_meta_value(entry.get("value_str"))
+					default_line = entry.get("line")
 	for scheme_name: String in scheme_parents:
 		var parent: String = str(scheme_parents.get(scheme_name))
 		var line: int = int(scheme_lines.get(scheme_name, 0))
@@ -712,7 +828,7 @@ func save_current(source: String) -> void:
 	GdssStorage.write_source(GdssStorage.get_save_path(), source)
 	parsed = parse(source)
 	if check_errors(source).is_empty():
-		GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta)
+		GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta, resources, config)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
 	saved.emit()
 	parsed_changed.emit()
@@ -811,6 +927,8 @@ static func compile_for_export() -> PackedByteArray:
 		"instance_defaults": _instance_defaults.duplicate(true),
 		"local_vars": _local_vars.duplicate(true),
 		"schemes": schemes.duplicate(true),
+		"resources": resources.duplicate(true),
+		"config": config.duplicate(true),
 		"meta": meta.duplicate(true),
 		"parsed": parsed.duplicate(true),
 		"current_scheme": current_scheme,
@@ -822,6 +940,8 @@ static func compile_for_export() -> PackedByteArray:
 		"instance_defaults": _instance_defaults.duplicate(true),
 		"local_vars": _local_vars.duplicate(true),
 		"schemes": schemes.duplicate(true),
+		"resources": resources.duplicate(true),
+		"config": config.duplicate(true),
 		"meta": meta.duplicate(true),
 	}
 	var bytes: PackedByteArray = GdssStorage.compiled_bytes(source, bundle, FileAccess.get_modified_time(GdssStorage.get_save_path()))
@@ -830,18 +950,24 @@ static func compile_for_export() -> PackedByteArray:
 
 
 static func _restore_statics(snapshot: Dictionary) -> void:
-	globals = snapshot["globals"]
-	_global_defaults = snapshot["global_defaults"]
-	_instance_defaults = snapshot["instance_defaults"]
-	_local_vars = snapshot["local_vars"]
-	meta = snapshot["meta"]
-	current_scheme = snapshot["current_scheme"]
+	globals = snapshot.get("globals")
+	_global_defaults = snapshot.get("global_defaults")
+	_instance_defaults = snapshot.get("instance_defaults")
+	_local_vars = snapshot.get("local_vars")
+	meta = snapshot.get("meta")
+	current_scheme = snapshot.get("current_scheme")
 	parsed.clear()
-	for key: String in (snapshot["parsed"] as Dictionary):
-		parsed[key] = snapshot["parsed"][key]
+	for key: String in (snapshot.get("parsed") as Dictionary):
+		parsed.set(key, snapshot.get("parsed").get(key))
 	schemes.clear()
-	for key: String in (snapshot["schemes"] as Dictionary):
-		schemes[key] = snapshot["schemes"][key]
+	for key: String in (snapshot.get("schemes") as Dictionary):
+		schemes.set(key, snapshot.get("schemes").get(key))
+	resources.clear()
+	for key: String in (snapshot.get("resources") as Dictionary):
+		resources.set(key, snapshot.get("resources").get(key))
+	config.clear()
+	for key: String in (snapshot.get("config") as Dictionary):
+		config.set(key, snapshot.get("config").get(key))
 
 
 static var _override_entry_cache: Dictionary = {}
@@ -894,11 +1020,24 @@ static func parse_paths(paths: PackedStringArray) -> Dictionary[String, Dictiona
 	return parse_all(gathered)
 
 
+## Every method that takes a single path and loads a resource from it, so a
+## [code]@resources[/code] entry can name one. Derived from the registry, in method order.
+static func resource_methods() -> PackedStringArray:
+	var result: PackedStringArray = []
+	for method: GdssMethod in GDSS._get_gdss_methods().values():
+		if method.parameters.size() != 1:
+			continue
+		if method.parameters.get(0).type == GdssMethod.ParamType.STRING:
+			result.append(method.method_name)
+	result.sort()
+	return result
+
+
 static func _collect_imports(source: String) -> Array:
 	var result: Array = []
 	var lines: PackedStringArray = source.split("\n")
 	for i: int in lines.size():
-		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+		var stripped: String = _strip_line_comment(lines.get(i).strip_edges())
 		var m: RegExMatch = _re_import.search(stripped)
 		if m != null:
 			result.append({"path": m.get_string(2), "line": i})
@@ -1006,19 +1145,21 @@ static func parse_all(sources: PackedStringArray) -> Dictionary[String, Dictiona
 	_instance_defaults.clear()
 	_local_vars.clear()
 	schemes.clear()
+	resources.clear()
+	config.clear()
 	meta.clear()
 	_override_entry_cache.clear()
 	var known_states: PackedStringArray = _get_known_states()
 	var cleaned_sources: PackedStringArray = []
 	for source: String in sources:
 		var pre: Dictionary = _strip_annotation_blocks(_normalize_separators(source))
-		cleaned_sources.append(pre["cleaned"])
-		_accumulate_blocks(pre["blocks"], known_states)
+		cleaned_sources.append(pre.get("cleaned"))
+		_accumulate_blocks(pre.get("blocks"), known_states)
 	var local_vars: Dictionary = {}
 	for source: String in cleaned_sources:
 		var file_locals: Dictionary = _accumulate_globals(source)
 		for key: String in file_locals:
-			local_vars[key] = file_locals[key]
+			local_vars.set(key, file_locals.get(key))
 	_instance_scheme_base = _instance_defaults.duplicate(true)
 	var result: Dictionary[String, Dictionary] = {}
 	_patch_composites = true
@@ -1028,7 +1169,8 @@ static func parse_all(sources: PackedStringArray) -> Dictionary[String, Dictiona
 		_parse_block(tokens, 0, result, "", known_states)
 	_patch_composites = false
 	for selector: String in result:
-		_resolve_base_composite_patches(result[selector])
+		_resolve_base_composite_patches(result.get(selector))
+	GDSS.reset_config()
 	return result
 
 
@@ -1104,18 +1246,20 @@ static func _strip_annotation_blocks(source: String) -> Dictionary:
 	var blocks: Array[Dictionary] = []
 	var i: int = 0
 	while i < lines.size():
-		var stripped: String = _strip_line_comment(lines[i].strip_edges())
+		var stripped: String = _strip_line_comment(lines.get(i).strip_edges())
 		if _re_import.search(stripped) != null:
 			out_lines.append("")
 			i += 1
 			continue
 		var scheme_match: RegExMatch = _re_scheme.search(stripped)
 		var is_meta: bool = _re_meta.search(stripped) != null
-		if scheme_match == null and not is_meta:
-			out_lines.append(lines[i])
+		var is_resources: bool = _re_resources.search(stripped) != null
+		var is_config: bool = _re_config.search(stripped) != null
+		if scheme_match == null and not is_meta and not is_resources and not is_config:
+			out_lines.append(lines.get(i))
 			i += 1
 			continue
-		var kind: String = "scheme" if scheme_match != null else "meta"
+		var kind: String = "scheme" if scheme_match != null else ("resources" if is_resources else ("config" if is_config else "meta"))
 		var block_name: String = scheme_match.get_string(1) if scheme_match != null else ""
 		var block_parent: String = scheme_match.get_string(2) if scheme_match != null else ""
 		var header_line: int = i
@@ -1183,25 +1327,33 @@ static func _brace_delta(s: String) -> int:
 
 static func _accumulate_blocks(blocks: Array, known_states: PackedStringArray) -> void:
 	for block: Dictionary in blocks:
-		if block["malformed"]:
+		if block.get("malformed"):
 			continue
-		if block["kind"] == "scheme":
-			var name: String = block["name"]
+		if block.get("kind") == "scheme":
+			var name: String = block.get("name")
 			if not schemes.has(name):
-				schemes[name] = {}
+				schemes.set(name, {})
 			var parent: String = str(block.get("parent", ""))
 			if not parent.is_empty():
-				schemes[name][SCHEME_PARENT_KEY] = parent
-			for entry: Dictionary in block["entries"]:
-				var value_str: String = entry["value_str"]
+				schemes.get(name).set(SCHEME_PARENT_KEY, parent)
+			for entry: Dictionary in block.get("entries"):
+				var value_str: String = entry.get("value_str")
 				if value_str.is_empty():
 					continue
 				var tokens: Array[String] = _tokenize_value(value_str)
 				var consumed: Array = _consume_value(tokens, 0, known_states)
-				schemes[name][entry["key"]] = consumed[0]
+				schemes.get(name).set(entry.get("key"), consumed.get(0))
+		elif block.get("kind") == "config":
+			for entry: Dictionary in block.get("entries"):
+				config.set(entry.get("key"), entry.get("value_str"))
+		elif block.get("kind") == "resources":
+			for entry: Dictionary in block.get("entries"):
+				var value: RegExMatch = _re_resource_value.search(str(entry.get("value_str")).strip_edges())
+				if value != null:
+					resources.set(entry.get("key"), {"method": value.get_string(1), "path": value.get_string(2)})
 		else:
-			for entry: Dictionary in block["entries"]:
-				meta[entry["key"]] = _parse_meta_value(entry["value_str"])
+			for entry: Dictionary in block.get("entries"):
+				meta.set(entry.get("key"), _parse_meta_value(entry.get("value_str")))
 
 
 static func _parse_meta_value(value_str: String) -> String:
@@ -1245,8 +1397,15 @@ static func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -
 	for token: String in tokens:
 		if token.begins_with("$"):
 			var key: String = token.substr(1)
+			if resources.has(key):
+				var entry: Dictionary = resources.get(key)
+				result.append(str(entry.get("method")))
+				result.append("(")
+				result.append("\"%s\"" % entry.get("path"))
+				result.append(")")
+				continue
 			if local_vars.has(key):
-				var val: Variant = local_vars[key]
+				var val: Variant = local_vars.get(key)
 				if val is Dictionary:
 					result.append("__gdss_local_method__" + key)
 				else:

@@ -12,6 +12,7 @@ var _properties: Dictionary = {}
 var _states: Dictionary = {}
 var _property_meta: Dictionary = {}
 var _user_variables: Array[String] = []
+var _resource_variables: Array[String] = []
 var _variable_lines: Dictionary = {}
 var _methods: Array[GdssMethod] = []
 var _events: Dictionary = {}
@@ -24,6 +25,9 @@ var _hint_label: Label
 static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\s*[:=]")
 static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*[:=]")
 static var _re_local: RegEx = RegEx.create_from_string(r"^var\s+(\w+)\s*[:=]")
+static var _re_resources: RegEx = RegEx.create_from_string(r"^@resources\b")
+static var _re_config: RegEx = RegEx.create_from_string(r"^@config\b")
+static var _re_entry: RegEx = RegEx.create_from_string(r"^(\w+)\s*[:=]")
 static var _re_node_open: RegEx = RegEx.create_from_string(r"^([\w][\w\s,]*)(?::(\w+))?\s*\{")
 static var _re_variant_open: RegEx = RegEx.create_from_string(r"^:([\w][\w\s,:]*)?\s*\{")
 static var _re_scheme_open: RegEx = RegEx.create_from_string(r"^@scheme\s+(\w+)")
@@ -152,7 +156,7 @@ func _on_text_changed() -> void:
 			return
 		var context: Dictionary = _get_context()
 		var type: String = context.get("type", "")
-		if type == "property_value" or type == "variant_decl" or type == "scheme_block" or type == "meta_block":
+		if type == "property_value" or type == "variant_decl" or type == "scheme_block" or type == "meta_block" or type == "resources_block" or type == "config_block":
 			editor.request_code_completion(true)
 			return
 		editor.cancel_code_completion()
@@ -331,6 +335,10 @@ func _update_completions(word: String) -> void:
 			_complete_scheme_vars(word)
 		"meta_block":
 			_complete_meta_keys(word)
+		"resources_block":
+			_complete_resource_loaders(word)
+		"config_block":
+			_complete_config(word)
 	
 	editor.update_code_completion_options(true)
 
@@ -397,6 +405,9 @@ func _complete_states(word: String, style_name: String) -> void:
 func _complete_values(word: String, style_name: String, prop: String) -> void:
 	if word.begins_with("$"):
 		var partial: String = word.substr(1)
+		for name: String in _resource_variables:
+			if partial.is_empty() or name.to_lower().begins_with(partial.to_lower()):
+				editor.add_code_completion_option(CodeEdit.KIND_VARIABLE, "$" + name, name + " ", _completion_color, _get_icon(&"MemberMethod"))
 		for v: String in _user_variables:
 			if v.begins_with("$"):
 				var name: String = v.substr(1)
@@ -515,6 +526,10 @@ func _complete_at_directives(word: String) -> void:
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@meta", "meta {", _completion_color, _get_icon(&"MemberAnnotation"))
 	if word.is_empty() or "@import".begins_with(word):
 		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@import", "import \"", _completion_color, _get_icon(&"MemberAnnotation"))
+	if word.is_empty() or "@config".begins_with(word):
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@config", "config {", _completion_color, _get_icon(&"MemberAnnotation"))
+	if word.is_empty() or "@resources".begins_with(word):
+		editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, "@resources", "resources {", _completion_color, _get_icon(&"MemberAnnotation"))
 
 
 func _get_prop_icon(prop_def: GdssProp) -> Texture2D:
@@ -547,19 +562,23 @@ func _get_context() -> Dictionary:
 		return {"type": "scheme_block"}
 	if annotation == "meta":
 		return {"type": "meta_block"}
+	if annotation == "resources":
+		return {"type": "resources_block"}
+	if annotation == "config":
+		return {"type": "config_block"}
 	var caret_line: int = editor.get_caret_line()
 	var lines: PackedStringArray = editor.text.split("\n")
 	
 	var stack: Array[Dictionary] = []
-
+	
 	for i: int in range(caret_line):
-		var line: String = lines[i].strip_edges()
+		var line: String = lines.get(i).strip_edges()
 		var comment_idx: int = line.find("#")
 		if comment_idx != -1:
 			line = line.substr(0, comment_idx).strip_edges()
 		if line.is_empty():
 			continue
-
+		
 		var m: RegExMatch = _re_node_open.search(line)
 		if m:
 			var raw_selector: String = m.get_string(1)
@@ -656,11 +675,25 @@ func _get_context() -> Dictionary:
 
 func _parse_user_variables() -> void:
 	_user_variables.clear()
+	_resource_variables.clear()
 	_variable_lines.clear()
 	var source: String = gdss_editor.get_full_source() if gdss_editor != null else editor.text
 	var lines: PackedStringArray = source.split("\n")
+	var in_resources: bool = false
 	for line_number: int in lines.size():
-		var stripped: String = lines[line_number].strip_edges()
+		var stripped: String = lines.get(line_number).strip_edges()
+		if in_resources:
+			if stripped.begins_with("}"):
+				in_resources = false
+				continue
+			var resource_entry: RegExMatch = _re_entry.search(stripped)
+			if resource_entry:
+				_resource_variables.append(resource_entry.get_string(1))
+				_variable_lines.set(resource_entry.get_string(1), line_number)
+			continue
+		if _re_resources.search(stripped) != null:
+			in_resources = true
+			continue
 		var gm: RegExMatch = _re_global.search(stripped)
 		if gm:
 			_record_variable(gm.get_string(1), line_number)
@@ -811,6 +844,12 @@ func _annotation_block_context() -> String:
 			elif _re_meta_open.search(stripped) != null and stripped.contains("{"):
 				kind = "meta"
 				depth += _brace_count(stripped)
+			elif _re_resources.search(stripped) != null and stripped.contains("{"):
+				kind = "resources"
+				depth += _brace_count(stripped)
+			elif _re_config.search(stripped) != null and stripped.contains("{"):
+				kind = "config"
+				depth += _brace_count(stripped)
 		else:
 			depth += _brace_count(stripped)
 			if depth <= 0:
@@ -881,6 +920,35 @@ func _complete_scheme_vars(word: String) -> void:
 	for name: String in names:
 		if word.is_empty() or name.begins_with(word):
 			editor.add_code_completion_option(CodeEdit.KIND_VARIABLE, name, name + ": ", _completion_color, _get_icon(&"LocalVariable"))
+
+
+func _complete_config(word: String) -> void:
+	var line: String = editor.get_line(editor.get_caret_line())
+	var colon: int = line.find(":")
+	if colon != -1 and editor.get_caret_column() > colon:
+		_complete_config_values(line.substr(0, colon).strip_edges(), word)
+		return
+	for key: String in GDSS.CONFIG_KEYS:
+		if _matches(key, word):
+			editor.add_code_completion_option(CodeEdit.KIND_MEMBER, key, key + ": ", _completion_color, _get_icon(&"MemberProperty"))
+
+
+func _complete_config_values(key: String, word: String) -> void:
+	match str(GDSS.CONFIG_KEYS.get(key, "")):
+		"bool":
+			for value: String in ["true", "false"]:
+				if _matches(value, word):
+					editor.add_code_completion_option(CodeEdit.KIND_CONSTANT, value, value, _completion_color, _get_icon(&"bool"))
+		"BlurQuality":
+			for value: String in GDSS.BlurQuality.keys():
+				if _matches(value, word):
+					editor.add_code_completion_option(CodeEdit.KIND_ENUM, value, value, _completion_color, _get_icon(&"Curve"))
+
+
+func _complete_resource_loaders(word: String) -> void:
+	for name: String in GdssStylesheet.resource_methods():
+		if _matches(name, word):
+			editor.add_code_completion_option(CodeEdit.KIND_FUNCTION, name + "(…)", name + "(\"", _completion_color, _get_icon(&"MemberMethod"))
 
 
 func _complete_meta_keys(word: String) -> void:

@@ -4,6 +4,8 @@ extends VBoxContainer
 
 @export var code_edit: CodeEdit
 
+static var _re_entry: RegEx = RegEx.create_from_string(r"^(\w+)\s*[:=]")
+
 var _search: LineEdit
 var _tree: Tree
 var _filter: String = ""
@@ -13,6 +15,8 @@ var _state_icon: Texture2D
 var _fallback_icon: Texture2D
 var _event_icon: Texture2D
 var _scheme_icon: Texture2D
+var _resource_icon: Texture2D
+var _config_icon: Texture2D
 var _white_icon_cache: Dictionary = {}
 
 
@@ -45,6 +49,8 @@ func _load_icons() -> void:
 	_fallback_icon = _get_icon(&"Theme")
 	_event_icon = _get_icon(&"Slot")
 	_scheme_icon = _get_icon(&"BlitMaterial")
+	_resource_icon = GdssEditor.first_icon(["Resource", "ResourcePreloader", "Object", "Load"])
+	_config_icon = GdssEditor.first_icon(["Tools", "Settings", "GDScript"])
 
 
 func _queue_rebuild() -> void:
@@ -61,9 +67,10 @@ func _rebuild() -> void:
 	var open_blocks: Array[TreeItem] = [_tree.create_item()]
 	var base_selectors: Array[String] = [""]
 	var scheme_items: Dictionary = {}
+	var resources_item: TreeItem = null
 	var lines: PackedStringArray = code_edit.text.split("\n")
 	for line_number: int in lines.size():
-		var content: String = _without_comment(lines[line_number]).strip_edges()
+		var content: String = _without_comment(lines.get(line_number)).strip_edges()
 		if content.ends_with("{"):
 			var label: String = content.trim_suffix("{").strip_edges()
 			var depth: int = open_blocks.size()
@@ -83,17 +90,34 @@ func _rebuild() -> void:
 			item.set_metadata(0, line_number)
 			_decorate(item, label, depth, base_selector)
 			if not scheme_name.is_empty():
-				scheme_items[scheme_name] = item
+				scheme_items.set(scheme_name, item)
+			if label.begins_with("@resources"):
+				resources_item = item
 			open_blocks.push_back(item)
 			base_selectors.push_back(base_selector)
 		elif content.begins_with("}") and open_blocks.size() > 1:
+			if open_blocks.back() == resources_item:
+				resources_item = null
 			open_blocks.pop_back()
 			base_selectors.pop_back()
+		elif resources_item != null and open_blocks.back() == resources_item:
+			var entry: RegExMatch = _re_entry.search(content)
+			if entry != null:
+				var leaf: TreeItem = _tree.create_item(resources_item)
+				leaf.set_text(0, entry.get_string(1))
+				leaf.set_metadata(0, line_number)
+				leaf.set_icon(0, _resource_icon)
 	_rebuilding = false
 	_refilter()
 
 
 func _decorate(item: TreeItem, label: String, depth: int, base_selector: String) -> void:
+	if label.begins_with("@resources"):
+		item.set_icon(0, _resource_icon)
+		return
+	if label.begins_with("@config"):
+		item.set_icon(0, _config_icon)
+		return
 	if label.begins_with(":"):
 		item.set_icon(0, _state_icon)
 		return

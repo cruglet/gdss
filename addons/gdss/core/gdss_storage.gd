@@ -2,7 +2,7 @@
 class_name GdssStorage
 extends RefCounted
 
-const FORMAT_VERSION: int = 6
+const FORMAT_VERSION: int = 8
 
 
 static func is_current_format(raw: Variant) -> bool:
@@ -104,12 +104,12 @@ static func write_source(path: String, source: String) -> void:
 	file.close()
 
 
-static func write_cache(parsed: Dictionary, global_defaults: Dictionary, instance_defaults: Dictionary, local_vars: Dictionary, schemes: Dictionary = {}, meta: Dictionary = {}) -> void:
+static func write_cache(parsed: Dictionary, global_defaults: Dictionary, instance_defaults: Dictionary, local_vars: Dictionary, schemes: Dictionary = {}, meta: Dictionary = {}, resources: Dictionary = {}, config: Dictionary = {}) -> void:
 	var cache_file: FileAccess = FileAccess.open(get_cache_path(), FileAccess.WRITE)
 	if cache_file == null:
 		printerr("[GDSS] Failed to open cache file for writing: ", get_cache_path())
 		return
-	cache_file.store_var({"format": FORMAT_VERSION, "source_modified": get_latest_modified(), "parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": schemes, "meta": meta})
+	cache_file.store_var({"format": FORMAT_VERSION, "source_modified": get_latest_modified(), "parsed": parsed, "global_defaults": global_defaults, "instance_defaults": instance_defaults, "local_vars": local_vars, "schemes": schemes, "meta": meta, "resources": resources, "config": config})
 	cache_file.close()
 
 

@@ -33,6 +33,7 @@ func _process(_delta: float) -> void:
 func _ready() -> void:
 	GDSS._runtime = self
 	_ensure_parsed()
+	GDSS.reset_config()
 	if not Engine.is_editor_hint():
 		var default_scheme: String = GDSS.get_default_scheme()
 		if not default_scheme.is_empty() and GdssStylesheet.schemes.has(default_scheme):
@@ -89,26 +90,36 @@ func _parse_sources() -> Dictionary:
 		return {}
 	var parsed_data: Dictionary = GdssStylesheet.parse_paths(GdssStorage.get_save_paths())
 	if OS.is_debug_build() and not Engine.is_editor_hint():
-		GdssStorage.write_cache(parsed_data, GdssStylesheet._global_defaults, GdssStylesheet._instance_defaults, GdssStylesheet._local_vars, GdssStylesheet.schemes, GdssStylesheet.meta)
+		GdssStorage.write_cache(parsed_data, GdssStylesheet._global_defaults, GdssStylesheet._instance_defaults, GdssStylesheet._local_vars, GdssStylesheet.schemes, GdssStylesheet.meta, GdssStylesheet.resources, GdssStylesheet.config)
 	return {
 		"parsed": parsed_data,
 		"global_defaults": GdssStylesheet._global_defaults.duplicate(true),
 		"instance_defaults": GdssStylesheet._instance_defaults.duplicate(true),
 		"local_vars": GdssStylesheet._local_vars.duplicate(true),
 		"schemes": GdssStylesheet.schemes.duplicate(true),
+		"resources": GdssStylesheet.resources.duplicate(true),
+		"config": GdssStylesheet.config.duplicate(true),
 		"meta": GdssStylesheet.meta.duplicate(true),
 	}
 
 
 func _apply_scheme_meta(data: Dictionary) -> void:
-	if data.has("schemes") and data["schemes"] is Dictionary:
+	if data.has("resources") and data.get("resources") is Dictionary:
+		GdssStylesheet.resources.clear()
+		for key: String in (data.get("resources") as Dictionary):
+			GdssStylesheet.resources.set(key, (data.get("resources") as Dictionary).get(key))
+	if data.has("config") and data.get("config") is Dictionary:
+		GdssStylesheet.config.clear()
+		for key: String in (data.get("config") as Dictionary):
+			GdssStylesheet.config.set(key, (data.get("config") as Dictionary).get(key))
+	if data.has("schemes") and data.get("schemes") is Dictionary:
 		GdssStylesheet.schemes.clear()
-		for key: String in (data["schemes"] as Dictionary):
-			GdssStylesheet.schemes[key] = (data["schemes"] as Dictionary)[key]
-	if data.has("meta") and data["meta"] is Dictionary:
+		for key: String in (data.get("schemes") as Dictionary):
+			GdssStylesheet.schemes.set(key, (data.get("schemes") as Dictionary).get(key))
+	if data.has("meta") and data.get("meta") is Dictionary:
 		GdssStylesheet.meta.clear()
-		for key: String in (data["meta"] as Dictionary):
-			GdssStylesheet.meta[key] = (data["meta"] as Dictionary)[key]
+		for key: String in (data.get("meta") as Dictionary):
+			GdssStylesheet.meta.set(key, (data.get("meta") as Dictionary).get(key))
 
 
 func _reload_parsed() -> void:
@@ -116,33 +127,34 @@ func _reload_parsed() -> void:
 	if not data.has("parsed"):
 		return
 	GdssStylesheet._override_entry_cache.clear()
-	var raw: Variant = data["parsed"]
+	var raw: Variant = data.get("parsed")
 	if not raw is Dictionary:
 		return
 	var parsed_data: Dictionary = raw
 	GdssStylesheet.parsed.clear()
 	for key: String in parsed_data:
-		var val: Variant = parsed_data[key]
+		var val: Variant = parsed_data.get(key)
 		if val is Dictionary:
-			GdssStylesheet.parsed[key] = val
-	if data.has("local_vars") and data["local_vars"] is Dictionary:
-		var local_vars: Dictionary = data["local_vars"]
+			GdssStylesheet.parsed.set(key, val)
+	if data.has("local_vars") and data.get("local_vars") is Dictionary:
+		var local_vars: Dictionary = data.get("local_vars")
 		GdssStylesheet._local_vars.clear()
 		for key: String in local_vars:
-			GdssStylesheet._local_vars[key] = local_vars[key]
+			GdssStylesheet._local_vars.set(key, local_vars.get(key))
 	_apply_scheme_meta(data)
-	if data.has("global_defaults") and data["global_defaults"] is Dictionary:
-		var global_defaults: Dictionary = data["global_defaults"]
+	GDSS.reset_config()
+	if data.has("global_defaults") and data.get("global_defaults") is Dictionary:
+		var global_defaults: Dictionary = data.get("global_defaults")
 		GdssStylesheet._global_defaults.clear()
 		for key: String in global_defaults:
-			GdssStylesheet._global_defaults[key] = global_defaults[key]
+			GdssStylesheet._global_defaults.set(key, global_defaults.get(key))
 			if not GdssStylesheet.globals.has(key):
-				GdssStylesheet.globals[key] = global_defaults[key]
-	if data.has("instance_defaults") and data["instance_defaults"] is Dictionary:
-		var instance_defaults: Dictionary = data["instance_defaults"]
+				GdssStylesheet.globals.set(key, global_defaults.get(key))
+	if data.has("instance_defaults") and data.get("instance_defaults") is Dictionary:
+		var instance_defaults: Dictionary = data.get("instance_defaults")
 		GdssStylesheet._instance_defaults.clear()
 		for key: String in instance_defaults:
-			GdssStylesheet._instance_defaults[key] = instance_defaults[key]
+			GdssStylesheet._instance_defaults.set(key, instance_defaults.get(key))
 		GdssStylesheet._instance_scheme_base = GdssStylesheet._instance_defaults.duplicate(true)
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		if method.returns_texture:
