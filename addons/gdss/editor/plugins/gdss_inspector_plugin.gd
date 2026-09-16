@@ -198,6 +198,12 @@ class GdssClassesProperty extends EditorProperty:
 		line.focus_exited.connect(_commit_line.bind(index, option, line))
 		row.add_child(option)
 		row.add_child(line)
+		var edit_button: Button = Button.new()
+		_apply_icon(edit_button, &"Edit", "→")
+		edit_button.tooltip_text = "Open this class in the GDSS editor"
+		edit_button.disabled = not existing.has(value)
+		edit_button.pressed.connect(_on_edit_in_gdss.bind(value))
+		row.add_child(edit_button)
 		var up_button: Button = Button.new()
 		_apply_icon(up_button, &"MoveUp", "↑")
 		up_button.tooltip_text = "Move up"
@@ -216,6 +222,12 @@ class GdssClassesProperty extends EditorProperty:
 		remove_button.pressed.connect(_on_remove.bind(index))
 		row.add_child(remove_button)
 		return row
+	
+	func _on_edit_in_gdss(value: String) -> void:
+		var gdss_editor: GdssEditor = GdssEditor.instance()
+		if gdss_editor != null:
+			gdss_editor.goto_symbol(GdssSymbols.Kind.CLASS, value)
+
 
 	func _on_option_selected(item_index: int, row_index: int, option: OptionButton, line: LineEdit) -> void:
 		if _updating:

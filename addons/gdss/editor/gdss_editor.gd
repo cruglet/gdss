@@ -3,6 +3,7 @@ class_name GdssEditor
 extends Node
 
 static var _code_editor_ref: CodeEdit
+static var _inst: GdssEditor
 static var _re_hex: RegEx = RegEx.create_from_string(r"\"(#[0-9A-Fa-f]{3,8})\"")
 static var _re_word: RegEx = RegEx.create_from_string(r"[A-Za-z_][A-Za-z_0-9]*")
 static var _auto_checked: bool = false
@@ -59,6 +60,14 @@ var _search_index: int = -1
 var _zoom_menu: PopupMenu
 var _file_menu: PopupMenu
 var _recent_menu: PopupMenu
+var _refs_panel: GdssReferencesPanel
+var _bottom_split: VSplitContainer
+var _bottom_frame: PanelContainer
+var _bottom_dock: VBoxContainer
+var _symbol_index: GdssSymbols.Index
+var _symbol_index_dirty: bool = true
+var _occurrences: Array[Vector3i] = []
+var _occurrence_color: Color
 
 enum {
 	MENU_SAVE,
@@ -80,6 +89,9 @@ enum {
 	MENU_FOLD_ALL,
 	MENU_UNFOLD_ALL,
 	MENU_CHECK_UPDATE,
+	MENU_RENAME_SYMBOL,
+	MENU_FIND_REFS,
+	MENU_PROBLEMS,
 }
 
 var file_name: String:
@@ -98,6 +110,7 @@ func _ready() -> void:
 	
 	name = "GDSS"
 	_code_editor_ref = code_edit
+	_inst = self
 	error_label.add_theme_font_override(&"font", EditorInterface.get_editor_theme().get_font(&"expression", &"EditorFonts"))
 	error_label.add_theme_color_override(&"font_color", EditorInterface.get_editor_theme().get_color(&"error_color", &"Editor"))
 	error_label.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -126,6 +139,7 @@ func _ready() -> void:
 	_setup_stylesheet()
 	_setup_chunk_tabs()
 	_setup_search()
+	_setup_symbols()
 	_setup_color_swatches()
 	_update_editor()
 	_on_code_edit_caret_changed()
@@ -551,6 +565,10 @@ func _setup_stylesheet() -> void:
 
 func _on_source_changed() -> void:
 	_prompt_save()
+	_symbol_index_dirty = true
+	if not _occurrences.is_empty():
+		_occurrences.clear()
+		code_edit.queue_redraw()
 	_error_timer.start()
 
 
@@ -562,6 +580,8 @@ func _recheck_errors() -> void:
 	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
 	if stylesheet != null:
 		display_errors(stylesheet.check_errors(get_full_source()))
+	symbol_index()
+	_refresh_occurrences()
 
 
 func _on_stylesheet_source_loaded(source: String) -> void:
@@ -628,6 +648,8 @@ func _on_code_edit_input(event: InputEvent) -> void:
 			font_size -= 2
 			_apply_font_size()
 			code_edit.get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_LEFT and _open_import_at(mb.position):
+			code_edit.get_viewport().set_input_as_handled()
 		return
 	if not event is InputEventKey:
 		return
@@ -665,6 +687,15 @@ func _on_code_edit_input(event: InputEvent) -> void:
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_F8:
 		_goto_error(-1 if key.shift_pressed else 1)
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_ESCAPE and _bottom_frame != null and _bottom_frame.visible:
+		close_bottom_panel()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_F2:
+		_start_rename()
+		code_edit.get_viewport().set_input_as_handled()
+	if key.keycode == KEY_F12 and key.shift_pressed:
+		_find_references()
 		code_edit.get_viewport().set_input_as_handled()
 	if key.keycode == KEY_D and key.is_command_or_control_pressed() and key.shift_pressed and Engine.is_editor_hint():
 		EditorInterface.distraction_free_mode = not EditorInterface.distraction_free_mode
@@ -720,6 +751,10 @@ func _setup_menu_bar() -> void:
 	edit_menu.add_item("Move Line Up  (Alt+Up)", MENU_MOVE_UP)
 	edit_menu.add_item("Move Line Down  (Alt+Down)", MENU_MOVE_DOWN)
 	edit_menu.add_item("Select Next Occurrence  (Ctrl+D)", MENU_SELECT_NEXT)
+	edit_menu.add_separator()
+	edit_menu.add_item("Rename Symbol  (F2)", MENU_RENAME_SYMBOL)
+	edit_menu.add_item("Find References  (Shift+F12)", MENU_FIND_REFS)
+	edit_menu.add_item("Show Problems", MENU_PROBLEMS)
 	edit_menu.add_separator()
 	edit_menu.add_item("Next Error  (F8)", MENU_NEXT_ERROR)
 	edit_menu.add_item("Previous Error  (Shift+F8)", MENU_PREV_ERROR)
@@ -778,6 +813,12 @@ func _on_menu_id_pressed(id: int) -> void:
 			code_edit.unfold_all_lines()
 		MENU_CHECK_UPDATE:
 			_check_for_updates()
+		MENU_RENAME_SYMBOL:
+			_start_rename()
+		MENU_FIND_REFS:
+			_find_references()
+		MENU_PROBLEMS:
+			show_problems()
 
 
 func _toggle_comment() -> void:
@@ -1035,17 +1076,18 @@ func _replace_all() -> void:
 
 func _on_code_edit_caret_changed() -> void:
 	caret_pos_label.text = "%s:%s" % [code_edit.get_caret_line() + 1, code_edit.get_caret_column()]
+	_refresh_occurrences()
 
 
 func _convert_spaces_to_tabs() -> void:
 	var lines: PackedStringArray = code_edit.text.split("\n")
 	for i: int in lines.size():
-		var line: String = lines[i]
+		var line: String = lines.get(i)
 		var tab_count: int = 0
 		while line.begins_with("    "):
 			line = line.substr(4)
 			tab_count += 1
-		lines[i] = "\t".repeat(tab_count) + line
+		lines.set(i, "\t".repeat(tab_count) + line)
 	var caret_line: int = code_edit.get_caret_line()
 	var caret_col: int = code_edit.get_caret_column()
 	code_edit.text = "\n".join(lines)
@@ -1086,11 +1128,17 @@ func _user_saved(flash: bool = true) -> void:
 
 
 func _show_saved() -> void:
+	_flash("Saved!")
+
+
+func _flash(message: String, success: bool = true) -> void:
 	if _saved_label == null:
 		return
 	if _saved_tween != null and _saved_tween.is_valid():
 		_saved_tween.kill()
-	_saved_label.text = "Saved!"
+	var editor_theme: Theme = EditorInterface.get_editor_theme()
+	_saved_label.add_theme_color_override(&"font_color", editor_theme.get_color(&"success_color" if success else &"warning_color", &"Editor"))
+	_saved_label.text = message
 	_saved_label.modulate.a = 1.0
 	_saved_tween = create_tween().set_ease(Tween.EASE_IN)
 	_saved_tween.tween_interval(0.8)
@@ -1216,6 +1264,7 @@ func _insert_meta_at_top(content: String, block_text: String) -> String:
 	return "\n".join(result)
 
 
+const BOTTOM_PANEL_HEIGHT: float = 220.0
 const RECENT_KEY: String = "gdss/editor/recent_files"
 const RECENT_MAX: int = 10
 
@@ -1561,39 +1610,106 @@ func _on_swatch_gui_input(event: InputEvent) -> void:
 	if mb.button_index != MOUSE_BUTTON_LEFT or not mb.pressed:
 		return
 	for hit: Dictionary in _swatch_hitboxes:
-		if hit["rect"].has_point(mb.position):
+		if hit.get("rect").has_point(mb.position):
 			_open_swatch_picker(hit)
 			code_edit.accept_event()
 			return
 
 
 func _open_swatch_picker(hit: Dictionary) -> void:
-	var text: String = code_edit.get_line(hit["line"])
-	if hit["to"] > text.length():
+	var text: String = code_edit.get_line(hit.get("line"))
+	if hit.get("to") > text.length():
 		return
-	var state: Dictionary = {"line": hit["line"], "from": hit["from"], "to": hit["to"]}
+	var state: Dictionary = {"line": hit.get("line"), "from": hit.get("from"), "to": hit.get("to")}
 	var popup: PopupPanel = PopupPanel.new()
 	var picker: ColorPicker = ColorPicker.new()
-	picker.color = Color.from_string(text.substr(hit["from"], hit["to"] - hit["from"]).strip_edges().trim_prefix("\"").trim_suffix("\""), Color.WHITE)
+	picker.color = Color.from_string(text.substr(hit.get("from"), hit.get("to") - hit.get("from")).strip_edges().trim_prefix("\"").trim_suffix("\""), Color.WHITE)
 	picker.color_changed.connect(_apply_swatch_color.bind(state))
 	popup.add_child(picker)
 	popup.popup_hide.connect(popup.queue_free)
 	EditorInterface.get_base_control().add_child(popup)
-	var origin: Vector2 = code_edit.get_screen_position() + hit["rect"].position + Vector2(0, hit["rect"].size.y)
+	var origin: Vector2 = code_edit.get_screen_position() + hit.get("rect").position + Vector2(0, hit.get("rect").size.y)
 	popup.popup(Rect2i(Vector2i(origin), Vector2i.ZERO))
 
 
 func _apply_swatch_color(color: Color, state: Dictionary) -> void:
-	var line: int = state["line"]
+	var line: int = state.get("line")
 	if line < 0 or line >= code_edit.get_line_count():
 		return
 	var text: String = code_edit.get_line(line)
-	var from: int = state["from"]
-	var to: int = state["to"]
+	var from: int = state.get("from")
+	var to: int = state.get("to")
 	if from < 0 or to > text.length():
 		return
 	var literal: String = "\"#%s\"" % color.to_html(color.a < 1.0)
 	code_edit.set_line(line, text.substr(0, from) + literal + text.substr(to))
+	state.set("to", from + literal.length())
+
+
+static func instance() -> GdssEditor:
+	return _inst
+
+
+## A solid background for the editor's docked panels. The editor theme leaves some panel
+## styleboxes empty, so the first one that actually paints wins, and a flat box built from
+## the editor's own base colour is the last resort.
+static func editor_panel_stylebox() -> StyleBox:
+	var editor_theme: Theme = EditorInterface.get_editor_theme()
+	for type: StringName in [&"Panel", &"Tree", &"ItemList"]:
+		if not editor_theme.has_stylebox(&"panel", type):
+			continue
+		var box: StyleBox = editor_theme.get_stylebox(&"panel", type)
+		if box is StyleBoxEmpty:
+			continue
+		if box is StyleBoxFlat and (box as StyleBoxFlat).bg_color.a <= 0.0:
+			continue
+		return box
+	var flat: StyleBoxFlat = StyleBoxFlat.new()
+	flat.bg_color = editor_theme.get_color(&"base_color", &"Editor") if editor_theme.has_color(&"base_color", &"Editor") else Color(0.13, 0.14, 0.17)
+	return flat
+
+
+func _setup_symbols() -> void:
+	var split: Control = code_edit.get_parent() as Control
+	if split == null:
+		return
+	var raw: Variant = EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/word_highlighted_color")
+	_occurrence_color = raw if raw is Color else Color(0.45, 0.6, 1.0, 0.25)
+	_occurrence_color.a = minf(_occurrence_color.a, 0.35)
+	_setup_bottom_dock(split)
+	_refs_panel = GdssReferencesPanel.new()
+	_refs_panel.editor = self
+	_refs_panel.jump_requested.connect(_on_jump_requested)
+	_add_bottom_panel(_refs_panel)
+	if not code_edit.draw.is_connected(_draw_occurrences):
+		code_edit.draw.connect(_draw_occurrences)
+
+
+func _setup_bottom_dock(split: Control) -> void:
+	var inner_box: Node = split.get_parent()
+	var slot: int = split.get_index()
+	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_bottom_split = VSplitContainer.new()
+	_bottom_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_bottom_frame = PanelContainer.new()
+	_bottom_frame.custom_minimum_size = Vector2(0, 150)
+	_bottom_frame.visible = false
+	_bottom_frame.add_theme_stylebox_override(&"panel", editor_panel_stylebox())
+	var dock_margin: MarginContainer = MarginContainer.new()
+	dock_margin.add_theme_constant_override(&"margin_left", 4)
+	dock_margin.add_theme_constant_override(&"margin_right", 4)
+	dock_margin.add_theme_constant_override(&"margin_top", 4)
+	dock_margin.add_theme_constant_override(&"margin_bottom", 4)
+	_bottom_dock = VBoxContainer.new()
+	dock_margin.add_child(_bottom_dock)
+	_bottom_frame.add_child(dock_margin)
+	inner_box.remove_child(split)
+	_bottom_split.add_child(split)
+	_bottom_split.add_child(_bottom_frame)
+	inner_box.add_child(_bottom_split)
+	inner_box.move_child(_bottom_split, slot)
+
+
 static func first_icon(names: Array[String]) -> Texture2D:
 	var editor_theme: Theme = EditorInterface.get_editor_theme()
 	for icon_name: String in names:
@@ -1602,4 +1718,402 @@ static func first_icon(names: Array[String]) -> Texture2D:
 	return null
 
 
-	state["to"] = from + literal.length()
+func _add_bottom_panel(panel: Control) -> void:
+	panel.visible = false
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.close_requested.connect(close_bottom_panel)
+	_bottom_dock.add_child(panel)
+
+
+func open_bottom_panel(panel: Control) -> void:
+	if _bottom_dock == null:
+		return
+	for child: Node in _bottom_dock.get_children():
+		(child as Control).visible = child == panel
+	_bottom_frame.visible = true
+	_expand_bottom_dock()
+
+
+func close_bottom_panel() -> void:
+	if _bottom_frame == null or not _bottom_frame.visible:
+		return
+	for child: Node in _bottom_dock.get_children():
+		(child as Control).visible = false
+	_bottom_frame.visible = false
+	code_edit.grab_focus()
+
+
+func _expand_bottom_dock() -> void:
+	if _bottom_split.split_offset != 0:
+		return
+	var desired: float = BOTTOM_PANEL_HEIGHT
+	var available: float = _bottom_split.size.y
+	if available > 0.0:
+		desired = minf(desired, available * 0.45)
+	_bottom_split.split_offset = -int(maxf(desired, _bottom_frame.custom_minimum_size.y))
+
+
+func symbol_index(force: bool = false) -> GdssSymbols.Index:
+	if force or _symbol_index_dirty or _symbol_index == null:
+		var source: String = get_full_source()
+		var sources: Dictionary = {GdssSymbols.DOC: source}
+		for path: String in imported_paths(source):
+			sources.set(path, GdssStorage.read_source(path))
+		_symbol_index = GdssSymbols.build(sources)
+		_symbol_index_dirty = false
+	return _symbol_index
+
+
+func imported_paths(source: String) -> Array[String]:
+	var found: Array[String] = []
+	_gather_imports(source, GdssStorage.get_save_path().get_base_dir(), found)
+	return found
+
+
+func _gather_imports(source: String, base_dir: String, found: Array[String]) -> void:
+	for entry: Dictionary in GdssStylesheet._collect_imports(source):
+		var resolved: String = GdssStylesheet._resolve_import_path(str(entry.get("path")), base_dir).simplify_path()
+		if resolved.is_empty() or found.has(resolved) or not FileAccess.file_exists(resolved):
+			continue
+		found.append(resolved)
+		_gather_imports(GdssStorage.read_source(resolved), resolved.get_base_dir(), found)
+
+
+func chunk_offset(chunk: int) -> int:
+	if _chunk_offsets.is_empty():
+		get_full_source()
+	if chunk < 0 or chunk >= _chunk_offsets.size():
+		return 0
+	return _chunk_offsets.get(chunk)
+
+
+func caret_full_line() -> int:
+	return chunk_offset(_active_chunk) + code_edit.get_caret_line()
+
+
+func chunk_location(full_line: int) -> Vector2i:
+	if _chunk_offsets.is_empty():
+		get_full_source()
+	var chunk: int = _chunk_for_line(full_line)
+	return Vector2i(chunk, full_line - chunk_offset(chunk))
+
+
+func describe_file(file: String) -> String:
+	return file_name if file == GdssSymbols.DOC else file
+
+
+func describe_location(file: String, line: int) -> String:
+	if file != GdssSymbols.DOC:
+		return "%s:%d" % [file.get_file(), line + 1]
+	var location: Vector2i = chunk_location(line)
+	if _chunks.size() <= 1:
+		return "line %d" % (location.y + 1)
+	return "%s:%d" % [_chunks.get(location.x).get("name"), location.y + 1]
+
+
+func scene_state(path: String) -> String:
+	var root: Node = EditorInterface.get_edited_scene_root()
+	if root != null and root.scene_file_path == path:
+		return "current"
+	if EditorInterface.get_open_scenes().has(path):
+		return "open"
+	return "disk"
+
+
+func symbol_at_caret() -> GdssSymbols.Symbol:
+	var index: GdssSymbols.Index = symbol_index()
+	var entry: GdssSymbols.Ref = index.find_at(GdssSymbols.DOC, caret_full_line(), code_edit.get_caret_column())
+	if entry == null:
+		return null
+	return index.get_symbol(entry.kind, entry.name)
+
+
+func goto_symbol(kind: GdssSymbols.Kind, name: String) -> void:
+	reveal()
+	var symbol: GdssSymbols.Symbol = symbol_index(true).get_symbol(kind, name)
+	var declaration: GdssSymbols.Ref = symbol.declaration() if symbol != null else null
+	if declaration == null:
+		_flash("'%s' is not declared in this stylesheet" % name, false)
+		return
+	_on_jump_requested(declaration.file, declaration.line, declaration.from)
+
+
+func goto_symbol_at(local_line: int, column: int, word: String) -> void:
+	var index: GdssSymbols.Index = symbol_index()
+	var entry: GdssSymbols.Ref = index.find_at(GdssSymbols.DOC, chunk_offset(_active_chunk) + local_line, column)
+	var symbol: GdssSymbols.Symbol = index.get_symbol(entry.kind, entry.name) if entry != null else index.find_by_name(word.trim_prefix("$").trim_prefix("%"))
+	if symbol == null:
+		return
+	var declaration: GdssSymbols.Ref = symbol.declaration()
+	if declaration != null:
+		_on_jump_requested(declaration.file, declaration.line, declaration.from)
+
+
+func reveal() -> void:
+	var host: Node = get_parent()
+	if host == null:
+		return
+	if Engine.is_editor_hint() and host == EditorInterface.get_editor_main_screen():
+		EditorInterface.set_main_screen_editor("GDSS")
+		return
+	var tabs: TabContainer = host.get_parent() as TabContainer
+	if tabs != null:
+		tabs.current_tab = host.get_index()
+
+
+func show_references(symbol: GdssSymbols.Symbol, extra: Array[GdssSymbols.Ref]) -> void:
+	var refs: Array[GdssSymbols.Ref] = symbol.refs.duplicate()
+	refs.append_array(extra)
+	_refs_panel.show_references(symbol, GdssSymbols.sort_refs(refs))
+	open_bottom_panel(_refs_panel)
+
+
+func show_problems() -> void:
+	_refs_panel.show_diagnostics(GdssSymbols.diagnostics(symbol_index(true)))
+	open_bottom_panel(_refs_panel)
+
+
+func flash_warning(message: String) -> void:
+	_flash(message, false)
+
+
+func _apply_full_source(source: String) -> void:
+	var caret_line: int = code_edit.get_caret_line()
+	var caret_column: int = code_edit.get_caret_column()
+	set_full_source(source)
+	code_edit.set_caret_line(caret_line)
+	code_edit.set_caret_column(caret_column)
+	_symbol_index_dirty = true
+
+
+func rename_symbol(symbol: GdssSymbols.Symbol, new_name: String, scene_refs: Array[GdssSymbols.Ref]) -> void:
+	var renamed: int = _rename_in_document(symbol, new_name) + _rename_in_imports(symbol, new_name)
+	var nodes: int = _rename_in_scenes(symbol, new_name, scene_refs)
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet != null:
+		stylesheet.save_current(get_full_source())
+	_symbol_index_dirty = true
+	symbol_index()
+	_refresh_occurrences()
+	var message: String = "Renamed %d reference%s" % [renamed, "" if renamed == 1 else "s"]
+	if nodes > 0:
+		message += " and %d node%s" % [nodes, "" if nodes == 1 else "s"]
+	_flash(message)
+
+
+func _start_rename() -> void:
+	var index: GdssSymbols.Index = symbol_index(true)
+	var symbol: GdssSymbols.Symbol = symbol_at_caret()
+	if symbol == null or not GdssSymbols.RENAMEABLE.has(symbol.kind):
+		_flash("No renameable symbol at the caret", false)
+		return
+	if symbol.declaration() == null:
+		_flash("'%s' has no declaration in this stylesheet" % symbol.name, false)
+		return
+	var dialog: GdssRenameDialog = GdssRenameDialog.new()
+	_base_control().add_child(dialog)
+	dialog.open_for(self, index, symbol)
+
+
+func _find_references() -> void:
+	symbol_index(true)
+	var symbol: GdssSymbols.Symbol = symbol_at_caret()
+	if symbol == null:
+		_flash("No symbol at the caret", false)
+		return
+	var extra: Array[GdssSymbols.Ref] = GdssSymbols.scan_scenes(symbol)
+	extra.append_array(GdssSymbols.scan_scripts(symbol))
+	show_references(symbol, extra)
+
+
+func _rename_in_document(symbol: GdssSymbols.Symbol, new_name: String) -> int:
+	var refs: Array[GdssSymbols.Ref] = symbol.in_file(GdssSymbols.DOC)
+	if refs.is_empty():
+		return 0
+	var source: String = get_full_source()
+	var offset: int = chunk_offset(_active_chunk)
+	var only_active: bool = true
+	for entry: GdssSymbols.Ref in refs:
+		if _chunk_for_line(entry.line) != _active_chunk:
+			only_active = false
+			break
+	if only_active:
+		_rename_in_code_edit(refs, offset, new_name)
+		return refs.size()
+	_apply_full_source(GdssSymbols.apply(source, refs, new_name))
+	return refs.size()
+
+
+func _rename_in_code_edit(refs: Array[GdssSymbols.Ref], offset: int, new_name: String) -> void:
+	code_edit.remove_secondary_carets()
+	code_edit.begin_complex_operation()
+	for entry: GdssSymbols.Ref in GdssSymbols.sort_refs(refs.duplicate(), true):
+		var line: int = entry.line - offset
+		if line < 0 or line >= code_edit.get_line_count():
+			continue
+		if code_edit.get_line(line).substr(entry.from, entry.to - entry.from) != entry.name:
+			continue
+		code_edit.select(line, entry.from, line, entry.to)
+		code_edit.delete_selection()
+		code_edit.set_caret_line(line)
+		code_edit.set_caret_column(entry.from)
+		code_edit.insert_text_at_caret(new_name)
+	code_edit.end_complex_operation()
+
+
+func _rename_in_imports(symbol: GdssSymbols.Symbol, new_name: String) -> int:
+	var total: int = 0
+	for path: String in symbol.files():
+		if path == GdssSymbols.DOC:
+			continue
+		var refs: Array[GdssSymbols.Ref] = symbol.in_file(path)
+		GdssStorage.write_source(path, GdssSymbols.apply(GdssStorage.read_source(path), refs, new_name))
+		total += refs.size()
+	return total
+
+
+func _rename_in_scenes(symbol: GdssSymbols.Symbol, new_name: String, refs: Array[GdssSymbols.Ref]) -> int:
+	var grouped: Dictionary = {}
+	for entry: GdssSymbols.Ref in refs:
+		var bucket: Array[GdssSymbols.Ref] = grouped.get(entry.file, [] as Array[GdssSymbols.Ref])
+		bucket.append(entry)
+		grouped.set(entry.file, bucket)
+	var total: int = 0
+	var touched_disk: bool = false
+	for path: String in grouped:
+		var state: String = scene_state(path)
+		if state == "open":
+			continue
+		if state == "current":
+			total += _rename_in_current_scene(symbol, new_name)
+			continue
+		var source: String = FileAccess.get_file_as_string(path)
+		var updated: String = GdssSymbols.apply(source, grouped.get(path), new_name)
+		if updated == source:
+			continue
+		var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+		if file == null:
+			continue
+		file.store_string(updated)
+		file.close()
+		total += (grouped.get(path) as Array).size()
+		touched_disk = true
+	if touched_disk and Engine.is_editor_hint():
+		EditorInterface.get_resource_filesystem().scan()
+	return total
+
+
+func _rename_in_current_scene(symbol: GdssSymbols.Symbol, new_name: String) -> int:
+	var root: Node = EditorInterface.get_edited_scene_root()
+	if root == null:
+		return 0
+	var targets: Array[Node] = []
+	_collect_symbol_nodes(root, symbol, targets)
+	if targets.is_empty():
+		return 0
+	var undo_redo: EditorUndoRedoManager = EditorInterface.get_editor_undo_redo()
+	undo_redo.create_action("Rename GDSS %s" % GdssSymbols.KIND_LABELS.get(symbol.kind))
+	for node: Node in targets:
+		if symbol.kind == GdssSymbols.Kind.VARIATION:
+			undo_redo.add_do_property(node, "theme_type_variation", new_name)
+			undo_redo.add_undo_property(node, "theme_type_variation", symbol.name)
+			continue
+		if GdssSymbols.VAR_KINDS.has(symbol.kind):
+			var text: String = node.get_meta(GDSS.OVERRIDES_META, "")
+			undo_redo.add_do_method(GDSS, &"set_override_text", node, GdssSymbols.rename_in_text(text, symbol.name, new_name))
+			undo_redo.add_undo_method(GDSS, &"set_override_text", node, text)
+			continue
+		var classes: PackedStringArray = node.get_meta(GDSS.CLASSES_META, PackedStringArray())
+		var updated: PackedStringArray = classes.duplicate()
+		for i: int in updated.size():
+			if updated.get(i) == symbol.name:
+				updated.set(i, new_name)
+		undo_redo.add_do_method(node, &"set_meta", GDSS.CLASSES_META, updated)
+		undo_redo.add_undo_method(node, &"set_meta", GDSS.CLASSES_META, classes.duplicate())
+		undo_redo.add_do_method(GdssNodeBinder, &"refresh", node)
+		undo_redo.add_undo_method(GdssNodeBinder, &"refresh", node)
+	undo_redo.commit_action()
+	return targets.size()
+
+
+func _collect_symbol_nodes(node: Node, symbol: GdssSymbols.Symbol, out: Array[Node]) -> void:
+	if symbol.kind == GdssSymbols.Kind.VARIATION:
+		if node is Control and str((node as Control).theme_type_variation) == symbol.name:
+			out.append(node)
+	elif GdssSymbols.VAR_KINDS.has(symbol.kind):
+		var text: Variant = node.get_meta(GDSS.OVERRIDES_META) if node.has_meta(GDSS.OVERRIDES_META) else null
+		if text is String and GdssSymbols.text_has_var(text, symbol.name):
+			out.append(node)
+	elif (node.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray).has(symbol.name):
+		out.append(node)
+	for child: Node in node.get_children():
+		_collect_symbol_nodes(child, symbol, out)
+
+
+func _on_jump_requested(file: String, line: int, column: int) -> void:
+	if file == GdssSymbols.DOC:
+		goto_full_source_line(line)
+		code_edit.set_caret_column(column)
+		code_edit.grab_focus()
+		return
+	match file.get_extension().to_lower():
+		"tgdss":
+			_confirm_unsaved(func() -> void:
+				_switch_to_file(file)
+				goto_full_source_line.call_deferred(line)
+			)
+		"tscn":
+			EditorInterface.open_scene_from_path(file)
+		"gd":
+			var script: Script = load(file) as Script
+			if script != null:
+				EditorInterface.edit_script(script, line + 1)
+
+
+func _open_import_at(position: Vector2) -> bool:
+	var at: Vector2i = code_edit.get_line_column_at_pos(position)
+	var entry: GdssSymbols.Ref = symbol_index().find_at(GdssSymbols.DOC, chunk_offset(_active_chunk) + at.y, at.x)
+	if entry == null or entry.kind != GdssSymbols.Kind.IMPORT:
+		return false
+	var resolved: String = GdssStylesheet._resolve_import_path(entry.name, GdssStorage.get_save_path().get_base_dir()).simplify_path()
+	if not FileAccess.file_exists(resolved):
+		return false
+	_confirm_unsaved(func() -> void:
+		_switch_to_file(resolved)
+	)
+	return true
+
+
+func _refresh_occurrences() -> void:
+	var previous: int = _occurrences.size()
+	_occurrences.clear()
+	if _symbol_index != null and not _symbol_index_dirty:
+		var symbol: GdssSymbols.Symbol = symbol_at_caret()
+		if symbol != null:
+			var offset: int = chunk_offset(_active_chunk)
+			for entry: GdssSymbols.Ref in symbol.in_file(GdssSymbols.DOC):
+				if _chunk_for_line(entry.line) == _active_chunk:
+					_occurrences.append(Vector3i(entry.line - offset, entry.from, entry.to))
+	if previous > 0 or not _occurrences.is_empty():
+		code_edit.queue_redraw()
+
+
+func _draw_occurrences() -> void:
+	if _occurrences.is_empty():
+		return
+	var line_height: float = code_edit.get_line_height()
+	var first: int = code_edit.get_first_visible_line()
+	var last: int = code_edit.get_last_full_visible_line()
+	for occurrence: Vector3i in _occurrences:
+		if occurrence.x < first or occurrence.x > last:
+			continue
+		if occurrence.x >= code_edit.get_line_count() or occurrence.z > code_edit.get_line(occurrence.x).length():
+			continue
+		var head: Rect2i = code_edit.get_rect_at_line_column(occurrence.x, occurrence.y + 1)
+		var tail: Rect2i = code_edit.get_rect_at_line_column(occurrence.x, occurrence.z)
+		if head.position.x < 0 or tail.position.x < 0:
+			continue
+		var width: float = tail.position.x + tail.size.x - head.position.x
+		if width <= 0.0:
+			continue
+		code_edit.draw_rect(Rect2(head.position.x, head.position.y, width, line_height), _occurrence_color)

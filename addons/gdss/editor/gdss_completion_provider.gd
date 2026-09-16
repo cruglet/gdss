@@ -709,22 +709,27 @@ func _parse_user_variables() -> void:
 
 func _record_variable(var_name: String, line_number: int) -> void:
 	_user_variables.append("$" + var_name)
-	_variable_lines[var_name] = line_number
+	_variable_lines.set(var_name, line_number)
 
 
 func _on_symbol_validate(symbol: String) -> void:
-	_parse_user_variables()
-	editor.set_symbol_lookup_word_as_valid(_variable_lines.has(symbol.trim_prefix("$")))
+	var name: String = symbol.trim_prefix("$").trim_prefix("%")
+	if gdss_editor == null:
+		_parse_user_variables()
+		editor.set_symbol_lookup_word_as_valid(_variable_lines.has(name))
+		return
+	var found: GdssSymbols.Symbol = gdss_editor.symbol_index().find_by_name(name)
+	editor.set_symbol_lookup_word_as_valid(found != null and found.declaration() != null)
 
 
-func _on_symbol_lookup(symbol: String, _line: int, _column: int) -> void:
+func _on_symbol_lookup(symbol: String, line: int, column: int) -> void:
+	if gdss_editor != null:
+		gdss_editor.goto_symbol_at(line, column, symbol)
+		return
 	var var_name: String = symbol.trim_prefix("$")
 	if not _variable_lines.has(var_name):
 		return
-	var target: int = _variable_lines[var_name]
-	if gdss_editor != null:
-		gdss_editor.goto_full_source_line(target)
-		return
+	var target: int = _variable_lines.get(var_name)
 	editor.set_caret_line(target)
 	editor.set_caret_column(editor.get_line(target).length())
 	editor.center_viewport_to_caret()
