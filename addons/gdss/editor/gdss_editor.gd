@@ -61,6 +61,8 @@ var _zoom_menu: PopupMenu
 var _file_menu: PopupMenu
 var _recent_menu: PopupMenu
 var _refs_panel: GdssReferencesPanel
+var _resource_panel: GdssResourcePanel
+var _resource_toggle: Button
 var _bottom_split: VSplitContainer
 var _bottom_frame: PanelContainer
 var _bottom_dock: VBoxContainer
@@ -582,6 +584,8 @@ func _recheck_errors() -> void:
 		display_errors(stylesheet.check_errors(get_full_source()))
 	symbol_index()
 	_refresh_occurrences()
+	if _resource_panel != null and _resource_panel.visible:
+		_resource_panel.refresh()
 
 
 func _on_stylesheet_source_loaded(source: String) -> void:
@@ -1681,6 +1685,7 @@ func _setup_symbols() -> void:
 	_refs_panel.editor = self
 	_refs_panel.jump_requested.connect(_on_jump_requested)
 	_add_bottom_panel(_refs_panel)
+	_setup_resource_sidebar(split)
 	if not code_edit.draw.is_connected(_draw_occurrences):
 		code_edit.draw.connect(_draw_occurrences)
 
@@ -1708,6 +1713,45 @@ func _setup_bottom_dock(split: Control) -> void:
 	_bottom_split.add_child(_bottom_frame)
 	inner_box.add_child(_bottom_split)
 	inner_box.move_child(_bottom_split, slot)
+
+
+func _setup_resource_sidebar(split: Control) -> void:
+	var host: Node = split.get_parent()
+	var slot: int = split.get_index()
+	var side_split: HSplitContainer = HSplitContainer.new()
+	side_split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side_split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	host.remove_child(split)
+	split.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side_split.add_child(split)
+	_resource_panel = GdssResourcePanel.new()
+	_resource_panel.editor = self
+	side_split.add_child(_resource_panel)
+	host.add_child(side_split)
+	host.move_child(side_split, slot)
+	if not ProjectSettings.has_setting("gdss/editor/show_resources"):
+		ProjectSettings.set_setting("gdss/editor/show_resources", false)
+	_resource_toggle = Button.new()
+	_resource_toggle.toggle_mode = true
+	_resource_toggle.theme_type_variation = &"FlatButton"
+	_resource_toggle.tooltip_text = "Toggle the resources panel"
+	var icon: Texture2D = first_icon(["Resource", "ResourcePreloader", "Object", "Load"])
+	if icon != null:
+		_resource_toggle.icon = icon
+	else:
+		_resource_toggle.text = "Resources"
+	_resource_toggle.toggled.connect(_on_resources_toggled)
+	var toolbar: Node = toggle_map_button.get_parent()
+	toolbar.add_child(_resource_toggle)
+	toolbar.move_child(_resource_toggle, toggle_map_button.get_index())
+	_resource_toggle.button_pressed = ProjectSettings.get_setting("gdss/editor/show_resources")
+
+
+func _on_resources_toggled(pressed: bool) -> void:
+	_resource_panel.visible = pressed
+	ProjectSettings.set_setting("gdss/editor/show_resources", pressed)
+	if pressed:
+		_resource_panel.refresh()
 
 
 static func first_icon(names: Array[String]) -> Texture2D:
@@ -1875,6 +1919,126 @@ func show_problems() -> void:
 
 func flash_warning(message: String) -> void:
 	_flash(message, false)
+
+
+func resource_entries() -> Array[Dictionary]:
+	var lines: PackedStringArray = get_full_source().split("\n")
+	return _resource_entries_in(lines, _resources_block(lines))
+
+
+func write_resource(old_key: String, key: String, method: String, path: String) -> void:
+	var lines: PackedStringArray = get_full_source().split("\n")
+	var declaration: String = "\t%s: %s(\"%s\")" % [key, method, path]
+	var bounds: Vector2i = _resources_block(lines)
+	if bounds.x == -1:
+		var insert_at: int = _block_insert_line(lines)
+		lines.insert(insert_at, "@resources {")
+		lines.insert(insert_at + 1, declaration)
+		lines.insert(insert_at + 2, "}")
+		lines.insert(insert_at + 3, "")
+	else:
+		var target: int = _resource_line(lines, bounds, old_key)
+		if target == -1:
+			lines.insert(bounds.y, declaration)
+		else:
+			lines.set(target, declaration)
+	_commit_source("\n".join(lines))
+
+
+func rename_resource(old_key: String, key: String) -> void:
+	var index: GdssSymbols.Index = symbol_index(true)
+	var symbol: GdssSymbols.Symbol = index.get_symbol(GdssSymbols.Kind.RESOURCE, old_key)
+	if symbol == null:
+		return
+	var error: String = GdssSymbols.validate(index, symbol, key)
+	if not error.is_empty():
+		_flash(error, false)
+		_resource_panel.refresh()
+		return
+	rename_symbol(symbol, key, [] as Array[GdssSymbols.Ref])
+	_resource_panel.refresh()
+
+
+func remove_resource(key: String) -> void:
+	var lines: PackedStringArray = get_full_source().split("\n")
+	var bounds: Vector2i = _resources_block(lines)
+	var target: int = _resource_line(lines, bounds, key)
+	if target == -1:
+		return
+	lines.remove_at(target)
+	bounds.y -= 1
+	if _resource_entries_in(lines, bounds).is_empty():
+		for line_number: int in range(bounds.y, bounds.x - 1, -1):
+			lines.remove_at(line_number)
+	_commit_source("\n".join(lines))
+
+
+func _resources_block(lines: PackedStringArray) -> Vector2i:
+	var header: int = -1
+	for line_number: int in lines.size():
+		var stripped: String = GdssSymbols.strip_comment(lines.get(line_number)).strip_edges()
+		if header == -1:
+			if GdssStylesheet._re_resources.search(stripped) != null:
+				header = line_number
+			continue
+		if stripped.begins_with("}"):
+			return Vector2i(header, line_number)
+	return Vector2i(-1, -1)
+
+
+func _resource_entries_in(lines: PackedStringArray, bounds: Vector2i) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if bounds.x == -1:
+		return result
+	for line_number: int in range(bounds.x + 1, mini(bounds.y, lines.size())):
+		var entry: Dictionary = _resource_at(lines.get(line_number), line_number)
+		if not entry.is_empty():
+			result.append(entry)
+	return result
+
+
+func _resource_at(line: String, line_number: int) -> Dictionary:
+	var stripped: String = GdssSymbols.strip_comment(line).strip_edges()
+	var entry: Dictionary = GdssStylesheet._extract_block_entry(stripped, line_number)
+	if entry.is_empty() or not str(entry.get("key")).is_valid_identifier():
+		return {}
+	var value: RegExMatch = GdssStylesheet._re_resource_value.search(str(entry.get("value_str")).strip_edges())
+	return {
+		"key": entry.get("key"),
+		"method": value.get_string(1) if value != null else "",
+		"path": value.get_string(2) if value != null else "",
+		"line": line_number,
+	}
+
+
+func _resource_line(lines: PackedStringArray, bounds: Vector2i, key: String) -> int:
+	if key.is_empty():
+		return -1
+	for entry: Dictionary in _resource_entries_in(lines, bounds):
+		if entry.get("key") == key:
+			return entry.get("line")
+	return -1
+
+
+func _block_insert_line(lines: PackedStringArray) -> int:
+	var insert_at: int = 0
+	for line_number: int in lines.size():
+		var stripped: String = lines.get(line_number).strip_edges()
+		if stripped.is_empty() or stripped.begins_with("#"):
+			insert_at = line_number + 1
+		else:
+			break
+	return insert_at
+
+
+func _commit_source(source: String) -> void:
+	_apply_full_source(source)
+	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
+	if stylesheet != null:
+		stylesheet.save_current(get_full_source())
+	symbol_index(true)
+	if _resource_panel != null and _resource_panel.visible:
+		_resource_panel.refresh()
 
 
 func _apply_full_source(source: String) -> void:
