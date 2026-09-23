@@ -1031,30 +1031,30 @@ func _build_override_entry(override_meta: Variant) -> Dictionary:
 func _resolve_override_patches(base: Dictionary, override_entry: Dictionary) -> Dictionary:
 	var has_patch: bool = false
 	for state_key: String in override_entry:
-		var state_dict: Variant = override_entry[state_key]
+		var state_dict: Variant = override_entry.get(state_key)
 		if not state_dict is Dictionary:
 			continue
 		for prop_name: String in (state_dict as Dictionary):
-			var raw: Variant = (state_dict as Dictionary)[prop_name]
+			var raw: Variant = (state_dict as Dictionary).get(prop_name)
 			if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__"):
 				has_patch = true
 	if not has_patch:
 		return override_entry
 	var resolved: Dictionary = override_entry.duplicate(true)
 	for state_key: String in resolved:
-		var state_dict: Variant = resolved[state_key]
+		var state_dict: Variant = resolved.get(state_key)
 		if not state_dict is Dictionary:
 			continue
 		for prop_name: String in (state_dict as Dictionary):
-			var raw: Variant = (state_dict as Dictionary)[prop_name]
+			var raw: Variant = (state_dict as Dictionary).get(prop_name)
 			if not (raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__")):
 				continue
-			var patch: Dictionary = (raw as Dictionary)["__gdss_composite4_patch__"]
+			var patch: Dictionary = (raw as Dictionary).get("__gdss_composite4_patch__")
 			# Keyed by the real property name so the fold can still see the parent's type.
 			var scratch: Dictionary = {prop_name: _base_composite_value(base, state_key, prop_name)}
 			for index: Variant in patch:
-				GdssStylesheet._fold_composite_component(scratch, prop_name, int(index), patch[index])
-			(state_dict as Dictionary)[prop_name] = scratch.get(prop_name)
+				GdssStylesheet._fold_composite_component(scratch, prop_name, int(index), patch.get(index))
+			(state_dict as Dictionary).set(prop_name, scratch.get(prop_name))
 	return resolved
 
 
@@ -1068,19 +1068,19 @@ func _base_composite_value(base: Dictionary, state_key: String, prop_name: Strin
 
 func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> Variant:
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4__"):
-		var parts: Array = (raw as Dictionary)["__gdss_composite4__"]
-		return Vector4i(_resolve_composite_part(parts[0]), _resolve_composite_part(parts[1]), _resolve_composite_part(parts[2]), _resolve_composite_part(parts[3]))
+		var parts: Array = (raw as Dictionary).get("__gdss_composite4__")
+		return Vector4i(_resolve_composite_part(parts.get(0)), _resolve_composite_part(parts.get(1)), _resolve_composite_part(parts.get(2)), _resolve_composite_part(parts.get(3)))
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite2__"):
-		var parts2: Array = (raw as Dictionary)["__gdss_composite2__"]
+		var parts2: Array = (raw as Dictionary).get("__gdss_composite2__")
 		return Vector2(_resolve_composite_part_f(parts2.front()), _resolve_composite_part_f(parts2.back()))
 	if raw is Dictionary and (raw as Dictionary).has(GdssStylesheet.COLOR4_KEY):
-		var sides: Array = (raw as Dictionary)[GdssStylesheet.COLOR4_KEY]
+		var sides: Array = (raw as Dictionary).get(GdssStylesheet.COLOR4_KEY)
 		var resolved_sides: Array = []
 		for side: Variant in sides:
 			resolved_sides.append(_resolve_value(side, fallback, state_key))
 		return resolved_sides
 	if raw is Dictionary and (raw as Dictionary).has("__gdss_calc__"):
-		return _eval_calc((raw as Dictionary)["__gdss_calc__"])
+		return _eval_calc((raw as Dictionary).get("__gdss_calc__"))
 	raw = _resolve_sentinel(raw, fallback)
 	if raw is Dictionary:
 		var d: Dictionary = raw as Dictionary
@@ -1099,20 +1099,33 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 	return raw
 
 
+func _splat_shorthand(key: String, value: Variant) -> Variant:
+	if not (value is int or value is float):
+		return value
+	var prop: GdssProp = GDSS.get_registry().property_list.get(key)
+	if prop == null:
+		return value
+	if prop.type == GDSS.Type.COMPOSITE4:
+		return Vector4i(int(value), int(value), int(value), int(value))
+	if prop.type == GDSS.Type.VECTOR2:
+		return Vector2(float(value), float(value))
+	return value
+
+
 func _eval_calc(node: Variant) -> float:
 	if not node is Dictionary:
 		return 0.0
 	var d: Dictionary = node as Dictionary
 	if d.has("calc_num"):
-		return float(d["calc_num"])
+		return float(d.get("calc_num"))
 	if d.has("calc_ref"):
-		return _calc_ref_value(d["calc_ref"])
+		return _calc_ref_value(d.get("calc_ref"))
 	if d.has("calc_neg"):
-		return -_eval_calc(d["calc_neg"])
+		return -_eval_calc(d.get("calc_neg"))
 	if d.has("calc_op"):
-		var l: float = _eval_calc(d["l"])
-		var r: float = _eval_calc(d["r"])
-		match d["calc_op"]:
+		var l: float = _eval_calc(d.get("l"))
+		var r: float = _eval_calc(d.get("r"))
+		match d.get("calc_op"):
 			"+": return l + r
 			"-": return l - r
 			"*": return l * r
@@ -1233,13 +1246,13 @@ func _get_parsed_val(key: String, state: String, fallback: Variant) -> Variant:
 	if entry.is_empty():
 		return fallback
 	var raw: Variant = null
-	if entry.has(state) and (entry[state] as Dictionary).has(key):
-		raw = entry[state][key]
-	elif entry.has("all") and (entry["all"] as Dictionary).has(key):
-		raw = entry["all"][key]
+	if entry.has(state) and (entry.get(state) as Dictionary).has(key):
+		raw = entry.get(state).get(key)
+	elif entry.has("all") and (entry.get("all") as Dictionary).has(key):
+		raw = entry.get("all").get(key)
 	else:
 		return fallback
-	return _resolve_value(raw, fallback, state)
+	return _splat_shorthand(key, _resolve_value(raw, fallback, state))
 
 
 func _get_state() -> String:
@@ -1314,7 +1327,7 @@ func _get_val_cached(key: String, entry: Dictionary, state: String, fallback: Va
 			raw = (ad as Dictionary).get(key)
 		if raw == null:
 			return fallback
-	return _resolve_value(raw, fallback, state)
+	return _splat_shorthand(key, _resolve_value(raw, fallback, state))
 
 
 func _get_raw_parsed_val(key: String, state: String) -> Variant:

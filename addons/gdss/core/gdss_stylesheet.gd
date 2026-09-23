@@ -496,8 +496,8 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 	
 	if actual_type == GDSS.Type.COMPOSITE4:
 		var parts: PackedStringArray = value_str.replace("\t", " ").split(" ", false)
-		if parts.size() != 4:
-			errors.append(["Property '%s' expects 4 integer values, got %d" % [prop_name, parts.size()], line])
+		if parts.size() != 1 and parts.size() != 4:
+			errors.append(["Property '%s' expects 1 or 4 integer values, got %d" % [prop_name, parts.size()], line])
 			return
 		for part: String in parts:
 			if part.begins_with("$"):
@@ -1867,15 +1867,16 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 		elif registered.type == GDSS.Type.VECTOR2 and (value is int or value is float):
 			# Single-value shorthand splats to both components (transform_scale: 1.1).
 			value = Vector2(float(value), float(value))
-	result[selector][state][prop] = value
+		elif registered.type == GDSS.Type.COMPOSITE4 and (value is int or value is float):
+			value = Vector4i(int(value), int(value), int(value), int(value))
+	result.get(selector).get(state).set(prop, value)
 
 
 static func _fold_composite_component(container: Dictionary, parent_prop: String, index: int, value: Variant) -> void:
 	var existing: Variant = container.get(parent_prop)
 	var parent: GdssProp = GDSS.get_registry().property_list.get(parent_prop)
-	# Color parents fold whole values (a color, a var sentinel, a method descriptor)
-	# per side; every other parent packs numbers, so a dictionary value is a method call
-	# in a slot that cannot hold one.
+	# Color parents fold whole values per side; every other parent packs numbers, so a
+	# dictionary value there is a method call in a slot that cannot hold one.
 	var is_color: bool = existing is Color \
 		or (existing is Dictionary and (existing as Dictionary).has(COLOR4_KEY)) \
 		or (parent != null and parent.type == GDSS.Type.COLOR)
@@ -1883,60 +1884,59 @@ static func _fold_composite_component(container: Dictionary, parent_prop: String
 		return
 	if _patch_composites and (existing == null or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite4_patch__"))):
 		var patch: Dictionary = (existing as Dictionary).get("__gdss_composite4_patch__") if existing is Dictionary else {}
-		patch[index] = value
-		container[parent_prop] = {"__gdss_composite4_patch__": patch}
+		patch.set(index, value)
+		container.set(parent_prop, {"__gdss_composite4_patch__": patch})
 		return
 	if existing == null:
 		existing = parent.get_default_value() if parent != null else Vector4i.ZERO
 	if is_color:
 		var sides: Array = []
 		if existing is Dictionary and (existing as Dictionary).has(COLOR4_KEY):
-			sides = (existing as Dictionary)[COLOR4_KEY]
+			sides = (existing as Dictionary).get(COLOR4_KEY)
 		else:
-			# Sides the sheet never names keep whatever the shorthand set, so
-			# "border_color: RED" plus "border_color_top: BLUE" leaves three red sides.
+			# Unnamed sides keep the shorthand: "border_color: RED" plus "border_color_top: BLUE"
+			# leaves three red sides.
 			sides = [existing, existing, existing, existing]
-		sides[index] = value
-		container[parent_prop] = {COLOR4_KEY: sides}
+		sides.set(index, value)
+		container.set(parent_prop, {COLOR4_KEY: sides})
 		return
-	# Two-component (Vector2) parents fold with float components; four-component ones
-	# stay int. Decide from the existing value first so a patch folding onto an already
-	# resolved base still picks the right shape.
+	# Vector2 parents fold with float components, four-component ones stay int. Decide from
+	# the existing value so a patch onto a resolved base picks the right shape.
 	var is_vec2: bool = existing is Vector2 \
 		or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite2__")) \
 		or (parent != null and parent.type == GDSS.Type.VECTOR2)
 	var is_ref: bool = value is String and (value as String).begins_with("__gdss_")
 	var sentinel: String = "__gdss_composite2__" if is_vec2 else "__gdss_composite4__"
 	if existing is Dictionary and (existing as Dictionary).has(sentinel):
-		var parts: Array = (existing as Dictionary)[sentinel]
+		var parts: Array = (existing as Dictionary).get(sentinel)
 		if index < parts.size():
-			parts[index] = String(value) if is_ref else (str(float(value)) if is_vec2 else str(int(value)))
-		container[parent_prop] = existing
+			parts.set(index, String(value) if is_ref else (str(float(value)) if is_vec2 else str(int(value))))
+		container.set(parent_prop, existing)
 		return
 	if is_vec2:
 		var vec2: Vector2 = existing if existing is Vector2 else Vector2.ZERO
 		if is_ref:
 			var parts2: Array = [str(vec2.x), str(vec2.y)]
-			parts2[index] = value
-			container[parent_prop] = {"__gdss_composite2__": parts2}
+			parts2.set(index, value)
+			container.set(parent_prop, {"__gdss_composite2__": parts2})
 			return
 		match index:
 			0: vec2.x = float(value)
 			1: vec2.y = float(value)
-		container[parent_prop] = vec2
+		container.set(parent_prop, vec2)
 		return
 	var vec: Vector4i = existing if existing is Vector4i else Vector4i.ZERO
 	if is_ref:
 		var parts: Array = [str(vec.x), str(vec.y), str(vec.z), str(vec.w)]
-		parts[index] = value
-		container[parent_prop] = {"__gdss_composite4__": parts}
+		parts.set(index, value)
+		container.set(parent_prop, {"__gdss_composite4__": parts})
 		return
 	match index:
 		0: vec.x = int(value)
 		1: vec.y = int(value)
 		2: vec.z = int(value)
 		3: vec.w = int(value)
-	container[parent_prop] = vec
+	container.set(parent_prop, vec)
 
 
 static func _resolve_base_composite_patches(selector_entry: Dictionary) -> void:
@@ -1946,17 +1946,17 @@ static func _resolve_base_composite_patches(selector_entry: Dictionary) -> void:
 	for state_key: String in selector_entry:
 		if state_key == "all" or state_key == "_classes" or state_key == "_variations":
 			continue
-		var sd: Variant = selector_entry[state_key]
+		var sd: Variant = selector_entry.get(state_key)
 		if sd is Dictionary:
 			_fold_state_patches(sd as Dictionary, all_dict if all_dict is Dictionary else {})
 
 
 static func _fold_state_patches(state_dict: Dictionary, base_all: Dictionary) -> void:
 	for prop_name: String in state_dict.keys():
-		var raw: Variant = state_dict[prop_name]
+		var raw: Variant = state_dict.get(prop_name)
 		if not (raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__")):
 			continue
-		var patch: Dictionary = (raw as Dictionary)["__gdss_composite4_patch__"]
+		var patch: Dictionary = (raw as Dictionary).get("__gdss_composite4_patch__")
 		var base_val: Variant = base_all.get(prop_name)
 		if base_val == null:
 			var prop: GdssProp = GDSS.get_registry().property_list.get(prop_name)

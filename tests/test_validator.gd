@@ -123,7 +123,7 @@ func run(t: TC) -> void:
 	var broken: Array[Array] = t.validate_fixture(FIXTURE_BROKEN)
 	t.check(t.has_error_containing(broken, "Unknown selector 'Bogus'"), "unknown selector flagged")
 	t.check(t.has_error_containing(broken, "Unknown property 'nope'"), "unknown property flagged")
-	t.check(t.has_error_containing(broken, "expects 4 integer values"), "composite arity flagged")
+	t.check(t.has_error_containing(broken, "expects 1 or 4 integer values"), "composite arity flagged")
 	t.check(t.has_error_containing(broken, "Undefined variable '$missing'"), "undefined variable flagged")
 	t.check(t.has_error_containing(broken, "integer components"), "non-integer composite component flagged")
 	t.check(t.has_error_containing(broken, "Unclosed brace"), "unclosed brace flagged")
