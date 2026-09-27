@@ -163,10 +163,10 @@ var _tweened_values: Dictionary[String, Variant] = {}
 var _tween: Tween = null
 var _state_sync_queued: bool = false
 var _applied_node_props: Dictionary = {}
+var _applied_overrides: Dictionary = {}
 
-# on_show()/on_hide() event state. _self_toggle swallows the visibility_changed our
-# own visible= writes fire (so re-showing to play an exit anim can't recurse).
-# _last_visible filters parent-driven changes (where the node's own visible is unchanged).
+# _self_toggle swallows the visibility_changed our own visible= writes fire;
+# _last_visible filters parent-driven changes, where the node's own visible is unchanged.
 var _self_toggle: bool = false
 var _last_visible: bool = true
 
@@ -335,26 +335,26 @@ func _clear_overrides() -> void:
 	if node_type == null:
 		return
 	var control: Variant = node
-	for prop: GdssProp in node_type.get_enabled_props():
-		match prop.category:
-			GdssProp.Category.COLOR:
-				if prop.category_subproperties.is_empty():
-					control.remove_theme_color_override(prop.name)
-				else:
-					if node_type.colors.has(prop.name):
-						control.remove_theme_color_override(prop.name)
-					for subprop: String in prop.category_subproperties:
-						if node_type.colors.has(subprop):
-							control.remove_theme_color_override(subprop)
-			GdssProp.Category.CONST:
-				control.remove_theme_constant_override(prop.name)
-			GdssProp.Category.FONT_SIZE:
-				control.remove_theme_font_size_override(prop.name)
-			GdssProp.Category.FONT:
-				control.remove_theme_font_override(prop.name)
-			GdssProp.Category.ICON:
-				control.remove_theme_icon_override(prop.name)
+	remove_applied_overrides(control)
 	_reset_node_props(node_type, control, true)
+
+
+# Only the overrides GDSS applied itself come off. Overrides the scene author set by hand
+# are left alone, so saving or packing a scene never eats them.
+func remove_applied_overrides(control: Variant) -> void:
+	for key: String in _applied_overrides.keys():
+		match int(_applied_overrides.get(key)):
+			GdssProp.Category.COLOR:
+				control.remove_theme_color_override(key)
+			GdssProp.Category.CONST:
+				control.remove_theme_constant_override(key)
+			GdssProp.Category.FONT_SIZE:
+				control.remove_theme_font_size_override(key)
+			GdssProp.Category.FONT:
+				control.remove_theme_font_override(key)
+			GdssProp.Category.ICON:
+				control.remove_theme_icon_override(key)
+	_applied_overrides.clear()
 
 
 func _reset_node_props(node_type: GdssNodeType, control: Variant, skip_tweened: bool) -> void:
@@ -433,9 +433,11 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 			if val is int or val is float:
 				var theme_def: Variant = node_type.theme_defaults.get(prop.name, null)
 				if theme_def is int and int(val) == int(theme_def):
-					if control.has_theme_constant_override(prop.name):
+					if _applied_overrides.has(prop.name):
 						control.remove_theme_constant_override(prop.name)
+						_applied_overrides.erase(prop.name)
 					return
+				_applied_overrides.set(prop.name, GdssProp.Category.CONST)
 				if control.has_theme_constant_override(prop.name) and control.get_theme_constant(prop.name) == int(val):
 					return
 				control.add_theme_constant_override(prop.name, int(val))
@@ -443,9 +445,11 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 			if val is int or val is float:
 				var theme_def: Variant = node_type.theme_defaults.get(prop.name, null)
 				if theme_def is int and int(val) == int(theme_def):
-					if control.has_theme_font_size_override(prop.name):
+					if _applied_overrides.has(prop.name):
 						control.remove_theme_font_size_override(prop.name)
+						_applied_overrides.erase(prop.name)
 					return
+				_applied_overrides.set(prop.name, GdssProp.Category.FONT_SIZE)
 				if control.has_theme_font_size_override(prop.name) and control.get_theme_font_size(prop.name) == int(val):
 					return
 				control.add_theme_font_size_override(prop.name, int(val))
@@ -454,11 +458,13 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 				var theme_def: Variant = node_type.theme_defaults.get(prop.name, null)
 				if theme_def is Font and val == theme_def:
 					return
+				_applied_overrides.set(prop.name, GdssProp.Category.FONT)
 				if control.has_theme_font_override(prop.name) and control.get_theme_font(prop.name) == val:
 					return
 				control.add_theme_font_override(prop.name, val as Font)
 		GdssProp.Category.ICON:
 			if val is Texture2D:
+				_applied_overrides.set(prop.name, GdssProp.Category.ICON)
 				if control.has_theme_icon_override(prop.name) and control.get_theme_icon(prop.name) == val:
 					return
 				control.add_theme_icon_override(prop.name, val)
@@ -491,9 +497,11 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 func _override_color_if_custom(control: Variant, node_type: GdssNodeType, key: String, val: Color) -> void:
 	var theme_def: Variant = node_type.theme_defaults.get(key, null)
 	if theme_def is Color and val.is_equal_approx(theme_def as Color):
-		if control.has_theme_color_override(key):
+		if _applied_overrides.has(key):
 			control.remove_theme_color_override(key)
+			_applied_overrides.erase(key)
 		return
+	_applied_overrides.set(key, GdssProp.Category.COLOR)
 	if control.has_theme_color_override(key) and control.get_theme_color(key).is_equal_approx(val):
 		return
 	control.add_theme_color_override(key, val)

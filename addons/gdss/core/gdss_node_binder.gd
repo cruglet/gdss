@@ -324,7 +324,9 @@ static func unbind(canvas_item: Node) -> void:
 		if is_instance_valid(interp) and interp.parsed_changed.is_connected(stylebox._on_parsed_changed):
 			interp.parsed_changed.disconnect(stylebox._on_parsed_changed)
 	control.begin_bulk_theme_override()
-	_clear_overrides_for(control, node_type)
+	for stylebox: GdssStylebox in slots.values():
+		if stylebox != null:
+			stylebox.remove_applied_overrides(control)
 	for state: String in node_type.states:
 		control.remove_theme_stylebox_override(state)
 	control.end_bulk_theme_override()
@@ -337,31 +339,8 @@ static func unbind(canvas_item: Node) -> void:
 			ei.call(&"mark_scene_as_unsaved")
 
 
-static func _clear_overrides_for(control: Variant, node_type: GdssNodeType) -> void:
-	for prop: GdssProp in node_type.get_enabled_props():
-		match prop.category:
-			GdssProp.Category.COLOR:
-				if prop.category_subproperties.is_empty():
-					control.remove_theme_color_override(prop.name)
-				else:
-					if node_type.colors.has(prop.name):
-						control.remove_theme_color_override(prop.name)
-					for subprop: String in prop.category_subproperties:
-						if node_type.colors.has(subprop):
-							control.remove_theme_color_override(subprop)
-			GdssProp.Category.CONST:
-				control.remove_theme_constant_override(prop.name)
-			GdssProp.Category.FONT_SIZE:
-				control.remove_theme_font_size_override(prop.name)
-			GdssProp.Category.FONT:
-				control.remove_theme_font_override(prop.name)
-			GdssProp.Category.ICON:
-				control.remove_theme_icon_override(prop.name)
-
-
-# Removes every GDSS-applied theme override from all bound nodes without tearing
-# down the binding, so a scene can be packed without baking runtime styling into
-# it. Pair with reapply_overrides() to restore the live preview afterwards.
+# Strips GDSS overrides from every bound node without tearing down the binding, so a
+# scene packs without baked styling. Pair with reapply_overrides().
 static func strip_overrides() -> void:
 	for id: int in _registry.keys():
 		var canvas_item: Node = instance_from_id(id) as Node
@@ -373,16 +352,15 @@ static func strip_overrides() -> void:
 		if not (canvas_item is Control or canvas_item is Window):
 			continue
 		var control: Variant = canvas_item
-		_clear_overrides_for(control, node_type)
 		for stylebox: GdssStylebox in _registry.get(id, {}).values():
 			if stylebox != null:
+				stylebox.remove_applied_overrides(control)
 				stylebox._reset_node_props(node_type, control, false)
 		for state: String in node_type.states:
 			control.remove_theme_stylebox_override(state)
 
 
-# Re-applies the GDSS style overrides to every bound node, reusing the styleboxes
-# that are already in the registry.
+# Re-applies the style overrides to every bound node, reusing the registry's styleboxes.
 static func reapply_overrides() -> void:
 	for id: int in _registry.keys():
 		var canvas_item: Node = instance_from_id(id) as Node
