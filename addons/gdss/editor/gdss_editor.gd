@@ -330,21 +330,22 @@ func _parse_chunks(source: String) -> Array[Dictionary]:
 		else:
 			lines.append(line)
 	chunks.append({"name": chunk_name, "content": "\n".join(lines)})
-	if chunks.size() > 1 and (chunks[0]["content"] as String).strip_edges().is_empty():
+	if chunks.size() > 1 and (chunks.get(0).get("content") as String).strip_edges().is_empty():
 		chunks.remove_at(0)
 	return chunks
 
 
 func _sync_active_chunk() -> void:
 	if _active_chunk >= 0 and _active_chunk < _chunks.size():
-		_chunks[_active_chunk]["content"] = code_edit.text
+		_chunks.get(_active_chunk).set("content", code_edit.text)
 
 
 func _rebuild_chunk_tabs() -> void:
+	_invalidate_chunk_state()
 	_rebuilding_tabs = true
 	_chunk_tabs.clear_tabs()
 	for chunk: Dictionary in _chunks:
-		_chunk_tabs.add_tab(str(chunk["name"]))
+		_chunk_tabs.add_tab(str(chunk.get("name")))
 	if _active_chunk >= 0 and _active_chunk < _chunks.size():
 		_chunk_tabs.current_tab = _active_chunk
 	_rebuilding_tabs = false
@@ -1795,6 +1796,14 @@ func _expand_bottom_dock() -> void:
 	if available > 0.0:
 		desired = minf(desired, available * 0.45)
 	_bottom_split.split_offset = -int(maxf(desired, _bottom_frame.custom_minimum_size.y))
+
+
+func _invalidate_chunk_state() -> void:
+	_symbol_index_dirty = true
+	_chunk_offsets = PackedInt32Array()
+	if not _occurrences.is_empty():
+		_occurrences.clear()
+		code_edit.queue_redraw()
 
 
 func symbol_index(force: bool = false) -> GdssSymbols.Index:
