@@ -1,29 +1,31 @@
-# @chunk main
-# Simple GDSS 0.8.0 showcase theme.
+# @chunk meta
 @meta {
 	name: "GDSS Demo"
 	description: "GDSS showcase: schemes, methods, gradients, glass, fonts, calc(), per-side keys, per-node overrides, and events."
-	default_scheme: dark
 	author: "Cruglet"
-	version: "0.8.0"
+	version: "0.9.0"
+	default_scheme: dark
 }
 
 # @chunk Palette
-# @global vars are shared and settable from GDScript (the Randomize button tweens
-# the accent live with GDSS.set_global_var).
-@global var accent: "#3b82f6"
-@global var accent_dark: "#2563eb"
 @global var bg: "#0d0d14"
 @global var surface: "#16161f"
 @global var surface_2: "#1f1f3a"
-@global var text: "#ffffff"
-@global var text_dim: "#9097ad"
 @global var border: "#ffffff22"
 
-# A @scheme is a named set of @global overrides. GDSS.set_scheme("light", 0.25)
-# tweens between them; the dark scheme matches the base so it stays empty.
-@scheme dark {
-}
+@global var text: "#ffffff"
+@global var text_dim: "#9097ad"
+
+@global var accent: "#3b82f6"
+@global var accent_dark: "#2563eb"
+
+@global var unit: 12
+var radius: 12
+
+@instance var glass_strength: 3.0
+@instance var glass_refraction: 1.0
+
+@scheme dark {}
 
 @scheme light {
 	bg: "#d4d8e4"
@@ -34,30 +36,22 @@
 	border: "#00000038"
 }
 
-@scheme light2 extends light {
-}
+@scheme light2 extends light {}
 
-# Per-node knobs so the sliders can retune the glass live.
-@instance var glass_strength: 3.0
-@instance var glass_refraction: 1.0
-
-var radius: 12
-@global var unit: 12
 # @chunk Buttons
-Button {
+Button, MenuButton {
 	bg_color: $accent
 	border_color: rgba(0.0, 0.0, 0.0, 0.0)
 	border: 0 0 0 0
 	corner_radius: $radius $radius $radius $radius
-	# contrast() picks black or white for readable text over any accent.
 	font_color: contrast($accent)
 	font_size: 14
 	padding: 14 14 9 9
 	cursor: POINTING
 	
 	transition_time: 0.15
-	transition_type: EASE_OUT
 	transition_func: QUINT
+	transition_type: EASE_OUT
 	
 	:hover {
 		bg_color: lighten($accent, 0.08)
@@ -68,21 +62,47 @@ Button {
 		bg_color: darken($accent, 0.1)
 		expand: 0 0 0 0
 	}
-
-	# Godot 4.7 transform (offset_transform): lifts and scales up on hover. It's
-	# visual_only by default, so it never reflows the layout; the Button transition tweens it.
+	
+	GhostButton {
+		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
+		border_color: $accent
+		border: 1 1 1 1
+		font_color: $accent
+		
+		:hover {
+			bg_color: alpha($accent, 0.14)
+			font_color: $text
+		}
+	}
+	
+	MenuItem {
+		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
+		corner_radius: 8 8 8 8
+		font_color: $text
+		padding: 12 12 7 7
+		
+		:hover {
+			bg_color: alpha($text, 0.1)
+		}
+		
+		:pressed {
+			bg_color: alpha($text, 0.16)
+		}
+	}
+	
 	LiftButton {
 		transform_enabled: true
-
+		
 		:hover {
 			transform_scale: 1.06 1.06
 			transform_position: 0 -4
 		}
 	}
-
+	
 	BounceButton {
 		transform_enabled: true
 		transform_scale: 1 1
+		
 		on_pressed() {
 			transform_scale: 0.88 0.88
 			transition_time: 0.18
@@ -90,51 +110,19 @@ Button {
 			transition_type: EASE_OUT
 		}
 	}
-
-	# Flat menu rows for the GlassMenu dropdown.
-	MenuItem {
-		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
-		font_color: $text
-		corner_radius: 8 8 8 8
-		padding: 12 12 7 7
-
-		:hover {
-			bg_color: alpha($text, 0.1)
-		}
-
-		:pressed {
-			bg_color: alpha($text, 0.16)
-		}
-	}
-
-	GhostButton {
-		bg_color: rgba(0.0, 0.0, 0.0, 0.0)
-		border_color: $accent
-		border: 1 1 1 1
-		font_color: $accent
-
-		:hover {
-			bg_color: alpha($accent, 0.14)
-			font_color: $text
-		}
-	}
-
-	# modulate tints the whole node (children included) and resets when the state exits.
+	
 	ModulateButton {
 		:hover {
 			modulate: "#ffd9a0"
 		}
 	}
 	
-	# blur(): just blurs and lightly tints the backdrop. Expands and rounds out
-	# on hover, squashes on press.
 	FrostedButton {
 		bg_color: blur($glass_strength, "#ffffff", 0.06)
 		border_color: alpha("#ffffff", 0.45)
 		border: 1 1 1 1
 		corner_radius: 28 28 28 28
 		cursor: MOVE
-		
 		transition_time: 0.2
 		
 		:hover {
@@ -150,17 +138,12 @@ Button {
 		}
 	}
 	
-	# liquid_blur(): blurs, then bends and magnifies the backdrop through the
-	# edges with a swept rim - the iOS/macOS-style glass.
-	
-	# 
 	LiquidButton {
 		bg_color: liquid_blur($glass_strength, "#ffffff", 0.05, $glass_refraction, 0.4)
 		border_color: alpha("#ffffff", 0.55)
 		border: 1 1 1 1
 		corner_radius: 44 44 44 44
 		cursor: MOVE
-		
 		transition_time: 0.2
 		
 		:hover {
@@ -190,17 +173,71 @@ Panel, PanelContainer {
 		corner_radius: 14 14 14 14
 	}
 	
-	# Translucent strip for the demo sliders.
 	ControlBar {
 		bg_color: alpha($surface, 0.85)
 		border_color: alpha($text, 0.12)
 		border: 1 1 1 1
 		corner_radius: 16 16 16 16
 	}
-
-	# Pop in/out via on_show()/on_hide() events. GDSS.show()/hide() (or just
-	# toggling `visible`) plays these one-shot transitions; offset_transform keeps
-	# it visual-only so nothing reflows while it animates.
+	
+	PerSideCard {
+		bg_color: $surface_2
+		border_color: $accent
+		border_bottom: 3
+		corner_radius_top_left: 26
+		corner_radius_bottom_right: 26
+	}
+	
+	GradientCard {
+		bg_color: linear_blur_gradient()
+		corner_radius: 12 12 12 12
+	}
+	
+	LinearGradientCard {
+		bg_color: linear_gradient($accent, $accent_dark, 135)
+		corner_radius: 12 12 12 12
+	}
+	
+	RadialGradientCard {
+		bg_color: radial_gradient(lighten($accent, 0.25), $accent_dark)
+		corner_radius: 12 12 12 12
+	}
+	
+	TextureCard {
+		bg_color: texture("res://meta/gdss_banner.png")
+		corner_radius: 12 12 12 12
+	}
+	
+	SwatchMix {
+		bg_color: mix($accent, "#ffffff", 0.5)
+		corner_radius: 8 8 8 8
+	}
+	
+	SwatchSaturate {
+		bg_color: saturate($accent, 0.3)
+		corner_radius: 8 8 8 8
+	}
+	
+	SwatchDesaturate {
+		bg_color: desaturate($accent, 0.4)
+		corner_radius: 8 8 8 8
+	}
+	
+	SwatchInvert {
+		bg_color: invert($accent)
+		corner_radius: 8 8 8 8
+	}
+	
+	SwatchComplement {
+		bg_color: complement($accent)
+		corner_radius: 8 8 8 8
+	}
+	
+	SwatchHsvShift {
+		bg_color: hsv_shift($accent, 0.33)
+		corner_radius: 8 8 8 8
+	}
+	
 	AnimCard {
 		bg_color: liquid_blur(3.0, "#ffffff", 0.07, 1.2, 0.4)
 		border_color: alpha("#ffffff", 0.5)
@@ -208,7 +245,7 @@ Panel, PanelContainer {
 		corner_radius: 22 22 22 22
 		transform_enabled: true
 		opacity: 1
-
+		
 		on_show() {
 			transform_scale: 0.6 0.6
 			opacity: 0
@@ -216,7 +253,7 @@ Panel, PanelContainer {
 			transition_func: BACK
 			transition_type: EASE_OUT
 		}
-
+		
 		on_hide() {
 			transform_scale: 0.7 0.7
 			opacity: 0
@@ -225,84 +262,21 @@ Panel, PanelContainer {
 			transition_type: EASE_IN
 		}
 	}
-
-	GradientCard {
-		bg_color: linear_blur_gradient()
-		corner_radius: 12 12 12 12
-	}
-
-	LinearGradientCard {
-		bg_color: linear_gradient($accent, $accent_dark, 135)
-		corner_radius: 12 12 12 12
-	}
-
-	RadialGradientCard {
-		bg_color: radial_gradient(lighten($accent, 0.25), $accent_dark)
-		corner_radius: 12 12 12 12
-	}
-
-	# texture() fills the panel with an image, clipped to the rounded rect.
-	TextureCard {
-		bg_color: texture("res://meta/icon.png")
-		corner_radius: 12 12 12 12
-	}
-
-	# Per-side keys set one component of a composite: corners and the bottom border here.
-	PerSideCard {
-		bg_color: $surface_2
-		border_color: $accent
-		border_bottom: 3
-		corner_radius_top_left: 26
-		corner_radius_bottom_right: 26
-	}
-
-	# One swatch per color method, all derived from the live $accent global.
-	SwatchMix {
-		bg_color: mix($accent, "#ffffff", 0.5)
-		corner_radius: 8 8 8 8
-	}
-
-	SwatchSaturate {
-		bg_color: saturate($accent, 0.3)
-		corner_radius: 8 8 8 8
-	}
-
-	SwatchDesaturate {
-		bg_color: desaturate($accent, 0.4)
-		corner_radius: 8 8 8 8
-	}
-
-	SwatchInvert {
-		bg_color: invert($accent)
-		corner_radius: 8 8 8 8
-	}
-
-	SwatchComplement {
-		bg_color: complement($accent)
-		corner_radius: 8 8 8 8
-	}
-
-	SwatchHsvShift {
-		bg_color: hsv_shift($accent, 0.33)
-		corner_radius: 8 8 8 8
-	}
-
-	# A Control-based glass dropdown menu. Being a Control, it refracts the app behind it
-	# (unlike a Window PopupMenu) and animates in/out with transform_scale.
+	
 	GlassMenu {
 		bg_color: liquid_blur(3.0, "#ffffff", 0.06, 1.3, 0.4)
 		border_color: alpha("#ffffff", 0.45)
 		border: 1 1 1 1
 		corner_radius: 16 16 16 16
 		transform_enabled: true
-
+		
 		on_show() {
 			transform_scale: 0.85 0.85
 			transition_time: 0.2
 			transition_func: BACK
 			transition_type: EASE_OUT
 		}
-
+		
 		on_hide() {
 			transform_scale: 0.9 0.9
 			transition_time: 0.12
@@ -311,63 +285,55 @@ Panel, PanelContainer {
 		}
 	}
 }
-# @chunk Popups
-# PopupMenu is a Window-derived node (not a Control). GDSS styles its panel, but a
-# blur/liquid_blur backdrop can't refract here: an embedded subwindow doesn't expose the
-# app behind it to the shader. So this gets a clean translucent surface; for an actual
-# glass popup use a Control (see the GlassMenu PanelContainer class below).
-PopupMenu {
-	bg_color: alpha($surface, 0.96)
-	border_color: alpha($text, 0.12)
-	border: 1 1 1 1
-	corner_radius: 14 14 14 14
-	font_color: $text
-}
 # @chunk Labels
 Label {
 	font_color: $text
 	font_size: 14
 	
 	Heading {
+		font_color: $text
 		font_size: 28
-		font_color: $text
 	}
-
-	CalcLabel {
-		font_size: calc($unit * 2)
+	
+	GlassLabel {
 		font_color: $text
-	}
-
-	# font() loads a Font resource, so typography lives in the stylesheet too.
-	MonoLabel {
-		font: font("res://_local/jetbrains_mono.ttf")
-		font_size: 13
-		font_color: $text_dim
+		font_size: 18
 	}
 	
 	SubtitleLabel {
-		font_size: 13
 		font_color: $text_dim
-	}
-	
-	# Glass labels follow the scheme text colour so they stay readable over the
-	# frosted backdrop in both light and dark.
-	GlassLabel {
-		font_size: 18
-		font_color: $text
+		font_size: 13
 	}
 	
 	Caption {
-		font_size: 12
 		font_color: $text_dim
+		font_size: 12
 	}
-
-	# Theme-type-variation target ("%Variation"): auto-applied to any Label whose
-	# theme_type_variation == "TooltipLabel" - including Godot's own tooltips.
+	
+	CalcLabel {
+		font_color: $text
+		font_size: calc($unit * 2)
+	}
+	
+	MonoLabel {
+		font: font("res://_local/jetbrains_mono.ttf")
+		font_color: $text_dim
+		font_size: 13
+	}
+	
 	%TooltipLabel {
 		font_color: $accent
 		font_size: 13
 	}
+}
+
+# @chunk Popups
+PopupMenu {
+	bg_color: alpha($surface, 0.96)
+	border_color: alpha($text, 0.12)
+	border: 1 1 1 1
+	corner_radius: 14 14 14 14
+	font_color: $text
 }
 
 # @chunk Inputs
