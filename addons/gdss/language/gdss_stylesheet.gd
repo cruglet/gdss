@@ -515,7 +515,7 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 					errors.append(["Resource '$%s' cannot be a component of '%s'" % [var_name, prop_name], line])
 				elif _is_undefined_var(var_name, declared_vars):
 					errors.append(["Undefined variable '$%s'" % var_name, line])
-			elif not part.is_valid_float():
+			elif not _is_numeric_token(part):
 				errors.append(["Property '%s' expects numeric components, got '%s'" % [prop_name, part], line])
 		return
 	
@@ -536,7 +536,9 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 				if enum_keys.is_empty() or not enum_keys.has(value_str.to_upper()):
 					errors.append(["Property '%s' expects an integer value, got '%s'" % [prop_name, value_str], line])
 		GDSS.Type.FLOAT:
-			if not value_str.is_valid_float():
+			if prop_name == "transition_time" and _scoped_duration(_tokenize_value(value_str)) != null:
+				pass
+			elif not _is_numeric_token(value_str):
 				errors.append(["Property '%s' expects a float value, got '%s'" % [prop_name, value_str], line])
 		GDSS.Type.AUDIO:
 			errors.append(["Property '%s' expects sound(\"res://...\") or a $resource, got '%s'" % [prop_name, value_str], line])
@@ -709,20 +711,21 @@ func check_errors(source: String) -> Array[Array]:
 			var node_type: GdssNodeType = GDSS._get_node_types().get(current_type) if not current_type.is_empty() else null
 			
 			if node_type != null:
+				var resolved_name: String = _resolve_deprecated(prop_name, i)
 				var all_props: Array[GdssProp] = node_type.get_enabled_props()
 				var matched_prop: GdssProp = null
 				for p: GdssProp in all_props:
-					if p.name == prop_name or p.composite_of.has(prop_name) or p.category_subproperties.has(prop_name):
+					if p.name == resolved_name or p.composite_of.has(resolved_name) or p.category_subproperties.has(resolved_name):
 						matched_prop = p
 						break
 				
-				if matched_prop == null and in_event and prop_name.begins_with("transition_"):
-					matched_prop = GDSS.get_registry().property_list.get(prop_name)
+				if matched_prop == null and in_event and resolved_name.begins_with("transition_"):
+					matched_prop = GDSS.get_registry().property_list.get(resolved_name)
 				
 				if matched_prop == null:
 					errors.append(["Unknown property '%s' for selector '%s'" % [prop_name, current_selector], i])
 				else:
-					_check_prop_value(value_str, matched_prop, prop_name, known_methods, declared_vars, errors, i)
+					_check_prop_value(value_str, matched_prop, resolved_name, known_methods, declared_vars, errors, i)
 			else:
 				if value_str.begins_with("$"):
 					var var_name: String = value_str.substr(1)
@@ -1782,6 +1785,10 @@ static func _inherit(result: Dictionary, child: String, parent_data: Dictionary)
 		if not result.get(child).has(state):
 			result.get(child).set(state, {})
 		for prop: String in parent_data.get(state):
+			if prop == "transition_time":
+				result.get(child).get(state).set(prop, _merge_scoped_time(
+					parent_data.get(state).get(prop), result.get(child).get(state).get(prop)))
+				continue
 			if not result.get(child).get(state).has(prop):
 				result.get(child).get(state).set(prop, parent_data.get(state).get(prop))
 
@@ -1789,6 +1796,9 @@ static func _inherit(result: Dictionary, child: String, parent_data: Dictionary)
 static func _parse_value(parts: Array[String]) -> Variant:
 	if parts.is_empty():
 		return ""
+	var scoped: Variant = _scoped_duration(parts)
+	if scoped != null:
+		return scoped
 	if parts.size() == 4:
 		var all_numeric: bool = true
 		var all_int_resolvable: bool = true
@@ -1821,6 +1831,9 @@ static func _parse_value(parts: Array[String]) -> Variant:
 			return false
 		if token.begins_with("#") and Color.html_is_valid(token):
 			return Color.html(token)
+		var angle: Variant = _angle_literal(token)
+		if angle != null:
+			return angle
 		if token.is_valid_int():
 			return int(token)
 		if token.is_valid_float():
@@ -1829,7 +1842,64 @@ static func _parse_value(parts: Array[String]) -> Variant:
 	return " ".join(parts)
 
 
+static func _scoped_duration(parts: Array[String]) -> Variant:
+	if parts.size() != 2 or not _is_numeric_token(parts.get(0)):
+		return null
+	var listed: String = parts.get(1)
+	var quoted: bool = (listed.begins_with("\"") and listed.ends_with("\"")) \
+		or (listed.begins_with("'") and listed.ends_with("'"))
+	if not quoted or listed.length() < 2:
+		return null
+	var seconds: float = float(_angle_literal(parts.get(0)) if _angle_literal(parts.get(0)) != null else parts.get(0).to_float())
+	var map: Dictionary = {}
+	for name: String in listed.substr(1, listed.length() - 2).split(" ", false):
+		map.set(resolve_property(name.strip_edges()), seconds)
+	return null if map.is_empty() else {SCOPED_TIME_KEY: map}
+
+
+static func _angle_literal(token: String) -> Variant:
+	for suffix: String in ["deg", "rad"]:
+		if not token.ends_with(suffix):
+			continue
+		var number: String = token.substr(0, token.length() - suffix.length())
+		if number.is_empty() or not number.is_valid_float():
+			continue
+		return deg_to_rad(float(number)) if suffix == "deg" else float(number)
+	return null
+
+
+static func _is_numeric_token(token: String) -> bool:
+	return token.is_valid_float() or _angle_literal(token) != null
+
+
+const DEPRECATED_PROPERTIES: Dictionary[String, String] = {
+	"font_skew": "char_skew",
+	"font_skew_x": "char_skew_x",
+	"font_skew_y": "char_skew_y",
+}
+
+static var _deprecation_notices: Dictionary[String, bool] = {}
+
+const SCOPED_TIME_KEY: String = "__gdss_scoped_time__"
+const SCOPED_TIME_ANY: String = "*"
+
+
+static func resolve_property(name: String) -> String:
+	return DEPRECATED_PROPERTIES.get(name, name)
+
+
+static func _resolve_deprecated(name: String, line: int) -> String:
+	if not DEPRECATED_PROPERTIES.has(name):
+		return name
+	var replacement: String = DEPRECATED_PROPERTIES.get(name)
+	if not _deprecation_notices.has(name):
+		_deprecation_notices.set(name, true)
+		push_warning("[GDSS] '%s' is deprecated, use '%s' instead (line %d)." % [name, replacement, line + 1])
+	return replacement
+
+
 static func _set_prop(result: Dictionary, selector: String, state: String, prop: String, value: Variant) -> void:
+	prop = resolve_property(prop)
 	if not result.has(selector):
 		return
 	if not result.get(selector).has(state):
@@ -1849,7 +1919,30 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 			value = Vector2(float(value), float(value))
 		elif registered.type == GDSS.Type.COMPOSITE4 and (value is int or value is float):
 			value = Vector4i(int(value), int(value), int(value), int(value))
+	if prop == "transition_time":
+		value = _merge_scoped_time(result.get(selector).get(state).get(prop), value)
 	result.get(selector).get(state).set(prop, value)
+
+
+static func _merge_scoped_time(existing: Variant, incoming: Variant) -> Variant:
+	if incoming == null:
+		return existing
+	if existing == null:
+		return incoming
+	var existing_scoped: bool = existing is Dictionary and (existing as Dictionary).has(SCOPED_TIME_KEY)
+	var incoming_scoped: bool = incoming is Dictionary and (incoming as Dictionary).has(SCOPED_TIME_KEY)
+	if not existing_scoped and not incoming_scoped:
+		return incoming
+	var map: Dictionary = {}
+	if existing_scoped:
+		map = (existing.get(SCOPED_TIME_KEY) as Dictionary).duplicate()
+	elif existing is int or existing is float:
+		map.set(SCOPED_TIME_ANY, float(existing))
+	if incoming_scoped:
+		map.merge(incoming.get(SCOPED_TIME_KEY) as Dictionary, true)
+	elif incoming is int or incoming is float:
+		map.set(SCOPED_TIME_ANY, float(incoming))
+	return {SCOPED_TIME_KEY: map}
 
 
 static func _fold_composite_component(container: Dictionary, parent_prop: String, index: int, value: Variant) -> void:

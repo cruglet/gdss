@@ -121,26 +121,31 @@ void fragment() {
 	vec2 full = half_size * 2.0;
 	vec4 cr = u_corner_radius;
 	float fit = min(1.0, min(
-		min(full.x / max(cr.x + cr.y, EPS), full.y / max(cr.y + cr.z, EPS)),
-		min(full.x / max(cr.z + cr.w, EPS), full.y / max(cr.w + cr.x, EPS))));
+		min(full.x / max(cr.x + cr.y, EPS), full.x / max(cr.z + cr.w, EPS)),
+		min(full.y / max(cr.x + cr.z, EPS), full.y / max(cr.y + cr.w, EPS))));
 	cr *= fit;
-	vec4 ordered_radius = vec4(cr.z, cr.y, cr.w, cr.x);
+	vec4 ordered_radius = vec4(cr.w, cr.y, cr.z, cr.x);
 	
 	vec3 q_outer = box_q(p, half_size, ordered_radius);
 	float d_outer = sd_box(q_outer);
-	float aa = max(u_aa * fwidth(d_outer), EPS);
+	float aa = max(u_aa * 0.5 * (fwidth(p.x) + fwidth(p.y)), EPS);
 	
 	vec2 inner_center = vec2((u_border_widths.x - u_border_widths.y) * 0.5,
 							 (u_border_widths.z - u_border_widths.w) * 0.5);
 	vec2 inner_half = max(half_size - vec2((u_border_widths.x + u_border_widths.y) * 0.5,
 										   (u_border_widths.z + u_border_widths.w) * 0.5), vec2(EPS));
 	vec2 inner_full = inner_half * 2.0;
-	vec4 icr = u_corner_radius;
+	vec4 corner_bw = vec4(
+		(u_border_widths.x + u_border_widths.z) * 0.5,
+		(u_border_widths.y + u_border_widths.z) * 0.5,
+		(u_border_widths.x + u_border_widths.w) * 0.5,
+		(u_border_widths.y + u_border_widths.w) * 0.5);
+	vec4 icr = max(cr - corner_bw, vec4(0.0));
 	float ifit = min(1.0, min(
-		min(inner_full.x / max(icr.x + icr.y, EPS), inner_full.y / max(icr.y + icr.z, EPS)),
-		min(inner_full.x / max(icr.z + icr.w, EPS), inner_full.y / max(icr.w + icr.x, EPS))));
+		min(inner_full.x / max(icr.x + icr.y, EPS), inner_full.x / max(icr.z + icr.w, EPS)),
+		min(inner_full.y / max(icr.x + icr.z, EPS), inner_full.y / max(icr.y + icr.w, EPS))));
 	icr *= ifit;
-	vec4 inner_radius = vec4(icr.z, icr.y, icr.w, icr.x);
+	vec4 inner_radius = vec4(icr.w, icr.y, icr.z, icr.x);
 	float d_inner = sd_box(box_q(p - inner_center, inner_half, inner_radius));
 	
 	vec4 fill_col;
@@ -210,9 +215,9 @@ void fragment() {
 		float reach = dot(dir * dir, ext);
 		float shadow_alpha = 1.0 - smoothstep(0.0, 1.0, d_outer / max(reach, EPS));
 		shadow_alpha *= u_shadow_color.a * (1.0 - panel_mask);
-		float out_a = col.a + shadow_alpha * (1.0 - col.a);
+		float out_a = min(col.a + shadow_alpha, 1.0);
 		col = vec4(out_a > EPS
-			? (col.rgb * col.a + u_shadow_color.rgb * shadow_alpha * (1.0 - col.a)) / out_a
+			? (col.rgb * col.a + u_shadow_color.rgb * shadow_alpha) / out_a
 			: col.rgb, out_a);
 	}
 	

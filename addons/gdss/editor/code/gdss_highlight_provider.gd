@@ -11,6 +11,10 @@ static var _re_global: RegEx = RegEx.create_from_string(r"@global\s+var\s+(\w+)\
 static var _re_instance: RegEx = RegEx.create_from_string(r"@instance\s+var\s+(\w+)\s*[:=]")
 static var _re_local: RegEx = RegEx.create_from_string(r"(?:^|\s)var\s+(\w+)\s*[:=]")
 static var _re_resources: RegEx = RegEx.create_from_string(r"^@resources\b")
+
+
+static func _is_word_char(c: String) -> bool:
+	return (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c == "_" or c.is_valid_int()
 static var _re_entry: RegEx = RegEx.create_from_string(r"^(\w+)\s*[:=]")
 
 var _highlighter: GdssCodeHighlighter
@@ -337,6 +341,13 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				i += 1
 				while i < line_length and (text[i].is_valid_int() or text[i] == "."):
 					i += 1
+				for unit: String in ["deg", "rad"]:
+					if text.substr(i, unit.length()) != unit:
+						continue
+					var after: String = text.substr(i + unit.length(), 1)
+					if after.is_empty() or not _is_word_char(after):
+						i += unit.length()
+					break
 				result.set(start, {"color": col_number})
 				continue
 			

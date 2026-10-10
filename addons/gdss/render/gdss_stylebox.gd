@@ -26,6 +26,33 @@ static func tween_ease(type_enum: GDSS.TransitionType) -> Tween.EaseType:
 	return _EASE_TYPES.get(GDSS.TransitionType.find_key(type_enum), Tween.EASE_IN_OUT)
 
 
+static func _time_for(raw: Variant, prop_name: String) -> float:
+	if raw is Dictionary and (raw as Dictionary).has(GdssStylesheet.SCOPED_TIME_KEY):
+		var map: Dictionary = raw.get(GdssStylesheet.SCOPED_TIME_KEY)
+		if map.has(prop_name):
+			return float(map.get(prop_name))
+		return float(map.get(GdssStylesheet.SCOPED_TIME_ANY, -1.0))
+	return float(raw) if raw is int or raw is float else 0.0
+
+
+func _resolve_time(prop_name: String, state: String) -> float:
+	var seconds: float = _time_for(_get_parsed_val("transition_time", state, 0.0), prop_name)
+	if seconds >= 0.0:
+		return seconds
+	var node_type: GdssNodeType = _resolve_gdss_node()
+	var base: String = node_type.states.get(0) if node_type and not node_type.states.is_empty() else "all"
+	return maxf(_time_for(_get_parsed_val("transition_time", base, 0.0), prop_name), 0.0)
+
+
+static func _longest_time(raw: Variant) -> float:
+	if not (raw is Dictionary and (raw as Dictionary).has(GdssStylesheet.SCOPED_TIME_KEY)):
+		return float(raw) if raw is int or raw is float else 0.0
+	var longest: float = 0.0
+	for key: String in (raw.get(GdssStylesheet.SCOPED_TIME_KEY) as Dictionary):
+		longest = maxf(longest, float(raw.get(GdssStylesheet.SCOPED_TIME_KEY).get(key)))
+	return longest
+
+
 static func _resolve_trans_val(raw: Variant) -> Tween.TransitionType:
 	if raw is int or raw is float:
 		var keys: Array = GDSS.TransitionFunc.keys()
@@ -226,6 +253,7 @@ func _apply_dynamic_nonstyle(node_type: GdssNodeType, entry: Dictionary, state: 
 		if val == null:
 			val = prop.get_default_value()
 		_apply_theme_prop(prop, control, node_type, val)
+	_refresh_font_transform(control, node_type)
 	_applying = false
 
 
@@ -396,6 +424,7 @@ func _apply_overrides_unwrapped(node_type: GdssNodeType, control: Variant, clear
 		if val == null:
 			val = prop.get_default_value()
 		_apply_theme_prop(prop, control, node_type, val)
+	_refresh_font_transform(control, node_type)
 	_applying = false
 
 
@@ -460,6 +489,9 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 				_applied_node_props.set(prop.name, true)
 			if prop.type == GDSS.Type.CURSOR:
 				control.set("mouse_default_cursor_shape", _get_cursor_shape(str(val)))
+				return
+			if prop.name == "char_skew" or prop.name == "char_embolden":
+				_refresh_font_transform(control, node_type)
 				return
 			if prop.name == "opacity":
 				var mod: Color = control.modulate
@@ -542,6 +574,7 @@ func refresh_globals() -> void:
 		if val == null:
 			val = prop.get_default_value()
 		_apply_theme_prop(prop, control, node_type, val)
+	_refresh_font_transform(control, node_type)
 	control.end_bulk_theme_override()
 	_applying = false
 
@@ -580,7 +613,8 @@ func _get_animatable_props() -> Dictionary:
 	for prop: GdssProp in node_type.get_enabled_props():
 		match prop.type:
 			GDSS.Type.COLOR, GDSS.Type.COMPOSITE4, GDSS.Type.FLOAT, GDSS.Type.INT, GDSS.Type.VECTOR2:
-				_animatable_cache.set(prop.name, prop)
+				if not prop.name.begins_with("transition_"):
+					_animatable_cache.set(prop.name, prop)
 	_animatable_dirty = false
 	return _animatable_cache
 
@@ -608,7 +642,9 @@ func _sync_active_state() -> void:
 
 func _start_transition(from_state: String, to_state: String, timing_state: String = "", on_finished: Callable = Callable()) -> void:
 	var ts: String = timing_state if not timing_state.is_empty() else to_state
-	var transition_time: float = GDSS.scaled_duration(float(_get_parsed_val("transition_time", ts, 0.0)))
+	var transition_time: float = GDSS.scaled_duration(maxf(
+		_longest_time(_get_parsed_val("transition_time", ts, 0.0)),
+		_resolve_time(GdssStylesheet.SCOPED_TIME_ANY, ts)))
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
 		_kill_tween()
 		if on_finished.is_valid():
@@ -632,6 +668,9 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	
 	for prop_name: String in animatable:
 		var prop: GdssProp = animatable.get(prop_name)
+		var prop_time: float = GDSS.scaled_duration(_resolve_time(prop_name, ts))
+		if prop_time <= 0.0:
+			continue
 		var is_style: bool = prop.category == GdssProp.Category.STYLE
 		
 		var from_raw: Variant = _get_raw_parsed_val(prop_name, resolved_from)
@@ -655,7 +694,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 					if result != null:
 						_tweened_values.set(captured_prop, result)
 					_safe_redraw()
-				, 0.0, 1.0, transition_time)
+				, 0.0, 1.0, prop_time)
 				tweener_count += 1
 				continue
 		
@@ -677,7 +716,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 							lerped.append((sides_from.get(side) as Color).lerp(sides_to.get(side), t))
 						_tweened_values.set(captured_sides, lerped)
 						_safe_redraw()
-					, 0.0, 1.0, transition_time)
+					, 0.0, 1.0, prop_time)
 					tweener_count += 1
 					continue
 				if not from_val is Color or not to_val is Color:
@@ -695,7 +734,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, v)
-				, from, to, transition_time)
+				, from, to, prop_time)
 				tweener_count += 1
 			
 			GDSS.Type.COMPOSITE4:
@@ -714,7 +753,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, v)
-				, from, to, transition_time)
+				, from, to, prop_time)
 				tweener_count += 1
 			
 			GDSS.Type.VECTOR2:
@@ -740,7 +779,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, v)
-				, from, to, transition_time)
+				, from, to, prop_time)
 				tweener_count += 1
 			
 			GDSS.Type.FLOAT:
@@ -758,7 +797,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, v)
-				, from, to, transition_time)
+				, from, to, prop_time)
 				tweener_count += 1
 			
 			GDSS.Type.INT:
@@ -776,7 +815,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 						_safe_redraw()
 					else:
 						_apply_single_override(captured_prop, int(v))
-				, float(from), float(to), transition_time)
+				, float(from), float(to), prop_time)
 				tweener_count += 1
 	
 	
@@ -939,6 +978,10 @@ func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
 			continue
 		if override.get(state) is Dictionary:
 			for key: String in override.get(state):
+				if key == "transition_time":
+					merged.get(state).set(key, GdssStylesheet._merge_scoped_time(
+						merged.get(state).get(key), override.get(state).get(key)))
+					continue
 				merged.get(state).set(key, override.get(state).get(key))
 		else:
 			merged.set(state, override.get(state))
@@ -1091,6 +1134,40 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 				return named
 	return raw
 
+
+func _apply_font_transform(control: Variant, node_type: GdssNodeType, skew: Vector2, embolden: float) -> void:
+	if control == null or node_type == null:
+		return
+	var neutral: bool = is_zero_approx(skew.x) and is_zero_approx(skew.y) and is_zero_approx(embolden)
+	for item: String in node_type.fonts:
+		var current: Font = control.get_theme_font(item)
+		var marked: bool = current is FontVariation and (current as FontVariation).has_meta(&"gdss_font_transform")
+		if neutral:
+			if marked and control.has_theme_font_override(item):
+				control.remove_theme_font_override(item)
+			continue
+		var xform: Transform2D = Transform2D(Vector2(1.0, skew.y), Vector2(skew.x, 1.0), Vector2.ZERO)
+		if marked and (current as FontVariation).variation_transform == xform \
+			and is_equal_approx((current as FontVariation).variation_embolden, embolden):
+			continue
+		var variation: FontVariation = FontVariation.new()
+		variation.base_font = (current as FontVariation).base_font if marked else current
+		variation.variation_transform = xform
+		variation.variation_embolden = embolden
+		variation.set_meta(&"gdss_font_transform", true)
+		control.add_theme_font_override(item, variation)
+
+
+func _refresh_font_transform(control: Variant, node_type: GdssNodeType) -> void:
+	if control == null or node_type == null or node_type.fonts.is_empty():
+		return
+	var entry: Dictionary = _resolve_entry()
+	var state: String = _get_state()
+	var skew: Variant = _tweened_values.get("char_skew", _get_val_cached("char_skew", entry, state, Vector2.ZERO))
+	var embolden: Variant = _tweened_values.get("char_embolden", _get_val_cached("char_embolden", entry, state, 0.0))
+	_apply_font_transform(control, node_type,
+		skew if skew is Vector2 else Vector2.ZERO,
+		float(embolden) if embolden is int or embolden is float else 0.0)
 
 func _splat_shorthand(key: String, value: Variant) -> Variant:
 	if not (value is int or value is float):

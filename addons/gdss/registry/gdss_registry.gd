@@ -51,6 +51,8 @@ func _build_properties_code() -> void:
 	_make_prop("corner_radius", GDSS.Type.COMPOSITE4, Vector4i.ZERO, GdssProp.Category.STYLE, PackedStringArray(["corner_radius_top_left", "corner_radius_top_right", "corner_radius_bottom_left", "corner_radius_bottom_right"]))
 	_make_prop("cursor", GDSS.Type.CURSOR, 0, GdssProp.Category.NODE_PROPERTY)
 	_make_prop("expand", GDSS.Type.COMPOSITE4, Vector4i.ZERO, GdssProp.Category.STYLE, PackedStringArray(["expand_left", "expand_right", "expand_top", "expand_bottom"]))
+	_make_prop("char_embolden", GDSS.Type.FLOAT, 0.0, GdssProp.Category.NODE_PROPERTY)
+	_make_prop("char_skew", GDSS.Type.VECTOR2, Vector2.ZERO, GdssProp.Category.NODE_PROPERTY, PackedStringArray(["char_skew_x", "char_skew_y"]))
 	_make_prop("font_color", GDSS.Type.COLOR, Color(1, 1, 1, 1), GdssProp.Category.COLOR, PackedStringArray(), PackedStringArray(["font_hover_color", "font_pressed_color", "font_focus_color", "font_disabled_color", "font_uneditable_color", "font_selected_color", "font_readonly_color", "font_unselected_color", "font_hovered_color", "font_hover_pressed_color", "font_hovered_selected_color"]))
 	_make_prop("icon_color", GDSS.Type.COLOR, Color(1, 1, 1, 1), GdssProp.Category.COLOR, PackedStringArray(), PackedStringArray(["icon_hover_color", "icon_pressed_color", "icon_focus_color", "icon_disabled_color", "icon_uneditable_color", "icon_selected_color", "icon_readonly_color", "icon_unselected_color", "icon_hovered_color", "icon_hover_pressed_color", "icon_hovered_selected_color", "icon_normal_color"]))
 	_make_prop("padding", GDSS.Type.COMPOSITE4, Vector4i.ZERO, GdssProp.Category.STYLE, PackedStringArray(["padding_left", "padding_right", "padding_top", "padding_bottom"]))
@@ -83,7 +85,7 @@ func _build_components_code() -> void:
 	var stylebox: GdssComponent = GdssComponent.new()
 	stylebox.component_name = "Stylebox"
 	stylebox.default_state = true
-	stylebox.properties = _component_props(PackedStringArray(["anti_aliasing", "bg_color", "border", "border_color", "corner_detail", "corner_radius", "cursor", "expand", "font_color", "padding", "shadow", "shadow_color", "skew_x", "skew_y"]))
+	stylebox.properties = _component_props(PackedStringArray(["anti_aliasing", "bg_color", "border", "border_color", "corner_detail", "corner_radius", "cursor", "expand", "char_embolden", "char_skew", "font_color", "padding", "shadow", "shadow_color", "skew_x", "skew_y"]))
 	component_list.set("Stylebox", stylebox)
 	var trans: GdssComponent = GdssComponent.new()
 	trans.component_name = "Transitionable"
