@@ -904,8 +904,6 @@ static func _restyle_all() -> void:
 
 
 static func _flush_global_refresh() -> void:
-	# queue_redraw() is idempotent within a frame, so no per-item dedup set is needed
-	# (a static multi-slot node redrawing twice is a free no-op, cheaper than hashing).
 	_global_flush_scheduled = false
 	var found_dead: bool = false
 	for stylebox: GdssStylebox in GdssNodeBinder.get_all_styleboxes():
@@ -917,7 +915,7 @@ static func _flush_global_refresh() -> void:
 		if item is CanvasItem:
 			(item as CanvasItem).queue_redraw()
 		else:
-			stylebox.emit_changed() # Window-derived nodes repaint via theme-changed notify
+			stylebox.emit_changed()
 	if found_dead:
 		GdssNodeBinder.mark_dirty()
 	_emit_globals_changed()
@@ -934,8 +932,6 @@ static func _get_gdss_methods() -> Dictionary[String, GdssMethod]:
 static func get_registry() -> GdssRegistry:
 	if _db != null and not _db.node_list.is_empty():
 		return _db
-	# Built entirely in code (props/components/methods + ThemeDB-derived nodes), so the
-	# plugin ships no registry resources to load, keep in sync, or repopulate. Cached for the run.
 	_db = GdssRegistry.new()
 	_db.build_code()
 	return _db

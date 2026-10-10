@@ -36,13 +36,10 @@ static func get_all_styleboxes() -> Array[GdssStylebox]:
 	return _all_cache
 
 
-## Marks the cached stylebox array stale so [method get_all_styleboxes] rebuilds it.
 static func mark_dirty() -> void:
 	_all_dirty = true
 
 
-## Releases everything GDSS holds for the node with instance id [param id]: registry
-## slot, method caches and instance variables. Idempotent.
 static func purge(id: int) -> void:
 	if _registry.has(id):
 		for stylebox: GdssStylebox in (_registry.get(id) as Dictionary).values():
@@ -57,8 +54,6 @@ static func purge(id: int) -> void:
 	GdssStylesheet._instance_vars.erase(id)
 
 
-## Purges only if the instance is genuinely gone. Deferred from tree-exit hooks so a
-## reparent (remove-then-readd in one frame) tears nothing down.
 static func _check_purge(id: int) -> void:
 	if is_instance_valid(instance_from_id(id)):
 		return
@@ -76,16 +71,12 @@ static func get_styleboxes(canvas_item: Node) -> Array[GdssStylebox]:
 	return result
 
 
-## The live {state -> stylebox} slots dict, uncopied (unlike get_styleboxes). Hot-path
-## callers iterate it directly and must not mutate it.
 static func get_slots(canvas_item: Node) -> Dictionary:
 	if canvas_item == null:
 		return {}
 	return _registry.get(canvas_item.get_instance_id(), {})
 
 
-## The stylebox that owns node-level concerns (on_show/on_hide): the unslotted one for
-## stateful nodes, else the first slot. Null if the node has none.
 static func get_primary_stylebox(canvas_item: Node) -> GdssStylebox:
 	if canvas_item == null:
 		return null
@@ -113,13 +104,10 @@ static func refresh(canvas_item: Node) -> void:
 		var stylebox: GdssStylebox = slots.get(state)
 		if stylebox != null:
 			stylebox.reapply()
-	# Window-derived nodes have no queue_redraw; reapply() already emitted changed.
 	if canvas_item is CanvasItem:
 		(canvas_item as CanvasItem).queue_redraw()
 
 
-## Lightweight refresh for an instance-variable change: re-applies only the node's
-## dynamic non-style overrides and queues a redraw.
 static func refresh_vars(canvas_item: Node) -> void:
 	if canvas_item == null:
 		return
@@ -227,17 +215,13 @@ static func _migrate_legacy(canvas_item: CanvasItem) -> void:
 
 
 static func bind(canvas_item: Node, apply: bool = true, node_type: GdssNodeType = null) -> void:
-	# node_type may be passed in (runtime._try_bind already looked it up) to skip a fetch.
 	if node_type == null:
 		node_type = GDSS._get_node_types().get(canvas_item.get_class())
 	if node_type == null:
 		return
-	# Control and Window both expose the theme-override API; everything else is unstylable.
 	if not (canvas_item is Control or canvas_item is Window):
 		return
 	var control: Variant = canvas_item
-	# One bulk region wraps the stylebox adds (a Button binds the same stylebox to ~9 slots)
-	# and the value overrides, so a fresh bind costs one theme-changed notification.
 	control.begin_bulk_theme_override()
 	var styleboxes: Array[GdssStylebox] = []
 	if node_type.is_static:
@@ -256,8 +240,6 @@ static func bind(canvas_item: Node, apply: bool = true, node_type: GdssNodeType 
 			if not control.has_theme_stylebox_override(state) or control.get_theme_stylebox(state) != stylebox:
 				control.add_theme_stylebox_override(state, stylebox)
 		styleboxes.append(stylebox)
-		# Seed the resting state without firing the setter and apply in this same bulk, so the
-		# caller's update_state no-ops and an unchanged reparent skips the re-apply.
 		if apply and canvas_item is CanvasItem:
 			var active: String = node_type.resolve_state(canvas_item as CanvasItem)
 			if stylebox.current_state != active:
@@ -339,8 +321,6 @@ static func unbind(canvas_item: Node) -> void:
 			ei.call(&"mark_scene_as_unsaved")
 
 
-# Strips GDSS overrides from every bound node without tearing down the binding, so a
-# scene packs without baked styling. Pair with reapply_overrides().
 static func strip_overrides() -> void:
 	for id: int in _registry.keys():
 		var canvas_item: Node = instance_from_id(id) as Node
@@ -360,7 +340,6 @@ static func strip_overrides() -> void:
 			control.remove_theme_stylebox_override(state)
 
 
-# Re-applies the style overrides to every bound node, reusing the registry's styleboxes.
 static func reapply_overrides() -> void:
 	for id: int in _registry.keys():
 		var canvas_item: Node = instance_from_id(id) as Node

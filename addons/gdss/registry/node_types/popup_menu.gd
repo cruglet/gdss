@@ -7,7 +7,6 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 	return "panel"
 
 
-# Only the panel background is GDSS-drawn; hover/separator stay theme-driven.
 func get_only_states() -> PackedStringArray:
 	return ["panel"]
 

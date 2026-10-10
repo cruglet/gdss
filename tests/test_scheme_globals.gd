@@ -89,8 +89,8 @@ func run(t: TC) -> void:
 	await t.await_frames(1)
 	t.check_eq(nested_stylebox._get_val("bg_color"), Color("#0d0d14"), "switching back restores the base palette")
 	t.check(not GDSS.get_schemes().has(GdssStylesheet.SCHEME_PARENT_KEY), "parent marker never leaks as a scheme name")
-	GdssStylesheet.schemes["loop_a"] = {GdssStylesheet.SCHEME_PARENT_KEY: "loop_b"}
-	GdssStylesheet.schemes["loop_b"] = {GdssStylesheet.SCHEME_PARENT_KEY: "loop_a"}
+	GdssStylesheet.schemes.set("loop_a", {GdssStylesheet.SCHEME_PARENT_KEY: "loop_b"})
+	GdssStylesheet.schemes.set("loop_b", {GdssStylesheet.SCHEME_PARENT_KEY: "loop_a"})
 	t.check_eq(GdssStylesheet._scheme_chain("loop_a").size(), 2, "runtime chain walk terminates on cycles")
 	GdssStylesheet.schemes.erase("loop_a")
 	GdssStylesheet.schemes.erase("loop_b")

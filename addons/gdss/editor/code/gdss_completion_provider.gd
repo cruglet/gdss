@@ -40,9 +40,6 @@ const BUILTIN_COLORS: Array[String] = [
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
 ]
 
-# Event blocks (on_show() { }) map to the node signal that drives them (see
-# gdss_runtime.gd _EVENT_SIGNALS). Only visibility events are completed; interaction
-# events are expressed as state selectors (:hover, :pressed, :focus) instead.
 const _EVENT_SIGNALS: Dictionary = {
 	"on_show": "visibility_changed",
 	"on_hide": "visibility_changed",
@@ -52,9 +49,6 @@ const _EVENT_SIGNALS: Dictionary = {
 func _ready() -> void:
 	gdss_editor = get_parent() as GdssEditor
 	_completion_color = EditorInterface.get_editor_settings().get_setting("text_editor/theme/highlighting/completion_font_color")
-	# CodeEdit keeps its own comment delimiters, separate from the highlighter. Without "#"
-	# registered, an apostrophe inside a comment (e.g. "It's") opens a phantom string and
-	# every following line reads as in-string, so completions get wrapped in quotes.
 	if not editor.has_comment_delimiter("#"):
 		editor.add_comment_delimiter("#", "")
 	_build_from_objects()
@@ -181,7 +175,8 @@ func _update_code_hint(_word: String) -> void:
 	var paren_pos: int = line.rfind("(", col)
 	if paren_pos != -1:
 		var before_paren: String = line.substr(0, paren_pos).strip_edges()
-		var method_name: String = before_paren.split(" ")[-1].split(":")[-1].strip_edges()
+		var last_word: String = before_paren.substr(before_paren.rfind(" ") + 1)
+		var method_name: String = last_word.substr(last_word.rfind(":") + 1).strip_edges()
 		var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
 		if (method_name == "calc" or method != null) and not _in_meta_block():
 			if method_name == "calc":
@@ -215,7 +210,6 @@ func _show_composite_hint(line: String, col: int) -> bool:
 		return false
 	var prop_name: String = line.substr(0, colon).strip_edges()
 	var prop_def: GdssProp = GDSS.get_registry().property_list.get(prop_name)
-	# Only the packed numeric composites spell components out; a color takes one value.
 	if prop_def == null or (prop_def.type != GDSS.Type.COMPOSITE4 and prop_def.type != GDSS.Type.VECTOR2):
 		return false
 	var context_type: String = str(_get_context().get("type", ""))
@@ -508,7 +502,6 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 				editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, str(default), str(default), _completion_color, _get_icon(&"MemberProperty"))
 
 
-
 func _complete_named_colors(word: String) -> void:
 	for c: String in GdssStylesheet.NAMED_COLORS:
 		if _matches(c, word):
@@ -582,7 +575,7 @@ func _get_context() -> Dictionary:
 		var m: RegExMatch = _re_node_open.search(line)
 		if m:
 			var raw_selector: String = m.get_string(1)
-			var first_selector: String = raw_selector.split(",")[0].strip_edges()
+			var first_selector: String = raw_selector.get_slice(",", 0).strip_edges()
 			stack.push_back({
 				"style": first_selector,
 				"variant": m.get_string(2),
@@ -593,7 +586,7 @@ func _get_context() -> Dictionary:
 		var vm: RegExMatch = _re_variant_open.search(line)
 		if vm:
 			var raw_variant: String = vm.get_string(1)
-			var first_variant: String = raw_variant.split(",")[0].strip_edges().trim_prefix(":")
+			var first_variant: String = raw_variant.get_slice(",", 0).strip_edges().trim_prefix(":")
 			var top: Dictionary = stack.back() if stack.size() > 0 else {}
 			stack.push_back({
 				"style": top.get("style", ""),
@@ -602,9 +595,6 @@ func _get_context() -> Dictionary:
 			})
 			continue
 		
-		# Event blocks use the call form, so they match neither selector regex. Track them as a
-		# frame inheriting the enclosing style; otherwise the closing brace pops the parent
-		# selector and desyncs every following subclass.
 		if line.ends_with("{"):
 			var head: String = line.substr(0, line.length() - 1).strip_edges()
 			var paren: int = head.find("(")
@@ -773,7 +763,7 @@ func _hover_doc(word: String) -> String:
 		var meta: Dictionary = _property_meta.get(style_name)
 		if meta.has(word):
 			var prop: GdssProp = meta.get(word)
-			return "%s: %s" % [word, GDSS.Type.keys()[prop.type].to_lower()]
+			return "%s: %s" % [word, GDSS.Type.find_key(prop.type).to_lower()]
 	return ""
 
 

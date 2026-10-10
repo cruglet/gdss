@@ -1,20 +1,20 @@
 [gd_scene format=3 uid="uid://bh4sv3ta53fmk"]
 
 [ext_resource type="Script" uid="uid://c8ecxj182iey" path="res://addons/gdss/editor/gdss_editor.gd" id="1_52mtl"]
-[ext_resource type="Script" uid="uid://ct5gmahfbd0cc" path="res://addons/gdss/editor/gdss_completion_provider.gd" id="2_vh56t"]
-[ext_resource type="Script" uid="uid://b8vfgh1l41n0a" path="res://addons/gdss/editor/gdss_highlight_provider.gd" id="2_wia40"]
-[ext_resource type="Script" uid="uid://d243kyxgy1fcy" path="res://addons/gdss/core/gdss_stylesheet.gd" id="4_squo2"]
+[ext_resource type="Script" uid="uid://ct5gmahfbd0cc" path="res://addons/gdss/editor/code/gdss_completion_provider.gd" id="2_vh56t"]
+[ext_resource type="Script" uid="uid://b8vfgh1l41n0a" path="res://addons/gdss/editor/code/gdss_highlight_provider.gd" id="2_wia40"]
+[ext_resource type="Script" uid="uid://d243kyxgy1fcy" path="res://addons/gdss/language/gdss_stylesheet.gd" id="4_squo2"]
 [ext_resource type="Texture2D" uid="uid://ceogrxr1lg3up" path="res://addons/gdss/editor/icons/Map.svg" id="5_50ht1"]
 [ext_resource type="Texture2D" uid="uid://85s2m2sx1kkb" path="res://addons/gdss/editor/icons/ActionCopy.svg" id="5_by7tt"]
 [ext_resource type="Texture2D" uid="uid://c55pmw55mh1ut" path="res://addons/gdss/editor/icons/Doc.svg" id="5_djuub"]
-[ext_resource type="Script" uid="uid://b6selo2ptljhh" path="res://addons/gdss/editor/gdss_outline.gd" id="9_outln"]
+[ext_resource type="Script" uid="uid://b6selo2ptljhh" path="res://addons/gdss/editor/panels/gdss_outline.gd" id="9_outln"]
 
 [sub_resource type="GDScript" id="GDScript_rjngg"]
 
 [sub_resource type="SyntaxHighlighter" id="SyntaxHighlighter_718be"]
 script = SubResource("GDScript_rjngg")
 
-[node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "copy_button", "toggle_map_button", "caret_pos_label", "zoom_percentage", "outline")]
+[node name="GDSS" type="Control" unique_id=212107563 node_paths=PackedStringArray("code_edit", "error_label", "title_label", "title_bar", "copy_button", "toggle_map_button", "caret_pos_label", "zoom_percentage", "outline")]
 clip_contents = true
 custom_minimum_size = Vector2(550, 400)
 layout_mode = 3
@@ -27,6 +27,7 @@ script = ExtResource("1_52mtl")
 code_edit = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HSplitContainer/CodeEdit")
 error_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/ErrorLabel")
 title_label = NodePath("VBoxContainer/TitleLabel")
+title_bar = NodePath("VBoxContainer/TitleLabel/HBoxContainer")
 copy_button = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CopyButton")
 toggle_map_button = NodePath("VBoxContainer/TitleLabel/HBoxContainer/ToggleMapButton")
 caret_pos_label = NodePath("VBoxContainer/MarginContainer/VBoxContainer/HBoxContainer/CaretPosLabel")

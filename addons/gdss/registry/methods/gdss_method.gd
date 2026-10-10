@@ -9,6 +9,7 @@ enum ParamType {
 	BOOL,
 }
 
+
 class Param:
 	var name: String
 	var type: ParamType
@@ -32,7 +33,7 @@ func get_code_hint(active_param: int = -1) -> String:
 	var parts: PackedStringArray = []
 	for i: int in parameters.size():
 		var param: Param = parameters.get(i)
-		var type_str: String = ParamType.keys()[param.type].to_lower()
+		var type_str: String = ParamType.find_key(param.type).to_lower()
 		if active_param == i:
 			var part: String = param.name + ": " + type_str
 			if param.optional:

@@ -37,7 +37,7 @@ func _make_prop(n: String, t: GDSS.Type, d: Variant, c: GdssProp.Category, comp:
 	p.default_value = d
 	p.category = c
 	if not comp.is_empty():
-		p.composite_of = comp # set after type so it overrides the auto _left/_right pattern
+		p.composite_of = comp
 	p.category_subproperties = sub
 	property_list.set(n, p)
 

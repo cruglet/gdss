@@ -1,9 +1,5 @@
 extends Button
 
-# Makes a free-floating button draggable with the mouse, clamped so its rect
-# stays inside the viewport. Hooked up via the gui_input signal so the button's
-# own hover/pressed handling (and GDSS state styling) keeps working.
-
 var _dragging: bool = false
 var _grab_offset: Vector2 = Vector2.ZERO
 

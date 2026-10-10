@@ -2,9 +2,6 @@
 class_name GdssMethod_LiquidBlur
 extends GdssMethod
 
-# The liquid-glass refraction this drives is ported from OverShifted/LiquidGlass
-# (MIT): https://github.com/OverShifted/LiquidGlass
-
 
 func _init() -> void:
 	method_name = "liquid_blur"

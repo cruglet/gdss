@@ -15,8 +15,6 @@ var grad_offsets: Vector2 = Vector2(0.0, 1.0)
 var _plain: GdssBlur
 
 
-## The same backdrop without refraction, edge highlight or saturation shift, so a
-## liquid_blur() degrades to what blur() would have produced. Cached per instance.
 func to_plain() -> GdssBlur:
 	if refraction == 0.0 and highlight == 0.0 and saturation == 1.0:
 		return self

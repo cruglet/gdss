@@ -26,7 +26,6 @@ static var _composite_map: Dictionary = {}
 static var _inst: GdssStylesheet
 
 const SCHEME_PARENT_KEY: String = "__gdss_extends__"
-## Marks a color property that carries one value per side (left, right, top, bottom).
 const COLOR4_KEY: String = "__gdss_color4__"
 
 static var _re_global: RegEx = RegEx.create_from_string(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
@@ -131,7 +130,6 @@ static func _strip_line_comment(s: String) -> String:
 	return s
 
 
-# Splits on unquoted semicolons; ";" acts like a newline.
 static func _split_statements(line: String) -> PackedStringArray:
 	var result: PackedStringArray = []
 	var current: String = ""
@@ -203,13 +201,9 @@ static var COLOR_ALIASES: Dictionary = {
 	"TRANSPARENT_BLACK": Color(0, 0, 0, 0),
 	"TRANSPARENT_WHITE": Color(1, 1, 1, 0),
 }
-# Memoizes name -> Color, or false for "not a color". Probed for every non-hex string
-# value, so caching misses too keeps to_upper()/from_string() off the hot path.
 static var _named_color_cache: Dictionary = {}
 
 
-## Resolves a named color, honouring GDSS aliases (such as TRANSPARENT_BLACK)
-## before falling back to Godot's built-in color names.
 static func parse_named_color(name: String, fallback: Color) -> Color:
 	var cached: Variant = _named_color_cache.get(name)
 	if cached != null:
@@ -280,7 +274,7 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 	
 	if prop != null and not gdss_method.supported_prop_types.is_empty():
 		if not gdss_method.supported_prop_types.has(prop.type):
-			errors.append(["Method '%s()' cannot be used for property type '%s'" % [method_name, GDSS.Type.keys()[prop.type]], line])
+			errors.append(["Method '%s()' cannot be used for property type '%s'" % [method_name, GDSS.Type.find_key(prop.type)], line])
 	
 	var args_start: int = value_str.find("(")
 	var args_end: int = value_str.rfind(")")
@@ -477,7 +471,6 @@ func _check_resource_use(name: String, entry: Dictionary, prop_name: String, act
 
 func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, known_methods: Dictionary, declared_vars: Dictionary, errors: Array[Array], line: int) -> void:
 	var is_component: bool = prop.composite_of.has(prop_name)
-	# Per-side colors take the shorthand's methods; numeric composites only hold numbers.
 	var is_color_component: bool = is_component and prop.type == GDSS.Type.COLOR
 	if not _is_quoted_literal(value_str) and value_str.contains("("):
 		if is_component and not is_color_component:
@@ -557,7 +550,7 @@ func _check_prop_value(value_str: String, prop: GdssProp, prop_name: String, kno
 
 func check_errors(source: String) -> Array[Array]:
 	var errors: Array[Array] = []
-	_check_separator_mix(_strip_annotation_blocks(source)["cleaned"], errors)
+	_check_separator_mix(_strip_annotation_blocks(source).get("cleaned"), errors)
 	var pre: Dictionary = _strip_annotation_blocks(_normalize_separators(source))
 	_collect_check_resources(pre.get("blocks"))
 	var lines: PackedStringArray = (pre.get("cleaned") as String).split("\n")
@@ -755,7 +748,7 @@ func check_errors(source: String) -> Array[Array]:
 	for entry: Dictionary in _collect_imports(source):
 		var resolved: String = _resolve_import_path(entry.get("path"), GdssStorage.get_save_path().get_base_dir())
 		if not FileAccess.file_exists(resolved):
-			errors.append(["Imported file not found: '%s'" % entry["path"], entry["line"]])
+			errors.append(["Imported file not found: '%s'" % entry.get("path"), entry.get("line")])
 	
 	return errors
 
@@ -769,10 +762,10 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 	for block: Dictionary in blocks:
 		var label: String = "@" + str(block.get("kind")) if block.get("kind") != "meta" else "@meta"
 		if block.get("malformed"):
-			errors.append(["Expected '{' on the same line as %s" % label, block["header_line"]])
+			errors.append(["Expected '{' on the same line as %s" % label, block.get("header_line")])
 			continue
 		if block.get("unterminated", false):
-			errors.append(["Unclosed brace '{' on %s block" % label, block["header_line"]])
+			errors.append(["Unclosed brace '{' on %s block" % label, block.get("header_line")])
 			continue
 		if block.get("kind") == "config":
 			_check_config_entries(block, errors)
@@ -789,16 +782,16 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 			for entry: Dictionary in block.get("entries"):
 				var value_str: String = entry.get("value_str")
 				if value_str.is_empty():
-					errors.append(["Scheme variable '%s' has no value" % entry["key"], entry["line"]])
+					errors.append(["Scheme variable '%s' has no value" % entry.get("key"), entry.get("line")])
 					continue
 				if not declared_globals.has(entry.get("key")) and not declared_instances.has(entry.get("key")) and not _global_defaults.has(entry.get("key")) and not _instance_defaults.has(entry.get("key")):
-					errors.append(["Scheme '%s' overrides '%s', which is not an @global or @instance var." % [block["name"], entry["key"]], entry["line"]])
+					errors.append(["Scheme '%s' overrides '%s', which is not an @global or @instance var." % [block.get("name"), entry.get("key")], entry.get("line")])
 				if value_str.begins_with("$"):
-					errors.append(["Scheme value for '%s' must be a literal; variable references aren't supported inside schemes." % entry["key"], entry["line"]])
+					errors.append(["Scheme value for '%s' must be a literal; variable references aren't supported inside schemes." % entry.get("key"), entry.get("line")])
 		else:
 			for entry: Dictionary in block.get("entries"):
 				if (entry.get("value_str") as String).is_empty():
-					errors.append(["Metadata key '%s' has no value" % entry["key"], entry["line"]])
+					errors.append(["Metadata key '%s' has no value" % entry.get("key"), entry.get("line")])
 				elif entry.get("key") == "default_scheme":
 					default_scheme = _parse_meta_value(entry.get("value_str"))
 					default_line = entry.get("line")
@@ -1020,8 +1013,6 @@ static func parse_paths(paths: PackedStringArray) -> Dictionary[String, Dictiona
 	return parse_all(gathered)
 
 
-## Every method that takes a single path and loads a resource from it, so a
-## [code]@resources[/code] entry can name one. Derived from the registry, in method order.
 static func resource_methods() -> PackedStringArray:
 	var result: PackedStringArray = []
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
@@ -1480,8 +1471,6 @@ static func _tokenize(source: String) -> Array[String]:
 
 
 static func _ensure_selector(result: Dictionary, selector: String, _known_states: PackedStringArray) -> void:
-	# States are created lazily by _set_prop / _inherit, so an entry no longer carries ~70
-	# empty state dicts. Unstyled states resolve via "all"/default.
 	if result.has(selector):
 		return
 	result.set(selector, {"all": {}, "_classes": {}})
@@ -1519,7 +1508,6 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 			pos = block_end
 			continue
 		
-		# Event block: name(...) { } - told from a state by the parens, keyed by event name.
 		if next == "(":
 			var close: int = pos + 2
 			while close < tokens.size() and tokens.get(close) != ")":
@@ -1532,8 +1520,6 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 			continue
 		
 		if (next == ":" or next == "::") and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens.get(pos + 3) == "{":
-			# "%Variation" targets a node's theme_type_variation; a prefix-less name is a
-			# regular gdss class (applied via gdss_classes / GDSS.add_class).
 			var is_variation: bool = token.begins_with("%") and not parent_selector.is_empty()
 			var child_name: String = token.substr(1) if is_variation else token
 			var child_container: Dictionary = _get_variation_container(result, parent_selector) if is_variation else _get_child_container(result, parent_selector)
@@ -1550,8 +1536,6 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 			continue
 		
 		if next == "{":
-			# "%Variation" targets a node's theme_type_variation; a prefix-less name is a
-			# regular gdss class (applied via gdss_classes / GDSS.add_class).
 			var is_variation: bool = token.begins_with("%") and not parent_selector.is_empty()
 			var child_name: String = token.substr(1) if is_variation else token
 			var child_container: Dictionary = _get_variation_container(result, parent_selector) if is_variation else _get_child_container(result, parent_selector)
@@ -1584,8 +1568,6 @@ static func _get_child_container(result: Dictionary, parent_selector: String) ->
 	return result.get(parent_selector).get("_classes")
 
 
-# Container for theme-type-variation blocks ("/FlatButton { }"), separate from "_classes"
-# so variations auto-apply from a node's theme_type_variation.
 static func _get_variation_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
@@ -1658,8 +1640,6 @@ static func _consume_value(tokens: Array[String], pos: int, known_states: Packed
 		var lookahead: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
 		var lookahead2: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
 		if lookahead == "(":
-			# "name(...)" is a method call only when it STARTS the value; later it begins the next
-			# statement (e.g. an on_show() block), so end this value here.
 			if parts.is_empty():
 				if t == "calc":
 					return _parse_calc(tokens, pos)
@@ -1799,7 +1779,6 @@ static func _inherit(result: Dictionary, child: String, parent_data: Dictionary)
 			continue
 		if not parent_data.get(state) is Dictionary:
 			continue
-		# States aren't pre-created, so create the child's on demand to keep inheriting.
 		if not result.get(child).has(state):
 			result.get(child).set(state, {})
 		for prop: String in parent_data.get(state):
@@ -1821,7 +1800,7 @@ static func _parse_value(parts: Array[String]) -> Variant:
 		if all_numeric:
 			return Vector4i(int(parts.get(0)), int(parts.get(1)), int(parts.get(2)), int(parts.get(3)))
 		if all_int_resolvable:
-			return {"__gdss_composite4__": [parts[0], parts[1], parts[2], parts[3]]}
+			return {"__gdss_composite4__": [parts.get(0), parts.get(1), parts.get(2), parts.get(3)]}
 	if parts.size() == 2:
 		var both_numeric: bool = true
 		var both_float_resolvable: bool = true
@@ -1867,7 +1846,6 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 				GDSS.Type.CURSOR, GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
 					value = (value as String).to_upper()
 		elif registered.type == GDSS.Type.VECTOR2 and (value is int or value is float):
-			# Single-value shorthand splats to both components (transform_scale: 1.1).
 			value = Vector2(float(value), float(value))
 		elif registered.type == GDSS.Type.COMPOSITE4 and (value is int or value is float):
 			value = Vector4i(int(value), int(value), int(value), int(value))
@@ -1877,8 +1855,6 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 static func _fold_composite_component(container: Dictionary, parent_prop: String, index: int, value: Variant) -> void:
 	var existing: Variant = container.get(parent_prop)
 	var parent: GdssProp = GDSS.get_registry().property_list.get(parent_prop)
-	# Color parents fold whole values per side; every other parent packs numbers, so a
-	# dictionary value there is a method call in a slot that cannot hold one.
 	var is_color: bool = existing is Color \
 		or (existing is Dictionary and (existing as Dictionary).has(COLOR4_KEY)) \
 		or (parent != null and parent.type == GDSS.Type.COLOR)
@@ -1896,14 +1872,10 @@ static func _fold_composite_component(container: Dictionary, parent_prop: String
 		if existing is Dictionary and (existing as Dictionary).has(COLOR4_KEY):
 			sides = (existing as Dictionary).get(COLOR4_KEY)
 		else:
-			# Unnamed sides keep the shorthand: "border_color: RED" plus "border_color_top: BLUE"
-			# leaves three red sides.
 			sides = [existing, existing, existing, existing]
 		sides.set(index, value)
 		container.set(parent_prop, {COLOR4_KEY: sides})
 		return
-	# Vector2 parents fold with float components, four-component ones stay int. Decide from
-	# the existing value so a patch onto a resolved base picks the right shape.
 	var is_vec2: bool = existing is Vector2 \
 		or (existing is Dictionary and (existing as Dictionary).has("__gdss_composite2__")) \
 		or (parent != null and parent.type == GDSS.Type.VECTOR2)
@@ -1963,7 +1935,6 @@ static func _fold_state_patches(state_dict: Dictionary, base_all: Dictionary) ->
 		if base_val == null:
 			var prop: GdssProp = GDSS.get_registry().property_list.get(prop_name)
 			base_val = prop.get_default_value() if prop != null else Vector4i.ZERO
-		# Keyed by the real property name so the fold can still see the parent's type.
 		var scratch: Dictionary = {prop_name: base_val if not base_val is Dictionary else (base_val as Dictionary).duplicate(true)}
 		for index: Variant in patch:
 			_fold_composite_component(scratch, prop_name, int(index), patch.get(index))

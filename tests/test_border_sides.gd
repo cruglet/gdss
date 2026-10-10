@@ -30,10 +30,10 @@ func run(t: TC) -> void:
 	var raw: Variant = t.entry_val(parsed, "Panel", "all", "border_color")
 	t.check(raw is Dictionary and (raw as Dictionary).has(GdssStylesheet.COLOR4_KEY), "per-side color folds into the color4 sentinel")
 	if raw is Dictionary:
-		t.check_eq((raw as Dictionary)[GdssStylesheet.COLOR4_KEY], ["RED", "RED", "__gdss_global__accent", "RED"], "unnamed sides keep the shorthand value")
+		t.check_eq((raw as Dictionary).get(GdssStylesheet.COLOR4_KEY), ["RED", "RED", "__gdss_global__accent", "RED"], "unnamed sides keep the shorthand value")
 	t.check_eq(t.entry_val(parsed, "Panel", "all", "shadow"), Vector4i(0, 0, 0, 5), "a lone shadow side leaves the others at zero")
 	t.check_eq(t.entry_val(parsed, "PanelContainer", "all", "border_color"), "LIME", "a later shorthand resets every side")
-
+	
 	var panel: Panel = Panel.new()
 	t.add_styled(panel)
 	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(panel)
@@ -42,13 +42,13 @@ func run(t: TC) -> void:
 	GDSS.add_class(panel, "Ghost")
 	t.check_eq(stylebox._get_val("border_color"), [Color(1, 1, 1, 0.5), Color.RED, Color("#3b82f6"), Color.RED], "a class patches its own side onto the inherited sides")
 	panel.free()
-
+	
 	var hovered: Panel = Panel.new()
 	t.add_styled(hovered)
 	var hover_stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(hovered)
 	t.check_eq(hover_stylebox._get_val_cached("border_color", hover_stylebox._resolve_entry(), "hover", null), [Color.RED, Color.LIME, Color("#3b82f6"), Color.RED], "a state patches its own side onto the base sides")
 	hovered.free()
-
+	
 	var uniform: GdssStylebox = GdssStylebox.new()
 	t.check(uniform._border_side_colors([Color.RED, Color.RED, Color.RED, Color.RED]).is_empty(), "four equal sides stay on the single-ring path")
 	t.check(uniform._border_side_colors([Color.RED, Color.RED, GdssGradient.new(), Color.RED]).is_empty(), "a gradient among the sides drives the whole border")

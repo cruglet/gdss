@@ -45,12 +45,12 @@ class Ref extends RefCounted:
 	var role: String = "use"
 	var text: String
 	var declaration: bool = false
-
-
+	
+	
 	func is_editable() -> bool:
 		return role != "script"
-
-
+	
+	
 	func covers(at_line: int, column: int) -> bool:
 		return at_line == line and column >= from and column <= to
 
@@ -59,35 +59,35 @@ class Symbol extends RefCounted:
 	var kind: GdssSymbols.Kind
 	var name: String
 	var refs: Array[Ref] = []
-
-
+	
+	
 	func label() -> String:
 		return "%s %s" % [GdssSymbols.KIND_LABELS.get(kind), name]
-
-
+	
+	
 	func declarations() -> Array[Ref]:
 		var result: Array[Ref] = []
 		for entry: Ref in refs:
 			if entry.declaration:
 				result.append(entry)
 		return result
-
-
+	
+	
 	func declaration() -> Ref:
 		for entry: Ref in refs:
 			if entry.declaration:
 				return entry
 		return null
-
-
+	
+	
 	func in_file(file: String) -> Array[Ref]:
 		var result: Array[Ref] = []
 		for entry: Ref in refs:
 			if entry.file == file:
 				result.append(entry)
 		return result
-
-
+	
+	
 	func files() -> PackedStringArray:
 		var result: PackedStringArray = []
 		for entry: Ref in refs:
@@ -99,8 +99,8 @@ class Symbol extends RefCounted:
 class Index extends RefCounted:
 	var symbols: Dictionary = {}
 	var by_line: Dictionary = {}
-
-
+	
+	
 	func register(entry: Ref) -> void:
 		var symbol_key: String = GdssSymbols.key(entry.kind, entry.name)
 		var symbol: Symbol = symbols.get(symbol_key)
@@ -114,28 +114,28 @@ class Index extends RefCounted:
 		var bucket: Array[Ref] = by_line.get(line_key, [] as Array[Ref])
 		bucket.append(entry)
 		by_line.set(line_key, bucket)
-
-
+	
+	
 	func get_symbol(kind: GdssSymbols.Kind, name: String) -> Symbol:
 		return symbols.get(GdssSymbols.key(kind, name))
-
-
+	
+	
 	func find_at(file: String, line: int, column: int) -> Ref:
 		var candidates: Array = by_line.get("%s|%d" % [file, line], [])
 		for entry: Ref in candidates:
 			if entry.covers(line, column):
 				return entry
 		return null
-
-
+	
+	
 	func find_by_name(name: String) -> Symbol:
 		for kind: int in GdssSymbols.RENAMEABLE:
 			var symbol: Symbol = get_symbol(kind, name)
 			if symbol != null:
 				return symbol
 		return null
-
-
+	
+	
 	func of_kind(kind: GdssSymbols.Kind) -> Array[Symbol]:
 		var result: Array[Symbol] = []
 		for symbol: Symbol in symbols.values():
@@ -143,15 +143,15 @@ class Index extends RefCounted:
 				result.append(symbol)
 		result.sort_custom(func(a: Symbol, b: Symbol) -> bool: return a.name < b.name)
 		return result
-
-
+	
+	
 	func names_of(kind: GdssSymbols.Kind) -> PackedStringArray:
 		var result: PackedStringArray = []
 		for symbol: Symbol in of_kind(kind):
 			result.append(symbol.name)
 		return result
-
-
+	
+	
 	func declared_var(name: String) -> Symbol:
 		for kind: int in GdssSymbols.DOLLAR_KINDS:
 			var symbol: Symbol = get_symbol(kind, name)
@@ -165,8 +165,8 @@ class _Scanner extends RefCounted:
 	var file: String
 	var line: int
 	var text: String
-
-
+	
+	
 	func emit(kind: GdssSymbols.Kind, name: String, from: int, to: int, role: String, declaration: bool) -> void:
 		var entry: Ref = Ref.new()
 		entry.kind = kind

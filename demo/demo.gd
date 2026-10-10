@@ -1,14 +1,5 @@
 extends Control
 
-# GDSS showcase. A small fake GDSS-themed app sits in the background so the two
-# draggable glass buttons have real UI to frost (blur) and refract (liquid_blur)
-# as you move them. The top bar swaps the light/dark @scheme and animates the
-# @global accent (which retunes every gradient card and color-method swatch live);
-# the sliders retune both glass buttons through @instance vars. The right column
-# shows gradients, texture fills, per-side composite keys, and per-node overrides;
-# the left column shows fonts, calc(), variations, transforms, modulate, and both
-# popup styles (Window PopupMenu vs Control glass menu).
-
 @export var frosted: Button
 @export var liquid: Button
 @export var switch_button: Button
@@ -25,7 +16,6 @@ var _menu_panel: PanelContainer
 
 func _ready() -> void:
 	get_window().content_scale_factor = DisplayServer.screen_get_scale()
-	# Embed subwindows so the GDSS-styled PopupMenu renders inside the app window.
 	get_window().gui_embed_subwindows = true
 	GDSS.set_scheme("dark")
 	_on_strength_slider_value_changed(strength_slider.value)
@@ -33,9 +23,6 @@ func _ready() -> void:
 	_build_menu()
 
 
-# A Control-based glass dropdown (PanelContainer + GlassMenu class). Being a Control it
-# refracts the app behind it via liquid_blur and pops in/out with the on_show/on_hide
-# transition - unlike a Window PopupMenu, whose embedded subwindow can't sample the backdrop.
 func _build_menu() -> void:
 	_menu_panel = PanelContainer.new()
 	_menu_panel.set_meta(GDSS.CLASSES_META, PackedStringArray(["GlassMenu"]))
@@ -54,7 +41,7 @@ func _build_menu() -> void:
 		col.add_child(row)
 	margin.add_child(col)
 	_menu_panel.add_child(margin)
-	add_child(_menu_panel) # added last -> draws above the rest of the UI
+	add_child(_menu_panel)
 
 
 func _on_menu_pressed() -> void:
@@ -66,7 +53,6 @@ func _on_menu_pressed() -> void:
 	GDSS.show(_menu_panel)
 
 
-# Plays the AnimCard's on_show()/on_hide() one-shot transition.
 func _on_toggle_card_pressed() -> void:
 	if anim_card.visible:
 		GDSS.hide(anim_card)

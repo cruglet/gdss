@@ -134,7 +134,7 @@ func _decorate(item: TreeItem, label: String, depth: int, base_selector: String)
 
 
 func _selector_icon(label: String) -> Texture2D:
-	var first_selector: String = label.split(",")[0].strip_edges()
+	var first_selector: String = label.get_slice(",", 0).strip_edges()
 	var editor_theme: Theme = EditorInterface.get_editor_theme()
 	if editor_theme.has_icon(first_selector, &"EditorIcons"):
 		return editor_theme.get_icon(first_selector, &"EditorIcons")

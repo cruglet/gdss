@@ -29,7 +29,6 @@ static func get_save_uid() -> int:
 	return ResourceUID.text_to_id(text)
 
 
-# Heals the save path after the .tgdss is moved or renamed, via its tracked UID.
 static func sync_save_path() -> void:
 	var path: String = get_save_path()
 	if FileAccess.file_exists(path):

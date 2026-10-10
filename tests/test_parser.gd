@@ -128,11 +128,11 @@ func run(t: TC) -> void:
 	var card_radius: Variant = (card.get("all", {}) as Dictionary).get("corner_radius")
 	t.check(card_radius is Dictionary and (card_radius as Dictionary).has("__gdss_composite4_patch__"), "per-side key in a class defers as a patch")
 	if card_radius is Dictionary:
-		t.check_eq(((card_radius as Dictionary)["__gdss_composite4_patch__"] as Dictionary).get(0), 30, "class patch records only the set side")
+		t.check_eq(((card_radius as Dictionary).get("__gdss_composite4_patch__") as Dictionary).get(0), 30, "class patch records only the set side")
 	var card_padding: Variant = (card.get("all", {}) as Dictionary).get("padding")
 	t.check(card_padding is Dictionary and (card_padding as Dictionary).has("__gdss_composite4_patch__"), "per-side var ref in a class defers as a patch")
 	if card_padding is Dictionary:
-		var patch: Dictionary = (card_padding as Dictionary)["__gdss_composite4_patch__"]
+		var patch: Dictionary = (card_padding as Dictionary).get("__gdss_composite4_patch__")
 		t.check_eq(patch.get(0), "__gdss_local__pad", "class patch keeps the var sentinel")
 	var fancy: Variant = ((composite.get("Button", {}) as Dictionary).get("_variations", {}) as Dictionary).get("Fancy")
 	t.check(fancy is Dictionary, "variation block parses")
@@ -140,7 +140,7 @@ func run(t: TC) -> void:
 		var fancy_border: Variant = ((fancy as Dictionary).get("all", {}) as Dictionary).get("border")
 		t.check(fancy_border is Dictionary and (fancy_border as Dictionary).has("__gdss_composite4_patch__"), "per-side key in a variation defers as a patch")
 		if fancy_border is Dictionary:
-			t.check_eq(((fancy_border as Dictionary)["__gdss_composite4_patch__"] as Dictionary).get(2), 3, "variation patch records only the top side")
+			t.check_eq(((fancy_border as Dictionary).get("__gdss_composite4_patch__") as Dictionary).get(2), 3, "variation patch records only the top side")
 	t.check_eq(t.entry_val(composite, "Button", "all", "transition_func"), "QUINT", "transition_func normalized to upper case")
 	t.check_eq(t.entry_val(composite, "Button", "all", "transition_type"), "EASE_IN", "transition_type normalized to upper case")
 	t.check_eq(t.entry_val(composite, "Button", "all", "cursor"), "POINTING", "cursor normalized to upper case")
@@ -159,4 +159,4 @@ func run(t: TC) -> void:
 	var lift_scale: Variant = (lift_class.get("all", {}) as Dictionary).get("transform_scale")
 	t.check(lift_scale is Dictionary and (lift_scale as Dictionary).has("__gdss_composite4_patch__"), "vector2 component in a class defers as a patch")
 	if lift_scale is Dictionary:
-		t.check_eq(((lift_scale as Dictionary)["__gdss_composite4_patch__"] as Dictionary).get(0), 2, "vector2 class patch records only the x side")
+		t.check_eq(((lift_scale as Dictionary).get("__gdss_composite4_patch__") as Dictionary).get(0), 2, "vector2 class patch records only the x side")

@@ -2,8 +2,7 @@
 extends EditorPlugin
 
 
-const GdssInspector = preload("uid://bhvd3stvftya8")
-const GDSS_EDITOR = preload("uid://bh4sv3ta53fmk")
+const GDSS_EDITOR: PackedScene = preload("uid://bh4sv3ta53fmk")
 
 static var _inst: EditorPlugin
 
@@ -132,7 +131,7 @@ func _setup_editor() -> void:
 	import_plugin = GdssImportPlugin.new()
 	add_import_plugin(import_plugin)
 	if not ProjectSettings.has_setting("autoload/GdssRuntime"):
-		add_autoload_singleton("GdssRuntime", "res://addons/gdss/core/gdss_runtime.gd")
+		add_autoload_singleton("GdssRuntime", "res://addons/gdss/runtime/gdss_runtime.gd")
 	if not scene_changed.is_connected(_on_scene_changed):
 		scene_changed.connect(_on_scene_changed)
 	if not get_tree().node_added.is_connected(_on_editor_node_added):
@@ -164,22 +163,16 @@ func _on_editor_node_added(node: Node) -> void:
 	GdssNodeBinder.apply_mode.call_deferred(node as CanvasItem)
 
 
-# Fires right before a scene is packed and again before the project runs. Flush the
-# editor buffer, then strip the live overrides so they are never baked into the .tscn,
-# restoring them on the next idle frame.
 func _apply_changes() -> void:
 	_flush_editor_source()
 	GdssNodeBinder.strip_overrides()
 	_reapply_overrides_deferred.call_deferred()
 
 
-# The only autosave hook that fires with no scene open (EditorNode::try_autosave).
 func _save_external_data() -> void:
 	_flush_editor_source()
 
 
-# The editor holds edits in memory until Ctrl+S and the runtime reads the stylesheet off
-# disk, so without this the game would start on the last written source.
 func _flush_editor_source() -> void:
 	if not is_instance_valid(gdss_editor) or not gdss_editor.has_unsaved_changes():
 		return

@@ -227,8 +227,8 @@ class GdssClassesProperty extends EditorProperty:
 		var gdss_editor: GdssEditor = GdssEditor.instance()
 		if gdss_editor != null:
 			gdss_editor.goto_symbol(GdssSymbols.Kind.CLASS, value)
-
-
+	
+	
 	func _on_option_selected(item_index: int, row_index: int, option: OptionButton, line: LineEdit) -> void:
 		if _updating:
 			return
@@ -434,8 +434,6 @@ class GdssPreviewProperty extends EditorProperty:
 			stylebox.current_state = state
 
 
-## Any Control or Window takes part, styleable or not: an unstyleable one still carries a
-## GDSS mode so that the subtree under it can inherit.
 static func handles(object: Object) -> bool:
 	return object is Control or object is Window
 
@@ -466,7 +464,6 @@ func _parse_property(object: Object, type: Variant.Type, name: String, hint_type
 			return true
 	
 	if is_enabled and node_type != null:
-		# theme_type_variation stays visible: GDSS targets it via "/Variation { }" selectors.
 		if name.begins_with("theme_override") and not GDSS.DEBUG_MODE:
 			return true
 	

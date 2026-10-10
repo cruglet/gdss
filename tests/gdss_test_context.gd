@@ -144,6 +144,6 @@ func _parse_into_stylesheet(sources: PackedStringArray) -> void:
 	var result: Dictionary = GdssStylesheet.parse_all(sources)
 	GdssStylesheet.parsed.clear()
 	for key: String in result:
-		GdssStylesheet.parsed[key] = result[key]
+		GdssStylesheet.parsed.set(key, result.get(key))
 	if GDSS._runtime != null:
 		GDSS._runtime._refresh_all_styleboxes()

@@ -585,9 +585,9 @@ func _inject_bench_classes() -> void:
 	if btn.is_empty():
 		return
 	var classes: Dictionary = btn.get("_classes", {})
-	classes["BenchGradient"] = {"all": {"bg_color": {"__gdss_method__": "linear_gradient", "args": ["RED", "BLUE", "90"]}}, "_classes": {}}
-	classes["BenchModulate"] = {"all": {}, "disabled": {"modulate": Color(1, 0.4, 0.4, 1), "opacity": 0.6}, "_classes": {}}
-	btn["_classes"] = classes
+	classes.set("BenchGradient", {"all": {"bg_color": {"__gdss_method__": "linear_gradient", "args": ["RED", "BLUE", "90"]}}, "_classes": {}})
+	classes.set("BenchModulate", {"all": {}, "disabled": {"modulate": Color(1, 0.4, 0.4, 1), "opacity": 0.6}, "_classes": {}})
+	btn.set("_classes", classes)
 
 
 func _build_gdss(n: int, visible_grid: bool) -> Node:

@@ -4,8 +4,6 @@ extends StyleBox
 
 static var _corner_start_angles: Array[float] = [PI, PI * 1.5, 0.0, PI * 0.5]
 const _DEFAULT_SHADOW_COLOR: Color = Color(0, 0, 0, 0.4)
-# Share of a side's reach its shadow carries around a corner; the direction-weighted
-# falloff peaks at 2/(3 * sqrt(3)).
 const _SHADOW_CORNER_SPILL: float = 0.4
 
 const _TRANSITION_FUNCS: Dictionary = {
@@ -21,11 +19,11 @@ const _EASE_TYPES: Dictionary = {
 
 
 static func tween_trans(func_enum: GDSS.TransitionFunc) -> Tween.TransitionType:
-	return _TRANSITION_FUNCS.get(GDSS.TransitionFunc.keys()[func_enum], Tween.TRANS_LINEAR)
+	return _TRANSITION_FUNCS.get(GDSS.TransitionFunc.find_key(func_enum), Tween.TRANS_LINEAR)
 
 
 static func tween_ease(type_enum: GDSS.TransitionType) -> Tween.EaseType:
-	return _EASE_TYPES.get(GDSS.TransitionType.keys()[type_enum], Tween.EASE_IN_OUT)
+	return _EASE_TYPES.get(GDSS.TransitionType.find_key(type_enum), Tween.EASE_IN_OUT)
 
 
 static func _resolve_trans_val(raw: Variant) -> Tween.TransitionType:
@@ -51,7 +49,6 @@ static func _resolve_ease_val(raw: Variant) -> Tween.EaseType:
 var _slot_state: String = ""
 
 var _ref_path: NodePath = NodePath()
-# Node, not CanvasItem, so Window-derived styled nodes are handled alongside Controls.
 var _ref_node: Node = null
 var _ref_node_rt: Node = null
 var _applying: bool = false
@@ -61,8 +58,6 @@ var _entry_cache_dirty: bool = true
 var _entry_cache_classes: PackedStringArray = []
 var _entry_cache_variation: String = ""
 var _entry_cache_overrides: Variant = null
-# Prop names present in ANY state of the resolved entry, so _apply_overrides can skip
-# node properties the stylesheet never sets instead of resolving each one.
 var _styled_props_cache: Dictionary = {}
 var _styled_props_dirty: bool = true
 
@@ -134,8 +129,6 @@ var ref: Node:
 		_connect_ref_signals(v)
 
 
-# While _seeding the setter only records the state (no transition, no apply) so bind()
-# can target a state inside its own bulk.
 var _seeding: bool = false
 var current_state: String = "":
 	set(s):
@@ -166,8 +159,6 @@ var _state_sync_queued: bool = false
 var _applied_node_props: Dictionary = {}
 var _applied_overrides: Dictionary = {}
 
-# _self_toggle swallows the visibility_changed our own visible= writes fire;
-# _last_visible filters parent-driven changes, where the node's own visible is unchanged.
 var _self_toggle: bool = false
 var _last_visible: bool = true
 
@@ -202,7 +193,6 @@ func _connect_ref_signals(v: Node) -> void:
 		if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
 			interp.parsed_changed.connect(_on_parsed_changed)
 	else:
-		# Only tree_exiting matters at runtime; the entered hook only refreshed _ref_path.
 		if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 
@@ -276,9 +266,6 @@ func _on_ref_tree_exiting() -> void:
 
 
 func _on_ref_tree_exiting_rt() -> void:
-	# Reparent-safe: free the GPU child item (re-created on the next draw), but KEEP
-	# _ref_node_rt so the stylebox still resolves while detached. Authoritative teardown
-	# runs from the runtime's tree_exited hook -> GdssNodeBinder.purge.
 	_free_gpu_ci()
 
 
@@ -340,8 +327,6 @@ func _clear_overrides() -> void:
 	_reset_node_props(node_type, control, true)
 
 
-# Only the overrides GDSS applied itself come off. Overrides the scene author set by hand
-# are left alone, so saving or packing a scene never eats them.
 func remove_applied_overrides(control: Variant) -> void:
 	for key: String in _applied_overrides.keys():
 		match int(_applied_overrides.get(key)):
@@ -381,15 +366,11 @@ func _apply_overrides(clear: bool = true) -> void:
 	if not GDSS.resolve_mode(node):
 		return
 	var control: Variant = node
-	# One theme-changed notification per node instead of one per override. Big win when
-	# many nodes bind at once, where per-override propagation is O(depth).
 	control.begin_bulk_theme_override()
 	_apply_overrides_unwrapped(node_type, control, clear)
 	control.end_bulk_theme_override()
 
 
-# Unwrapped so bind() can fold the stylebox adds and the value overrides into one
-# shared bulk. Callers guarantee ref / node_type / enabled mode.
 func _apply_overrides_unwrapped(node_type: GdssNodeType, control: Variant, clear: bool) -> void:
 	if _applying:
 		return
@@ -472,7 +453,6 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 		GdssProp.Category.NODE_PROPERTY:
 			if not GDSS.transforms_enabled and prop.name.begins_with("transform_"):
 				val = prop.get_default_value()
-			# A $variable holding one number can reach a Vector2 prop; splat it.
 			if prop.type == GDSS.Type.VECTOR2 and (val is int or val is float):
 				val = Vector2(float(val), float(val))
 			var def: Variant = prop.get_default_value()
@@ -488,7 +468,6 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 					mod.a = alpha
 					control.modulate = mod
 				return
-			# GDSS's "transform_*" maps to the real "offset_transform_*" node property.
 			var node_prop: String = "offset_" + prop.name if prop.name.begins_with("transform_") else prop.name
 			var current: Variant = control.get(node_prop)
 			if typeof(current) != typeof(val) or current != val:
@@ -613,7 +592,7 @@ func _safe_redraw() -> void:
 	if node is CanvasItem:
 		(node as CanvasItem).queue_redraw()
 	else:
-		emit_changed() # Window-derived nodes redraw via theme-changed notification
+		emit_changed()
 
 
 func _sync_active_state() -> void:
@@ -628,8 +607,6 @@ func _sync_active_state() -> void:
 
 
 func _start_transition(from_state: String, to_state: String, timing_state: String = "", on_finished: Callable = Callable()) -> void:
-	# timing_state selects which block supplies transition_time/func/type (defaults to
-	# to_state). on_finished fires after the tween - used to hide on on_hide.
 	var ts: String = timing_state if not timing_state.is_empty() else to_state
 	var transition_time: float = GDSS.scaled_duration(float(_get_parsed_val("transition_time", ts, 0.0)))
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
@@ -826,8 +803,6 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	)
 
 
-# The state the node settles into after an enter animation: the bound slot for static
-# nodes, else the active interaction state.
 func _resting_state(node_type: GdssNodeType, node: Node) -> String:
 	if not _slot_state.is_empty():
 		return _slot_state
@@ -847,7 +822,7 @@ func _on_node_visibility_changed() -> void:
 		return
 	var vis: bool = node.visible
 	if vis == _last_visible:
-		return # an ancestor toggled; this node's own `visible` didn't change
+		return
 	_last_visible = vis
 	if vis:
 		_play_show()
@@ -883,15 +858,23 @@ func _play_sfx(state_key: String) -> void:
 
 
 func _ev_pressed() -> void: _play_event("on_pressed")
+
+
 func _ev_focus() -> void: _play_event("on_focus")
+
+
 func _ev_blur() -> void: _play_event("on_blur")
+
+
 func _ev_mouse_entered() -> void: _play_event("on_mouse_entered")
+
+
 func _ev_mouse_exited() -> void: _play_event("on_mouse_exited")
+
+
 func _ev_toggled(_on: bool) -> void: _play_event("on_toggled")
 
 
-# Re-show the node so the exit animation can play, animate resting -> on_hide() values,
-# then actually hide once the tween finishes.
 func _play_hide() -> void:
 	var node: Control = ref as Control
 	if node == null:
@@ -912,7 +895,6 @@ func _play_hide() -> void:
 	)
 
 
-# Explicit programmatic visibility, so we don't rely on visibility_changed to detect it.
 func _request_visible(want_visible: bool) -> void:
 	var node: Control = ref as Control
 	if node == null:
@@ -989,7 +971,7 @@ func _resolve_entry() -> Dictionary:
 	var override_meta: Variant = ref.get_meta(GDSS.OVERRIDES_META) if ref.has_meta(GDSS.OVERRIDES_META) else null
 	if not _entry_cache_dirty and _entry_cache_classes == current_classes and _entry_cache_variation == variation and _entry_cache_overrides == override_meta:
 		return _entry_cache
-	_styled_props_dirty = true # entry is being recomputed; its styled-prop set is stale
+	_styled_props_dirty = true
 	var parsed: Dictionary[String, Dictionary] = GdssStylesheet.parsed
 	var selector: String = ref.get_class()
 	var entry: Dictionary = parsed.get(selector, {})
@@ -1003,7 +985,6 @@ func _resolve_entry() -> Dictionary:
 		_entry_cache_overrides = override_meta
 		_entry_cache_dirty = false
 		return entry
-	# Layer order, lowest to highest: base type -> theme_type_variation -> gdss_classes.
 	if has_variation:
 		entry = _merge_entries(entry, _resolve_override_patches(entry, variations.get(variation)))
 	for gdss_class_name: String in current_classes:
@@ -1063,7 +1044,6 @@ func _resolve_override_patches(base: Dictionary, override_entry: Dictionary) -> 
 			if not (raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__")):
 				continue
 			var patch: Dictionary = (raw as Dictionary).get("__gdss_composite4_patch__")
-			# Keyed by the real property name so the fold can still see the parent's type.
 			var scratch: Dictionary = {prop_name: _base_composite_value(base, state_key, prop_name)}
 			for index: Variant in patch:
 				GdssStylesheet._fold_composite_component(scratch, prop_name, int(index), patch.get(index))
@@ -1101,7 +1081,7 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 			return _call_method(d, fallback, state_key)
 	if raw is String:
 		var s: String = raw as String
-		if not s.is_empty() and s.unicode_at(0) == 35: # '#'
+		if not s.is_empty() and s.unicode_at(0) == 35:
 			if Color.html_is_valid(s):
 				return Color.html(s)
 			return raw
@@ -1329,7 +1309,6 @@ func _get_val_cached(key: String, entry: Dictionary, state: String, fallback: Va
 		return _tweened_values.get(key)
 	if entry.is_empty():
 		return fallback
-	# Parsed raw values are never null, so null means "key absent" - one probe per dict.
 	var raw: Variant = null
 	var sd: Variant = entry.get(state)
 	if sd is Dictionary:
@@ -1533,7 +1512,6 @@ func _draw_cpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 				_draw_ring(to_canvas_item, inner_rect, rect, corner_radius, border_src as Color, aa_size, detail, skew_x, skew_y)
 
 
-# Four colors, so a state styling only the shorthand can tween against one styling sides.
 func _side_colors(src: Variant, fallback: Color) -> Array:
 	var sides: Array = src as Array if src is Array else [src, src, src, src]
 	var result: Array = []
@@ -1542,9 +1520,6 @@ func _side_colors(src: Variant, fallback: Color) -> Array:
 	return result
 
 
-# border_color becomes a four-entry array (left, right, top, bottom) as soon as the sheet
-# names any border_color_<side>. Only plain colors can differ per side, so a gradient,
-# blur or texture anywhere drives the whole border.
 func _border_side_colors(src: Variant) -> Array:
 	if not src is Array:
 		return []
@@ -1558,7 +1533,6 @@ func _border_side_colors(src: Variant) -> Array:
 	return [] if uniform else sides
 
 
-# What the whole border falls back to: the shorthand, or the one non-per-side source.
 func _border_base(src: Variant) -> Variant:
 	if not src is Array:
 		return src
@@ -1575,13 +1549,13 @@ static func _max_side(sides: Vector4) -> float:
 
 static func _get_shared_shader() -> Shader:
 	if _shader == null:
-		_shader = load("res://addons/gdss/core/shaders/gdss_panel.gdshader") as Shader
+		_shader = load("res://addons/gdss/render/shaders/gdss_panel.gdshader") as Shader
 	return _shader
 
 
 static func _get_blur_shader() -> Shader:
 	if _blur_shader == null:
-		_blur_shader = load("res://addons/gdss/core/shaders/gdss_blur.gdshader") as Shader
+		_blur_shader = load("res://addons/gdss/render/shaders/gdss_blur.gdshader") as Shader
 	return _blur_shader
 
 
@@ -1593,10 +1567,6 @@ func _ensure_gpu_ci(to_canvas_item: RID, want_blur: bool = false) -> void:
 		_gpu_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
 		RenderingServer.canvas_item_set_material(_gpu_ci, _gpu_material.get_rid())
 		RenderingServer.canvas_item_set_draw_behind_parent(_gpu_ci, true)
-		# Godot captures the screen texture once per frame, before the FIRST item that reads it,
-		# so every later glass panel would sample that stale snapshot. An explicit full-screen
-		# backbuffer copy on this item refreshes the capture right before each glass panel draws
-		# (region-limited copies land misplaced on the compatibility renderer).
 		RenderingServer.canvas_item_set_copy_to_backbuffer(_gpu_ci, want_blur, Rect2())
 		_gpu_parent = RID()
 	elif _gpu_is_blur != want_blur:
@@ -1633,8 +1603,6 @@ func _draw_gpu(to_canvas_item: RID, rect: Rect2, vals: Dictionary) -> void:
 	var border_sides: Array = _border_side_colors(border_raw)
 	_ensure_gpu_ci(to_canvas_item, bg is GdssBlur or border_src is GdssBlur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
-	# Every side pads the quad by its own reach plus slack for the falloff's antialiasing,
-	# and keeps room for its neighbours' share where a shadow tapers round a corner.
 	var pad: Vector4 = Vector4.ZERO
 	if _max_side(shadow) > 0.5:
 		var spill_x: float = maxf(shadow.z, shadow.w) * _SHADOW_CORNER_SPILL
@@ -1756,7 +1724,6 @@ func _skew_transform(rect: Rect2, skew_x: float, skew_y: float) -> Transform2D:
 	var center: Vector2 = rect.position + rect.size * 0.5
 	var bx: Vector2 = Vector2(1.0, skew_y)
 	var by: Vector2 = Vector2(skew_x, 1.0)
-	# translate(center) * shear * translate(-center) folded: M*p + (center - M*center).
 	return Transform2D(bx, by, center - (bx * center.x + by * center.y))
 
 
@@ -1925,8 +1892,6 @@ func _draw_ring_raw(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, i
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, all_points, colors)
 
 
-# Each side owns its straight edge plus half of each neighbouring corner arc, so two
-# colors meet on the corner diagonal like a mitred frame.
 func _draw_ring_sides(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2, corner_radii: Vector4, colors: Array, detail: int, skew_x: float, skew_y: float) -> void:
 	var outer_fitted: Vector4 = _fit_corners(corner_radii, outer_rect)
 	var inner_fitted: Vector4 = _match_corner_counts(_fit_corners(corner_radii, inner_rect), outer_fitted)
@@ -1936,7 +1901,6 @@ func _draw_ring_sides(to_canvas_item: RID, inner_rect: Rect2, outer_rect: Rect2,
 	if inner_points.size() != count:
 		return
 	var splits: PackedInt32Array = _corner_splits(outer_fitted, detail)
-	# Composite side order: left wraps the array end (bottom-left split round to top-left).
 	var spans: Array[Vector2i] = [
 		Vector2i(splits.get(3), splits.get(0)),
 		Vector2i(splits.get(1), splits.get(2)),
@@ -1958,15 +1922,13 @@ func _draw_ring_span(to_canvas_item: RID, inner_points: PackedVector2Array, oute
 		var near: int = (span.x + i) % count
 		var far: int = (span.x + i + 1) % count
 		var base: int = verts.size()
-		verts.append_array(PackedVector2Array([inner_points[near], outer_points[near], outer_points[far], inner_points[far]]))
+		verts.append_array(PackedVector2Array([inner_points.get(near), outer_points.get(near), outer_points.get(far), inner_points.get(far)]))
 		indices.append_array([base, base + 1, base + 2, base, base + 2, base + 3])
 	if indices.is_empty():
 		return
 	RenderingServer.canvas_item_add_triangle_array(to_canvas_item, indices, verts, PackedColorArray([color]))
 
 
-# Vertex index of the 45-degree split in each corner arc, where one side hands over to
-# the next. _get_rounded_rect walks the corners clockwise from the top-left.
 func _corner_splits(radii: Vector4, detail: int) -> PackedInt32Array:
 	var splits: PackedInt32Array
 	var index: int = 0
@@ -1977,8 +1939,6 @@ func _corner_splits(radii: Vector4, detail: int) -> PackedInt32Array:
 	return splits
 
 
-# A corner that survives the outer fit but collapses on the inner one would pair a point
-# against a whole arc. Keep it at a hairline radius so the arc keeps its vertex count.
 func _match_corner_counts(inner: Vector4, outer: Vector4) -> Vector4:
 	return Vector4(
 		maxf(inner.x, 0.001) if outer.x > 0.0 else 0.0,

@@ -12,6 +12,7 @@ static var _auto_checked: bool = false
 @export var code_edit: CodeEdit
 @export var error_label: Label
 @export var title_label: Label
+@export var title_bar: HBoxContainer
 @export var copy_button: Button
 @export var toggle_map_button: Button
 @export var caret_pos_label: Label
@@ -211,7 +212,6 @@ func _on_location_toggled(pressed: bool) -> void:
 
 
 func _setup_version_button() -> void:
-	# Live in the bottom status bar (caret_pos_label's row), pinned to the far right.
 	if caret_pos_label == null:
 		return
 	var status_bar: Node = caret_pos_label.get_parent()
@@ -524,7 +524,7 @@ func display_errors(errors: Array) -> void:
 	_error_target_chunk = _chunk_for_line(first.get(1))
 	var chunk_start: int = _chunk_offsets.get(_error_target_chunk) if _error_target_chunk < _chunk_offsets.size() else 0
 	_error_target_line = first.get(1) - chunk_start
-	var message: String = str(first.get(0)) if _error_target_chunk == _active_chunk else "[%s] %s" % [_chunks[_error_target_chunk]["name"], first[0]]
+	var message: String = str(first.get(0)) if _error_target_chunk == _active_chunk else "[%s] %s" % [_chunks.get(_error_target_chunk).get("name"), first.get(0)]
 	show_error(message, _error_target_line, errors.size())
 
 
@@ -719,12 +719,8 @@ func _set_zoom_percent(percent: int) -> void:
 
 
 func _setup_menu_bar() -> void:
-	var top_bar: Node = title_label.get_node_or_null("HBoxContainer")
-	if top_bar == null:
-		return
 	var menu_bar: MenuBar = MenuBar.new()
 	menu_bar.flat = true
-	# Keep the menu in the editor panel; the native global menu hijacks macOS's menu bar.
 	menu_bar.prefer_global_menu = false
 	_file_menu = PopupMenu.new()
 	_file_menu.name = "File"
@@ -773,8 +769,8 @@ func _setup_menu_bar() -> void:
 	help_menu.add_item("Check for Updates…", MENU_CHECK_UPDATE)
 	help_menu.id_pressed.connect(_on_menu_id_pressed)
 	menu_bar.add_child(help_menu)
-	top_bar.add_child(menu_bar)
-	top_bar.move_child(menu_bar, 0)
+	title_bar.add_child(menu_bar)
+	title_bar.move_child(menu_bar, 0)
 
 
 func _on_menu_id_pressed(id: int) -> void:
@@ -1179,8 +1175,8 @@ func _on_copy_button_pressed() -> void:
 			var chunk_start: int = _chunk_offsets.get(chunk) if chunk < _chunk_offsets.size() else 0
 			var line_label: String = str(err.get(1) - chunk_start + 1)
 			if _chunks.size() > 1:
-				line_label = "%s:%s" % [_chunks[chunk]["name"], line_label]
-			formatted.append("[%s] %s" % [line_label, err[0]])
+				line_label = "%s:%s" % [_chunks.get(chunk).get("name"), line_label]
+			formatted.append("[%s] %s" % [line_label, err.get(0)])
 		DisplayServer.clipboard_set("\n".join(formatted))
 		return
 	DisplayServer.clipboard_set(error_label.text)
@@ -1222,7 +1218,6 @@ func _ensure_zoom_menu() -> void:
 		_zoom_menu.add_item("%d%%" % level, level)
 	_zoom_menu.id_pressed.connect(_set_zoom_percent)
 	zoom_percentage.add_child(_zoom_menu)
-	
 
 
 func _open_theme_properties() -> void:
@@ -1655,9 +1650,6 @@ static func instance() -> GdssEditor:
 	return _inst
 
 
-## A solid background for the editor's docked panels. The editor theme leaves some panel
-## styleboxes empty, so the first one that actually paints wins, and a flat box built from
-## the editor's own base colour is the last resort.
 static func editor_panel_stylebox() -> StyleBox:
 	var editor_theme: Theme = EditorInterface.get_editor_theme()
 	for type: StringName in [&"Panel", &"Tree", &"ItemList"]:

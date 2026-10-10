@@ -95,8 +95,6 @@ func get_extra_states() -> PackedStringArray:
 	return []
 
 
-# If non-empty, GDSS binds ONLY these stylebox slots. Window-derived nodes use it to
-# target just their background.
 func get_only_states() -> PackedStringArray:
 	return []
 
@@ -164,7 +162,6 @@ func bind_canvas_item(canvas_item: Node) -> void:
 	var events: PackedStringArray = get_events()
 	events.append_array(get_default_events())
 	for event: String in events:
-		# has_signal guard: Window-derived nodes lack some Control signals (item_rect_changed).
 		if not canvas_item.is_connected(event, _update_state):
 			canvas_item.connect(event, _update_state, CONNECT_APPEND_SOURCE_OBJECT)
 
@@ -177,9 +174,6 @@ func unbind_canvas_item(canvas_item: Node) -> void:
 			canvas_item.disconnect(event, _update_state)
 
 
-# Godot 4.7 Control offset-transform properties, exposed to GDSS under the shorter
-# "transform_" prefix; _apply_theme_prop maps them back to "offset_transform_*".
-# Defaults match Godot's, so a node styling none of them keeps an identity transform.
 const _TRANSFORM_PROP_NAMES: PackedStringArray = [
 	"transform_enabled", "transform_position", "transform_position_ratio",
 	"transform_scale", "transform_rotation", "transform_pivot",

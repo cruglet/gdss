@@ -4,12 +4,10 @@ signal scheme_changed(scheme_name: String)
 signal globals_changed
 signal parsed_reloaded
 
-# Frames an ambiguous tree-exit is re-checked before the node is assumed detached.
 const PURGE_GRACE_FRAMES: int = 4
 const SFX_VOICES: int = 8
 
 var _last_modified: int = 0
-# Ambiguous tree-exits -> frames waited. See _on_styled_node_exited.
 var _pending_purge: Dictionary[int, int] = {}
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _sfx_next: int = 0
@@ -170,7 +168,7 @@ func _refresh_all_styleboxes() -> void:
 		var item: Node = stylebox.ref
 		if item == null:
 			continue
-		stylebox.reapply() # reapply() emits changed, which repaints Window-derived nodes
+		stylebox.reapply()
 		if stylebox == GdssNodeBinder.get_primary_stylebox(item):
 			_connect_event_signals(item)
 		if item is CanvasItem:
@@ -257,7 +255,6 @@ func _try_bind(canvas_item: Node) -> void:
 	var exit_cb: Callable = _on_styled_node_exited.bind(canvas_item.get_instance_id())
 	if not canvas_item.tree_exited.is_connected(exit_cb):
 		canvas_item.tree_exited.connect(exit_cb)
-	# Not all Windows expose visibility_changed, so has_signal keeps the connect safe.
 	if canvas_item.has_signal(&"visibility_changed"):
 		var vis_cb: Callable = _on_styled_visibility_changed.bind(canvas_item)
 		if not canvas_item.visibility_changed.is_connected(vis_cb):
@@ -313,11 +310,6 @@ func _disconnect_node_signals(canvas_item: Node) -> void:
 			canvas_item.disconnect(sig, cb)
 
 
-# A styled node that leaves the tree for good must drop its registry slot, or
-# GdssNodeBinder._registry grows without bound. tree_exited also fires on a plain remove
-# or a reparent, so purge only when the node is really being destroyed; an ambiguous
-# removal is re-checked over the next few frames. One call_deferred check is not enough:
-# change_scene_to_file emits tree_exited while the outgoing nodes are still valid.
 func _on_styled_node_exited(id: int) -> void:
 	var obj: Object = instance_from_id(id)
 	if not is_instance_valid(obj):
@@ -329,7 +321,6 @@ func _on_styled_node_exited(id: int) -> void:
 	_pending_purge.set(id, 0)
 
 
-# Drives on_show()/on_hide() one-shot transitions off the node's own visibility.
 func _on_styled_visibility_changed(canvas_item: Node) -> void:
 	if not is_instance_valid(canvas_item):
 		return

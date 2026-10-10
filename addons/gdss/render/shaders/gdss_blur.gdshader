@@ -1,11 +1,7 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-// The liquid-glass refraction (sample-scaling lens + edge glow) is ported from
-// OverShifted/LiquidGlass (MIT): https://github.com/OverShifted/LiquidGlass
-
 uniform vec2 u_size = vec2(100.0, 40.0);
-// Per-side quad padding (left, right, top, bottom) that holds the shadow.
 uniform vec4 u_pad = vec4(0.0);
 uniform vec4 u_corner_radius = vec4(0.0);
 uniform vec4 u_border_widths = vec4(0.0);
@@ -38,8 +34,6 @@ uniform vec4 u_border_glass = vec4(4.0, 0.0, 0.0, 1.0);
 uniform vec4 u_fill_glass2 = vec4(0.0, 0.0, 0.0, 1.0);
 uniform vec4 u_border_glass2 = vec4(0.0, 0.0, 0.0, 1.0);
 
-// Lens falloff f(x) = 1 - b * (c * e)^(-d*x - a), raised to u_lens_power. Tuned
-// to OverShifted/LiquidGlass defaults: small near the rim, ~1 in the centre.
 uniform float u_lens_a = 0.7;
 uniform float u_lens_b = 2.3;
 uniform float u_lens_c = 5.2;
@@ -51,9 +45,6 @@ const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 const int BLUR_TAPS = 24;
 const float GOLDEN_ANGLE = 2.39996323;
 
-// A raw golden-angle disk convolution at base screen resolution: screen-texture mipmaps
-// are position- and zoom-dependent in the editor. Radius and refraction offsets track the
-// canvas scale, so a zoomed 2D view keeps the blur proportional to the content.
 varying float v_canvas_scale;
 
 
@@ -62,9 +53,6 @@ void vertex() {
 }
 
 
-// How far past each edge the point sits, measured from the corner circle's centre, with
-// that corner's radius in z. Its two components also name the side a point belongs to:
-// the larger one wins, which splits every corner down its 45-degree diagonal.
 vec3 box_q(vec2 p, vec2 b, vec4 r) {
 	r.xy = (p.x > 0.0) ? r.xy : r.zw;
 	r.x = (p.y > 0.0) ? r.x : r.y;
@@ -94,9 +82,6 @@ float glow_sweep(vec2 uv) {
 }
 
 
-// Backdrop glass. With g = (blur, refraction, highlight, saturation) carrying only blur
-// it is a plain frost. Refraction scales the sampled position toward the shape's centre
-// by lens_f() of the edge depth, bending the backdrop through the rim like liquid glass.
 vec4 glass(vec2 screen_uv, vec2 uv, vec2 p, vec2 b, float d, vec4 tint, vec4 g, vec2 px) {
 	float reach = max(min(b.x, b.y), EPS);
 	float dist = clamp(-d / reach, 0.0, 1.0);
@@ -131,7 +116,6 @@ vec4 glass(vec2 screen_uv, vec2 uv, vec2 p, vec2 b, float d, vec4 tint, vec4 g, 
 
 void fragment() {
 	vec2 half_size = u_size * 0.5 - vec2(u_pad.x + u_pad.y, u_pad.z + u_pad.w) * 0.5;
-	// Uneven padding pushes the panel off the quad's centre; p stays panel-relative.
 	vec2 p = (UV - 0.5) * u_size - vec2(u_pad.x - u_pad.y, u_pad.z - u_pad.w) * 0.5;
 	
 	vec2 full = half_size * 2.0;
@@ -211,9 +195,6 @@ void fragment() {
 	float panel_mask = 1.0 - smoothstep(-aa, aa, d_outer);
 	float border_mask = clamp(panel_mask - fill_mask, 0.0, 1.0);
 	
-	// Straight-alpha source-over throughout: the border sits on the fill, and both sit on
-	// the shadow. Blending the layers by coverage alone would tint a see-through panel
-	// with whatever is underneath it.
 	float fill_a = fill_col.a * fill_mask;
 	float border_a = border_col.a * border_mask;
 	float panel_a = border_a + fill_a * (1.0 - border_a);
@@ -223,9 +204,6 @@ void fragment() {
 	vec4 col = vec4(panel_rgb, panel_a);
 	
 	if (max(max(u_shadow.x, u_shadow.y), max(u_shadow.z, u_shadow.w)) > 0.5) {
-		// The reach in the fragment's outward direction blends the two side extents that
-		// meet at that corner, weighted by the squared direction so an even shadow keeps
-		// its radius and a side left at 0 fades out instead of cutting off.
 		vec2 outward = max(q_outer.xy, vec2(0.0));
 		vec2 dir = outward / max(length(outward), EPS);
 		vec2 ext = vec2(p.x < 0.0 ? u_shadow.x : u_shadow.y, p.y < 0.0 ? u_shadow.z : u_shadow.w);
