@@ -684,9 +684,9 @@ func check_errors(source: String) -> Array[Array]:
 				type_stack.append(enclosing_type)
 				event_stack.append(event_stack.back() if not event_stack.is_empty() else false)
 			
-			for raw_state: String in state_part.split(",", false):
+			for raw_state: String in (":" + state_part).split(",", false):
 				var state_name: String = raw_state.strip_edges().trim_prefix(":").strip_edges()
-				if not state_name.is_empty() and not known_states.has(state_name):
+				if not state_name.is_empty() and not state_name.begins_with(":") and not known_states.has(state_name):
 					errors.append(["Unknown state ':%s'" % state_name, i])
 			continue
 		
@@ -1430,9 +1430,9 @@ static func _collect_selector_group(tokens: Array[String], pos: int, known_state
 		if token == ",":
 			pos += 1
 			continue
-		if token == ":":
+		if token == ":" or token == "::":
 			var next: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
-			selectors.append(":" + next)
+			selectors.append(token + next)
 			pos += 2
 			continue
 		selectors.append(token)
@@ -1461,6 +1461,8 @@ static func _tokenize(source: String) -> Array[String]:
 				in_quote = true
 				quote_char = ch
 				current += ch
+			elif ch == ":" and current.strip_edges().is_empty() and not tokens.is_empty() and tokens.back() == ":":
+				tokens.set(tokens.size() - 1, "::")
 			elif ch in ["{", "}", ":", ",", "(", ")"]:
 				if not current.strip_edges().is_empty():
 					tokens.append(current.strip_edges())
@@ -1529,20 +1531,20 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 				pos = close + 1
 			continue
 		
-		if next == ":" and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens.get(pos + 3) == "{":
+		if (next == ":" or next == "::") and next2 != "" and next2 != "{" and pos + 3 < tokens.size() and tokens.get(pos + 3) == "{":
 			# "%Variation" targets a node's theme_type_variation; a prefix-less name is a
 			# regular gdss class (applied via gdss_classes / GDSS.add_class).
 			var is_variation: bool = token.begins_with("%") and not parent_selector.is_empty()
 			var child_name: String = token.substr(1) if is_variation else token
 			var child_container: Dictionary = _get_variation_container(result, parent_selector) if is_variation else _get_child_container(result, parent_selector)
 			_ensure_selector(child_container, child_name, known_states)
-			pos = _parse_props_into(tokens, pos + 4, child_container, child_name, next2.to_lower(), known_states)
+			pos = _parse_props_into(tokens, pos + 4, child_container, child_name, next.trim_prefix(":") + next2.to_lower(), known_states)
 			continue
 		
-		if token == ":" and next2 == "{":
+		if (token == ":" or token == "::") and next2 == "{":
 			if not parent_selector.is_empty():
 				_ensure_selector(result, parent_selector, known_states)
-				pos = _parse_props_into(tokens, pos + 3, result, parent_selector, next.to_lower(), known_states)
+				pos = _parse_props_into(tokens, pos + 3, result, parent_selector, token.trim_prefix(":") + next.to_lower(), known_states)
 			else:
 				pos += 3
 			continue
@@ -1667,7 +1669,7 @@ static func _consume_value(tokens: Array[String], pos: int, known_states: Packed
 			break
 		if lookahead == ",":
 			break
-		if lookahead == ":" and (lookahead2 == "{" or known_states.has(lookahead2.to_lower())):
+		if lookahead == "::" or (lookahead == ":" and (lookahead2 == "{" or known_states.has(lookahead2.to_lower()))):
 			parts.append(t)
 			pos += 1
 			break

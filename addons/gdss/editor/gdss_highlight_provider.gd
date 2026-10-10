@@ -367,15 +367,15 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				
 				if word == "pass":
 					result.set(start, {"color": col_control_flow})
-				elif is_after_colon and states.has(word):
+				elif is_after_colon and (states.has(word) or trimmed_before.ends_with("::")):
 					var before_colon: String = trimmed_before.substr(0, trimmed_before.length() - 1).strip_edges()
-					var valid: bool = false
-					if brace_depth > 0:
+					var valid: bool = trimmed_before.ends_with("::")
+					if not valid and brace_depth > 0:
 						for style_name: String in _node_states:
 							if _node_has_state(style_name, word):
 								valid = true
 								break
-					else:
+					elif not valid:
 						valid = _node_has_state(before_colon, word)
 					result.set(start, {"color": col_control_flow if valid else col_default})
 				elif nodes.has(word):

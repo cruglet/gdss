@@ -86,6 +86,11 @@ func _validate_property(property: Dictionary) -> void:
 @abstract func get_active_state(canvas_item: CanvasItem) -> String
 
 
+func resolve_state(canvas_item: CanvasItem) -> String:
+	var custom: String = str(canvas_item.get_meta(GDSS.STATE_META, ""))
+	return ":" + custom if not custom.is_empty() else get_active_state(canvas_item)
+
+
 func get_extra_states() -> PackedStringArray:
 	return []
 
@@ -308,4 +313,4 @@ func update_state(canvas_item: Node) -> void:
 		return
 	var stylebox: GdssStylebox = GdssNodeBinder.get_stylebox(canvas_item)
 	if stylebox != null:
-		stylebox.current_state = get_active_state(canvas_item as CanvasItem)
+		stylebox.current_state = resolve_state(canvas_item as CanvasItem)

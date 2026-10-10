@@ -155,7 +155,7 @@ func _node_config(type: String) -> Array:
 		"TextureRect", "ColorRect":
 			return [true, false, true]
 		"Panel", "PanelContainer":
-			return [false, true, false]
+			return [false, true, true]
 		"PopupMenu", "PopupPanel", "AcceptDialog", "ConfirmationDialog", "FileDialog", "Window":
 			return [true, true, false]
 	return []

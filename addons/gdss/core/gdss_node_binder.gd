@@ -259,7 +259,7 @@ static func bind(canvas_item: Node, apply: bool = true, node_type: GdssNodeType 
 		# Seed the resting state without firing the setter and apply in this same bulk, so the
 		# caller's update_state no-ops and an unchanged reparent skips the re-apply.
 		if apply and canvas_item is CanvasItem:
-			var active: String = node_type.get_active_state(canvas_item as CanvasItem)
+			var active: String = node_type.resolve_state(canvas_item as CanvasItem)
 			if stylebox.current_state != active:
 				var clear: bool = not stylebox.current_state.is_empty()
 				stylebox._seeding = true

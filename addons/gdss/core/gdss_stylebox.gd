@@ -160,6 +160,7 @@ var current_state: String = "":
 
 
 var _tweened_values: Dictionary[String, Variant] = {}
+var _tweened_args: Dictionary[String, Array] = {}
 var _tween: Tween = null
 var _state_sync_queued: bool = false
 var _applied_node_props: Dictionary = {}
@@ -527,6 +528,7 @@ func _kill_tween() -> void:
 		_tween.kill()
 		_tween = null
 	_tweened_values.clear()
+	_tweened_args.clear()
 
 
 func reapply() -> void:
@@ -622,7 +624,7 @@ func _sync_active_state() -> void:
 	var node_type: GdssNodeType = _resolve_gdss_node()
 	if node_type == null:
 		return
-	current_state = node_type.get_active_state(node as CanvasItem)
+	current_state = node_type.resolve_state(node as CanvasItem)
 
 
 func _start_transition(from_state: String, to_state: String, timing_state: String = "", on_finished: Callable = Callable()) -> void:
@@ -631,7 +633,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	var ts: String = timing_state if not timing_state.is_empty() else to_state
 	var transition_time: float = GDSS.scaled_duration(float(_get_parsed_val("transition_time", ts, 0.0)))
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
-		_tweened_values.clear()
+		_kill_tween()
 		if on_finished.is_valid():
 			on_finished.call()
 		return
@@ -664,13 +666,14 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 			var mn: String = (from_raw as Dictionary).get("__gdss_method__")
 			var method: GdssMethod = GDSS._get_gdss_methods().get(mn)
 			if method != null and not method.get_tweenable_args().is_empty():
-				var from_args: Array[Variant] = _resolve_method_args(from_raw as Dictionary)
+				var from_args: Array[Variant] = _tweened_args.get(prop_name, _resolve_method_args(from_raw as Dictionary))
 				var to_args: Array[Variant] = _resolve_method_args(to_raw as Dictionary)
 				var captured_prop: String = prop_name
 				var captured_method: GdssMethod = method
 				var node_id: int = ref.get_instance_id() if ref != null else -1
 				pending_tween.tween_method(func(t: float) -> void:
 					var interp_args: Array[Variant] = captured_method.interpolate_args(from_args, to_args, t)
+					_tweened_args.set(captured_prop, interp_args)
 					var result: Variant = captured_method.call_method(interp_args, node_id, "tween:" + captured_prop)
 					if result != null:
 						_tweened_values.set(captured_prop, result)
@@ -802,6 +805,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	
 	if tweener_count == 0:
 		pending_tween.kill()
+		_kill_tween()
 		if on_finished.is_valid():
 			on_finished.call()
 		return
@@ -813,6 +817,7 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	_tween.finished.connect(func() -> void:
 		_tween = null
 		_tweened_values.clear()
+		_tweened_args.clear()
 		if ref != null:
 			_apply_overrides()
 			_safe_redraw()
@@ -827,7 +832,7 @@ func _resting_state(node_type: GdssNodeType, node: Node) -> String:
 	if not _slot_state.is_empty():
 		return _slot_state
 	if not node_type.is_static and node is CanvasItem:
-		var active: String = node_type.get_active_state(node as CanvasItem)
+		var active: String = node_type.resolve_state(node as CanvasItem)
 		if not active.is_empty():
 			return active
 	return node_type.states.get(0) if not node_type.states.is_empty() else "all"
@@ -1456,7 +1461,7 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	if node_type == null:
 		return
 	if not Engine.is_editor_hint() and ref is CanvasItem and _slot_state.is_empty() and not node_type.is_static and not _state_sync_queued:
-		var active: String = node_type.get_active_state(ref as CanvasItem)
+		var active: String = node_type.resolve_state(ref as CanvasItem)
 		if active != current_state:
 			_state_sync_queued = true
 			_sync_active_state.call_deferred()

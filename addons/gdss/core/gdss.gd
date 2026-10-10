@@ -9,6 +9,7 @@ const DEBUG_WAS_VISIBLE: StringName = &"gdss_was_visible"
 const CLASSES_META: StringName = &"gdss_classes"
 const MODE_META: StringName = &"gdss_mode"
 const OVERRIDES_META: StringName = &"gdss_overrides"
+const STATE_META: StringName = &"gdss_state"
 
 enum GdssMode {
 	INHERIT,
@@ -606,6 +607,27 @@ static func clear_classes(node: Node) -> void:
 	if get_classes(node).is_empty():
 		return
 	set_classes(node, PackedStringArray())
+
+
+static func set_state(node: Node, state: String) -> void:
+	var custom: String = state.lstrip(":").to_lower()
+	if custom.is_empty():
+		node.remove_meta(STATE_META)
+	else:
+		node.set_meta(STATE_META, custom)
+	if not node is CanvasItem:
+		return
+	var node_type: GdssNodeType = _get_node_types().get(node.get_class())
+	if node_type != null:
+		node_type.update_state(node)
+
+
+static func get_state(node: Node) -> String:
+	return str(node.get_meta(STATE_META, ""))
+
+
+static func clear_state(node: Node) -> void:
+	set_state(node, "")
 
 
 ## Returns the freeform GDSS override text stored on [param node], or an empty
