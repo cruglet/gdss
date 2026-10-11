@@ -106,6 +106,37 @@ static func refresh(canvas_item: Node) -> void:
 			stylebox.reapply()
 	if canvas_item is CanvasItem:
 		(canvas_item as CanvasItem).queue_redraw()
+	if GdssStylesheet.has_descendant_rules and not _refreshing_descendants:
+		_refreshing_descendants = true
+		_refresh_descendants(canvas_item)
+		_refreshing_descendants = false
+
+
+static var _refreshing_descendants: bool = false
+
+
+static func reposition(node: Node) -> void:
+	var styleboxes: Array[GdssStylebox] = get_styleboxes(node)
+	for stylebox: GdssStylebox in styleboxes:
+		stylebox._invalidate_entry_cache()
+	for stylebox: GdssStylebox in styleboxes:
+		stylebox._apply_overrides(false)
+	if node is CanvasItem:
+		(node as CanvasItem).queue_redraw()
+
+
+static func _refresh_descendants(node: Node) -> void:
+	for child: Node in node.get_children(true):
+		var styleboxes: Array[GdssStylebox] = get_styleboxes(child)
+		for stylebox: GdssStylebox in styleboxes:
+			stylebox._kill_tween()
+			stylebox._invalidate_entry_cache()
+		for stylebox: GdssStylebox in styleboxes:
+			stylebox._apply_overrides()
+			stylebox.emit_changed()
+		if child is CanvasItem:
+			(child as CanvasItem).queue_redraw()
+		_refresh_descendants(child)
 
 
 static func refresh_vars(canvas_item: Node) -> void:

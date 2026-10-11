@@ -16,6 +16,8 @@ var _resource_variables: Array[String] = []
 var _variable_lines: Dictionary = {}
 var _methods: Array[GdssMethod] = []
 var _events: Dictionary = {}
+var _user_events: Dictionary = {}
+var _user_events_scene: int = 0
 var _last_hover_word: String = ""
 
 var _completion_color: Color
@@ -40,11 +42,6 @@ const BUILTIN_COLORS: Array[String] = [
 	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
 ]
 
-const _EVENT_SIGNALS: Dictionary = {
-	"on_show": "visibility_changed",
-	"on_hide": "visibility_changed",
-}
-
 
 func _ready() -> void:
 	gdss_editor = get_parent() as GdssEditor
@@ -52,6 +49,8 @@ func _ready() -> void:
 	if not editor.has_comment_delimiter("#"):
 		editor.add_comment_delimiter("#", "")
 	_build_from_objects()
+	EditorInterface.get_resource_filesystem().filesystem_changed.connect(_invalidate_user_events)
+	EditorInterface.get_resource_filesystem().script_classes_updated.connect(_invalidate_user_events)
 	editor.code_completion_requested.connect(_on_completion_requested)
 	editor.text_changed.connect(_on_text_changed)
 	editor.symbol_lookup_on_click = true
@@ -72,7 +71,7 @@ func _build_from_objects() -> void:
 	_methods.clear()
 	_events.clear()
 	
-	var prefixes: Array[String] = ["@", ":", "\t", "$"]
+	var prefixes: Array[String] = ["@", ":", ">", "\t", "$"]
 	
 	for obj: GdssNodeType in GDSS._get_node_types().values():
 		var style_name: String = obj.style_name
@@ -86,10 +85,20 @@ func _build_from_objects() -> void:
 		_states.set(style_name, obj.states)
 		
 		var events: Array[String] = []
-		for event_name: String in _EVENT_SIGNALS:
-			if ClassDB.class_has_signal(obj.base_type, _EVENT_SIGNALS.get(event_name)):
-				events.append(event_name)
+		for info: Dictionary in ClassDB.class_get_signal_list(obj.base_type):
+			var signal_name: String = str(info.get("name"))
+			if not signal_name.begins_with("_"):
+				events.append(signal_name)
+		if events.has("visibility_changed"):
+			events.append_array(["on_show", "on_hide"])
+		events.sort()
 		_events.set(style_name, events)
+		
+		for event_name: String in events:
+			for l: int in range(1, min(4, event_name.length()) + 1):
+				var pre: String = event_name.substr(0, l)
+				if not prefixes.has(pre):
+					prefixes.append(pre)
 		
 		if style_name.length() > 0 and not prefixes.has(style_name[0]):
 			prefixes.append(style_name[0])
@@ -99,12 +108,6 @@ func _build_from_objects() -> void:
 				var pre: String = key.substr(0, l)
 				if not prefixes.has(pre):
 					prefixes.append(pre)
-	
-	for event_name: String in _EVENT_SIGNALS:
-		for l: int in range(1, min(4, event_name.length()) + 1):
-			var pre: String = event_name.substr(0, l)
-			if not prefixes.has(pre):
-				prefixes.append(pre)
 	
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
 		_methods.append(method)
@@ -314,7 +317,9 @@ func _update_completions(word: String) -> void:
 				_complete_nodes(word)
 				_complete_at_directives(word)
 		"property_key":
-			if word.begins_with(":"):
+			if word.begins_with(">") or _after_combinator():
+				_complete_nodes(_strip_combinator(word))
+			elif word.begins_with(":"):
 				_complete_states(word.trim_prefix(":"), context.get("style", ""))
 			else:
 				_complete_properties(word, context.get("style", ""))
@@ -335,6 +340,23 @@ func _update_completions(word: String) -> void:
 			_complete_config(word)
 	
 	editor.update_code_completion_options(true)
+
+
+func _after_combinator() -> bool:
+	var line: String = editor.get_line(editor.get_caret_line())
+	var col: int = mini(editor.get_caret_column(), line.length())
+	var head: String = line.substr(0, col)
+	var word: String = _get_current_word()
+	if not word.is_empty() and head.length() >= word.length():
+		head = head.substr(0, head.length() - word.length())
+	return head.strip_edges().ends_with(">")
+
+
+func _strip_combinator(word: String) -> String:
+	var result: String = word
+	while result.begins_with(">"):
+		result = result.substr(1)
+	return result.strip_edges()
 
 
 func _complete_nodes(word: String) -> void:
@@ -381,10 +403,69 @@ func _complete_properties(word: String, style_name: String) -> void:
 
 
 func _complete_events(word: String, style_name: String) -> void:
-	var events: Array = _events.get(style_name, [])
-	for event_name: String in events:
-		if _matches(event_name, word):
-			editor.add_code_completion_option(CodeEdit.KIND_PLAIN_TEXT, event_name + "()", event_name + "() ", _completion_color, _get_icon(&"Signal"))
+	for event_name: String in _get_user_events(style_name):
+		_add_event_option(event_name, word, CodeEdit.LOCATION_LOCAL)
+	for event_name: String in _events.get(style_name, []):
+		_add_event_option(event_name, word, CodeEdit.LOCATION_OTHER)
+
+
+func _add_event_option(event_name: String, word: String, location: int) -> void:
+	if _matches(event_name, word):
+		editor.add_code_completion_option(CodeEdit.KIND_SIGNAL, event_name + "()", event_name + "() ", _completion_color, _get_icon(&"Signal"), null, location)
+
+
+func _get_user_events(style_name: String) -> Array[String]:
+	var root: Node = EditorInterface.get_edited_scene_root()
+	var scene: int = root.get_instance_id() if root != null else 0
+	if scene != _user_events_scene:
+		_user_events.clear()
+		_user_events_scene = scene
+	var events: Array[String] = []
+	if _user_events.has(style_name):
+		events.assign(_user_events.get(style_name))
+		return events
+	var node_type: GdssNodeType = GDSS._get_node_types().get(style_name)
+	var found: Dictionary = {}
+	if node_type != null:
+		var classes: Dictionary = {}
+		for info: Dictionary in ProjectSettings.get_global_class_list():
+			classes.set(str(info.get("class")), info)
+		for script_class: String in classes:
+			if ClassDB.is_parent_class(_native_base(script_class, classes), node_type.base_type):
+				_collect_script_signals(load(classes.get(script_class).get("path")) as Script, found)
+		if root != null:
+			_collect_scene_signals(root, node_type.base_type, found)
+	for event_name: String in _events.get(style_name, []):
+		found.erase(event_name)
+	events.assign(found.keys())
+	events.sort()
+	_user_events.set(style_name, events)
+	return events
+
+
+func _invalidate_user_events() -> void:
+	_user_events.clear()
+
+
+func _native_base(script_class: String, classes: Dictionary) -> String:
+	var current: String = script_class
+	while classes.has(current):
+		current = str(classes.get(current).get("base"))
+	return current
+
+
+func _collect_scene_signals(node: Node, base_type: String, found: Dictionary) -> void:
+	if node.is_class(base_type):
+		_collect_script_signals(node.get_script() as Script, found)
+	for child: Node in node.get_children():
+		_collect_scene_signals(child, base_type, found)
+
+
+func _collect_script_signals(script: Script, found: Dictionary) -> void:
+	if script == null:
+		return
+	for info: Dictionary in script.get_script_signal_list():
+		found.set(str(info.get("name")), true)
 
 
 func _complete_states(word: String, style_name: String) -> void:

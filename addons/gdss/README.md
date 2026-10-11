@@ -64,6 +64,8 @@ The stylesheet is saved to `res://theme.tgdss` by default. You can change that i
 
 - State blocks restyle interaction states like `:hover`, `:pressed`, `:focus`, and `:disabled`. You can group them too: `:hover, :pressed { ... }`.
 
+- Event blocks play once when a signal fires, like `mouse_exited() { sfx: $UNHOVER }`. Any signal on the node works, including your script's own (`my_signal() { ... }`), and only the signals a sheet actually uses get connected. `on_show()` and `on_hide()` animate visibility changes.
+
 - Classes are named variants nested inside a selector, like `GhostButton { ... }`. You assign them to individual nodes in the Inspector, and they cascade on top of the base selector.
 
 - "Composite" types are those which have multiple components; i.e. `border`, which can be set via something like `boder: 2 2 2 2` or `border_left: 2`, `border_right: 2`, etc. Shorthand for composite types are also now supported, so `border: 2` expands into `border: 2 2 2 2` 

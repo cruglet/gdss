@@ -321,7 +321,7 @@ class GdssCodeHighlighter extends SyntaxHighlighter:
 				i += 1
 				continue
 			
-			if c in [":", ",", "="]:
+			if c in [":", ",", "=", ">"]:
 				result.set(i, {"color": col_symbol})
 				i += 1
 				continue

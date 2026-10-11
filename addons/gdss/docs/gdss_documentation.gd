@@ -127,6 +127,92 @@ var FileFormat: GDSSDocumentation
 ## You can assign multiple classes as well. Each assigned class is space-separated in the input box, and the
 ## properties from each respective class are applied from left to right.
 ## [br][br]
+## Where a class names a node outright, a [b]combinator[/b] describes where a node sits. [code]>[/code]
+## matches a direct child and [code]>>[/code] matches a descendant at any depth, both by node type:
+## [codeblock]
+## PanelContainer {
+##     bg_color: "#222"
+##
+##     > Label {
+##         font_color: WHITE
+##     }
+##
+##     >> Button {
+##         font_size: 12
+##     }
+## }
+## [/codeblock]
+## A combinator block behaves exactly like a top-level type block, so states, classes and further
+## combinators all nest inside it as usual:
+## [codeblock]
+## PanelContainer {
+##     > Label {
+##         font_color: WHITE
+##
+##         Heading {       # only Labels this rule already matched
+##             font_size: 24
+##         }
+##
+##         > Button { }    # a Button directly under that Label
+##     }
+## }
+## [/codeblock]
+## Putting a combinator inside a [i]state[/i] block instead styles the match while the [b]ancestor[/b]
+## holds that state, which is how you make a child react to its parent being hovered:
+## [codeblock]
+## Button {
+##     > Label {
+##         font_color: "#aaa"
+##     }
+##
+##     :hover {
+##         > Label {
+##             font_color: WHITE    # applies while the BUTTON is hovered
+##         }
+##     }
+## }
+## [/codeblock]
+## Note the difference: a state nested [i]inside[/i] a combinator block ([code]> Label { :hover { } }[/code])
+## is the matched Label's own state, while a combinator nested inside a state block
+## ([code]:hover { > Label { } }[/code]) is the ancestor's. Both tween with the matched node's
+## [code]transition_time[/code].[br][br]
+## Combinators layer above a node's type and variation but below its own classes, matching the way CSS
+## ranks a class above type selectors - an explicit class on the node wins over a rule that only
+## describes where it sits. Between two combinators, the nearer ancestor wins, and [code]>[/code] beats
+## [code]>>[/code] at the same depth.
+## [br][br]
+## A [code]var[/code] declared [i]inside[/i] a block is scoped to it, and a nested class can redeclare
+## the name to shadow it - the same idea as a CSS custom property. One rule written against the
+## variable then renders differently per class, so a family of buttons that differ only by colour
+## costs a couple of lines each:
+## [codeblock]
+## Button {
+##     TitleButton {
+##         var accent: WHITE
+##
+##         bg_color: $accent
+##         border_color: darken($accent, 0.65)
+##
+##         > Label {
+##             font_color: darken($accent, 0.65)
+##         }
+##
+##         :hover {
+##             > Label { font_color: $accent }
+##         }
+##
+##         CampaignButton { var accent: "#FF5D5D" }
+##         LDButton       { var accent: "#2FBF71" }
+##     }
+## }
+## [/codeblock]
+## Lookup runs innermost-first: the node's own classes from the most deeply nested outwards, then the
+## base type's block, then any value a matched combinator's declaring block supplies, then file-level
+## [code]var[/code]s. That last step is why [code]> Label { font_color: $accent }[/code] above reads
+## the [i]button's[/i] accent rather than the Label's - the rule resolves where it was written.[br][br]
+## Because the name is scoped, sibling classes redeclaring it is expected rather than a redeclaration
+## error; only two file-level declarations of one name collide.
+## [br][br]
 ## Lastly, comments are denoted with [code]#[/code].
 ## [codeblock]
 ## Button {

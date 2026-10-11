@@ -191,6 +191,7 @@ static func get_global_var(name: String, fallback: Variant = null) -> Variant:
 ## [/codeblock]
 static func set_global_var(name: String, value: Variant) -> void:
 	GdssStylesheet.globals.set(name, value)
+	GdssStylesheet.global_overrides.set(name, value)
 	_schedule_global_refresh()
 
 
@@ -200,6 +201,7 @@ static func set_global_var(name: String, value: Variant) -> void:
 ## GDSS.reset_global_var("theme_accent")
 ## [/codeblock]
 static func reset_global_var(name: String) -> void:
+	GdssStylesheet.global_overrides.erase(name)
 	if GdssStylesheet._global_defaults.has(name):
 		GdssStylesheet.globals.set(name, GdssStylesheet._global_defaults.get(name))
 	else:
@@ -229,12 +231,14 @@ static func get_global_vars() -> Dictionary:
 static func set_global_vars(values: Dictionary) -> void:
 	for key: String in values:
 		GdssStylesheet.globals.set(key, values.get(key))
+		GdssStylesheet.global_overrides.set(key, values.get(key))
 	_schedule_global_refresh()
 
 
 ## Restores [b]every global variable[/b] to its stylesheet-declared value in a
 ## single refresh, discarding all runtime changes.
 static func reset_global_vars() -> void:
+	GdssStylesheet.global_overrides.clear()
 	GdssStylesheet.globals = GdssStylesheet._global_defaults.duplicate(true)
 	_schedule_global_refresh()
 

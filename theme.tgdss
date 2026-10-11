@@ -103,7 +103,7 @@ Button, MenuButton {
 		transform_enabled: true
 		transform_scale: 1 1
 		
-		on_pressed() {
+		pressed() {
 			transform_scale: 0.88 0.88
 			transition_time: 0.18
 			transition_func: BACK

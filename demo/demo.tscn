@@ -229,7 +229,7 @@ metadata/gdss_classes = PackedStringArray("LiftButton")
 
 [node name="BounceButton" type="Button" parent="App/Margin/Content/Scroll/Body/LeftColumn/MotionCard/Margin/Content/ButtonRow" unique_id=2035804364]
 layout_mode = 2
-tooltip_text = "transform_scale inside on_pressed()"
+tooltip_text = "transform_scale inside pressed()"
 text = "Press me to bounce"
 metadata/gdss_classes = PackedStringArray("BounceButton")
 

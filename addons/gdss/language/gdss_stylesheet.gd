@@ -8,6 +8,7 @@ signal saved
 
 static var parsed: Dictionary[String, Dictionary] = {}
 static var globals: Dictionary = {}
+static var global_overrides: Dictionary = {}
 static var _global_defaults: Dictionary = {}
 static var _instance_vars: Dictionary = {}
 static var _instance_defaults: Dictionary = {}
@@ -27,6 +28,10 @@ static var _inst: GdssStylesheet
 
 const SCHEME_PARENT_KEY: String = "__gdss_extends__"
 const COLOR4_KEY: String = "__gdss_color4__"
+const DESCENDANTS_KEY: String = "_descendants"
+const ANCESTOR_STATE_PREFIX: String = "@"
+const VARS_KEY: String = "_vars"
+static var has_descendant_rules: bool = false
 
 static var _re_global: RegEx = RegEx.create_from_string(r"^@global\s+var\s+(\w+)\s*:\s*(.+)")
 static var _re_instance: RegEx = RegEx.create_from_string(r"^@instance\s+var\s+(\w+)\s*:\s*(.+)")
@@ -42,6 +47,25 @@ static var _re_resource_value: RegEx = RegEx.create_from_string(r"^(\w+)\s*\(\s*
 
 static func get_instance() -> GdssStylesheet:
 	return _inst
+
+
+static func refresh_descendant_flag() -> void:
+	has_descendant_rules = _entries_use_combinators(parsed)
+
+
+static func _entries_use_combinators(entries: Dictionary) -> bool:
+	for key: String in entries:
+		var entry: Variant = entries.get(key)
+		if not entry is Dictionary:
+			continue
+		var container: Variant = (entry as Dictionary).get(DESCENDANTS_KEY)
+		if container is Dictionary and not (container as Dictionary).is_empty():
+			return true
+		for nested_key: String in ["_classes", "_variations"]:
+			var nested: Variant = (entry as Dictionary).get(nested_key)
+			if nested is Dictionary and _entries_use_combinators(nested as Dictionary):
+				return true
+	return false
 
 
 static func get_class_names(node_type: String) -> PackedStringArray:
@@ -565,7 +589,15 @@ func check_errors(source: String) -> Array[Array]:
 	var type_stack: Array[String] = []
 	var event_stack: Array[bool] = []
 	var declared_vars: Dictionary = {}
+	var file_level_vars: Dictionary = {}
 	var declared_globals: Dictionary = {}
+	for pre_line: String in lines:
+		var pre_stripped: String = _strip_line_comment(pre_line.strip_edges())
+		for rx_pre: RegEx in [_re_local, _re_global, _re_instance]:
+			var pre_match: RegExMatch = rx_pre.search(pre_stripped)
+			if pre_match:
+				declared_vars.set(pre_match.get_string(1), true)
+				break
 	var declared_instances: Dictionary = {}
 	
 	var statements: Array[Array] = []
@@ -593,8 +625,9 @@ func check_errors(source: String) -> Array[Array]:
 				if val_str.is_empty():
 					errors.append(["Variable '%s' has no value" % m.get_string(1), i])
 				else:
-					if declared_vars.has(m.get_string(1)):
+					if file_level_vars.has(m.get_string(1)):
 						errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
+					file_level_vars.set(m.get_string(1), true)
 					declared_vars.set(m.get_string(1), true)
 					if is_global:
 						declared_globals.set(m.get_string(1), true)
@@ -612,8 +645,10 @@ func check_errors(source: String) -> Array[Array]:
 				if val_str.is_empty():
 					errors.append(["Variable '%s' has no value" % m.get_string(1), i])
 				else:
-					if declared_vars.has(m.get_string(1)):
-						errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
+					if brace_depth == 0:
+						if file_level_vars.has(m.get_string(1)):
+							errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
+						file_level_vars.set(m.get_string(1), true)
 					declared_vars.set(m.get_string(1), true)
 					if not _is_quoted_literal(val_str) and val_str.contains("("):
 						var method_name: String = _method_name_of(val_str)
@@ -657,10 +692,27 @@ func check_errors(source: String) -> Array[Array]:
 			var state_part: String = selector_part.substr(colon_pos + 1).strip_edges().to_lower() if colon_pos != -1 else ""
 			
 			var frame_selector: String = ""
+			var frame_type: String = ""
 			var has_selector: bool = false
+			var is_combinator: bool = false
 			for sel: String in base_part.split(","):
 				var s: String = sel.strip_edges()
 				if s.is_empty():
+					continue
+				if s.begins_with(">"):
+					var combinator: String = ">>" if s.begins_with(">>") else ">"
+					var matched: String = s.substr(combinator.length()).strip_edges()
+					if brace_depth == 1:
+						errors.append(["Combinator '%s' needs an enclosing selector to be relative to" % combinator, i])
+					elif matched.is_empty():
+						errors.append(["Combinator '%s' names no node type" % combinator, i])
+					elif not known_selectors.has(matched):
+						errors.append(["Unknown selector '%s'" % matched, i])
+					else:
+						frame_type = matched
+					is_combinator = true
+					frame_selector = combinator + matched
+					has_selector = true
 					continue
 				if brace_depth == 1 and not known_selectors.has(s):
 					errors.append(["Unknown selector '%s'" % s, i])
@@ -669,7 +721,9 @@ func check_errors(source: String) -> Array[Array]:
 			var enclosing_type: String = type_stack.back() if not type_stack.is_empty() else ""
 			if has_selector:
 				selector_stack.append(frame_selector)
-				if brace_depth == 1 and known_selectors.has(frame_selector):
+				if is_combinator:
+					type_stack.append(frame_type if not frame_type.is_empty() else enclosing_type)
+				elif brace_depth == 1 and known_selectors.has(frame_selector):
 					type_stack.append(frame_selector)
 				else:
 					type_stack.append(enclosing_type)
@@ -823,6 +877,7 @@ func save_current(source: String) -> void:
 	_saving = true
 	GdssStorage.write_source(GdssStorage.get_save_path(), source)
 	parsed = parse(source)
+	refresh_descendant_flag()
 	if check_errors(source).is_empty():
 		GdssStorage.write_cache(parsed, _global_defaults, _instance_defaults, _local_vars, schemes, meta, resources, config)
 	_last_modified = FileAccess.get_modified_time(GdssStorage.get_save_path())
@@ -861,6 +916,7 @@ func _load_from_file() -> void:
 	var source: String = GdssStorage.read_source(GdssStorage.get_save_path())
 	source_loaded.emit(source)
 	parsed = parse(source)
+	refresh_descendant_flag()
 	parsed_changed.emit()
 
 
@@ -964,6 +1020,7 @@ static func _restore_statics(snapshot: Dictionary) -> void:
 	config.clear()
 	for key: String in (snapshot.get("config") as Dictionary):
 		config.set(key, snapshot.get("config").get(key))
+	refresh_descendant_flag()
 
 
 static var _override_entry_cache: Dictionary = {}
@@ -986,6 +1043,8 @@ static func parse_override_entry(text: String) -> Dictionary:
 	var entry: Dictionary = container.get("__override__", {})
 	entry.erase("_classes")
 	entry.erase("_variations")
+	entry.erase(DESCENDANTS_KEY)
+	entry.erase(VARS_KEY)
 	if _override_entry_cache.size() > 512:
 		_override_entry_cache.clear()
 	_override_entry_cache.set(text, entry)
@@ -1134,6 +1193,7 @@ func _check_separator_mix(source: String, errors: Array[Array]) -> void:
 
 
 static func parse_all(sources: PackedStringArray) -> Dictionary[String, Dictionary]:
+	has_descendant_rules = false
 	globals.clear()
 	_global_defaults.clear()
 	_instance_defaults.clear()
@@ -1165,15 +1225,22 @@ static func parse_all(sources: PackedStringArray) -> Dictionary[String, Dictiona
 	for selector: String in result:
 		_resolve_base_composite_patches(result.get(selector))
 	GDSS.reset_config()
+	for key: String in global_overrides:
+		globals.set(key, global_overrides.get(key))
 	return result
 
 
 static func _accumulate_globals(source: String) -> Dictionary:
 	var local_vars: Dictionary = {}
 	var known_states: PackedStringArray = _get_known_states()
+	var depth: int = 0
 	for line: String in source.split("\n"):
 		var stripped: String = _strip_line_comment(line.strip_edges())
 		if stripped.is_empty():
+			continue
+		var line_depth: int = depth
+		depth += stripped.count("{") - stripped.count("}")
+		if line_depth > 0 or depth > 0:
 			continue
 		var gm: RegExMatch = _re_global.search(stripped)
 		if gm:
@@ -1411,6 +1478,8 @@ static func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -
 			if _instance_defaults.has(key):
 				result.append("__gdss_instance__" + key)
 				continue
+			result.append("__gdss_local__" + key)
+			continue
 		result.append(token)
 	return result
 
@@ -1429,6 +1498,11 @@ static func _collect_selector_group(tokens: Array[String], pos: int, known_state
 			selectors.append(token + next)
 			pos += 2
 			continue
+		if token == ">" or token == ">>":
+			var next: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
+			selectors.append(token + next)
+			pos += 2
+			continue
 		selectors.append(token)
 		pos += 1
 	return [selectors, pos]
@@ -1438,7 +1512,7 @@ static func _tokenize(source: String) -> Array[String]:
 	var tokens: Array[String] = []
 	for line: String in source.split("\n"):
 		var stripped: String = line.strip_edges()
-		if stripped.begins_with("@global") or stripped.begins_with("@instance") or stripped.begins_with("var "):
+		if stripped.begins_with("@global") or stripped.begins_with("@instance"):
 			continue
 		stripped = _strip_line_comment(stripped)
 		if stripped.is_empty():
@@ -1462,6 +1536,14 @@ static func _tokenize(source: String) -> Array[String]:
 					tokens.append(current.strip_edges())
 					current = ""
 				tokens.append(ch)
+			elif ch == ">":
+				if not current.strip_edges().is_empty():
+					tokens.append(current.strip_edges())
+					current = ""
+				if not tokens.is_empty() and tokens.get(tokens.size() - 1) == ">":
+					tokens.set(tokens.size() - 1, ">>")
+				else:
+					tokens.append(">")
 			elif ch == " " or ch == "\t" or ch == ";":
 				if not current.strip_edges().is_empty():
 					tokens.append(current.strip_edges())
@@ -1488,6 +1570,17 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 		var next: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
 		var next2: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
 		
+		if token == "var" and next2 == ":" and not next.is_empty():
+			if parent_selector.is_empty():
+				var skip: Array = _consume_value(tokens, pos + 3, known_states)
+				pos = skip.get(1)
+				continue
+			_ensure_selector(result, parent_selector, known_states)
+			var declared: Array = _consume_value(tokens, pos + 3, known_states)
+			_get_vars_container(result, parent_selector).set(next, declared.get(0))
+			pos = declared.get(1)
+			continue
+		
 		var is_comma_group: bool = _has_comma_before_brace(tokens, pos)
 		
 		if is_comma_group:
@@ -1502,6 +1595,12 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 					if not parent_selector.is_empty():
 						_ensure_selector(result, parent_selector, known_states)
 						_parse_props_into(block_tokens, 0, result, parent_selector, state, known_states)
+				elif raw_selector.begins_with(">"):
+					if not parent_selector.is_empty():
+						var desc_container: Dictionary = _get_descendant_container(result, parent_selector)
+						_ensure_selector(desc_container, raw_selector, known_states)
+						_parse_block(block_tokens, 0, desc_container, raw_selector, known_states, true)
+						has_descendant_rules = true
 				else:
 					var child_container: Dictionary = _get_child_container(result, parent_selector)
 					_ensure_selector(child_container, raw_selector, known_states)
@@ -1511,13 +1610,34 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 			pos = block_end
 			continue
 		
+		if token == ">" or token == ">>":
+			if parent_selector.is_empty() or next.is_empty() or next == "{":
+				var stray: int = pos + 1 if next == "{" else pos + 2
+				if stray < tokens.size() and tokens.get(stray) == "{":
+					pos = _find_block_end(tokens, stray + 1)
+				else:
+					pos += 1
+				continue
+			var desc_key: String = token + next
+			var after: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
+			var desc_container: Dictionary = _get_descendant_container(result, parent_selector)
+			_ensure_selector(desc_container, desc_key, known_states)
+			has_descendant_rules = true
+			if after == "{":
+				pos = _parse_block(tokens, pos + 3, desc_container, desc_key, known_states, true)
+			elif after == ":" and pos + 4 < tokens.size() and tokens.get(pos + 4) == "{":
+				pos = _parse_props_into(tokens, pos + 5, desc_container, desc_key, tokens.get(pos + 3).to_lower(), known_states)
+			else:
+				pos += 2
+			continue
+		
 		if next == "(":
 			var close: int = pos + 2
 			while close < tokens.size() and tokens.get(close) != ")":
 				close += 1
 			if not parent_selector.is_empty() and close + 1 < tokens.size() and tokens.get(close + 1) == "{":
 				_ensure_selector(result, parent_selector, known_states)
-				pos = _parse_props_into(tokens, close + 2, result, parent_selector, token.to_lower(), known_states)
+				pos = _parse_props_into(tokens, close + 2, result, parent_selector, token + "()", known_states)
 			else:
 				pos = close + 1
 			continue
@@ -1579,6 +1699,22 @@ static func _get_variation_container(result: Dictionary, parent_selector: String
 	return result.get(parent_selector).get("_variations")
 
 
+static func _get_vars_container(result: Dictionary, parent_selector: String) -> Dictionary:
+	if parent_selector.is_empty():
+		return {}
+	if not result.get(parent_selector).has(VARS_KEY):
+		result.get(parent_selector).set(VARS_KEY, {})
+	return result.get(parent_selector).get(VARS_KEY)
+
+
+static func _get_descendant_container(result: Dictionary, parent_selector: String) -> Dictionary:
+	if parent_selector.is_empty():
+		return result
+	if not result.get(parent_selector).has(DESCENDANTS_KEY):
+		result.get(parent_selector).set(DESCENDANTS_KEY, {})
+	return result.get(parent_selector).get(DESCENDANTS_KEY)
+
+
 static func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
 	var i: int = pos
 	while i < tokens.size():
@@ -1620,6 +1756,18 @@ static func _parse_props_into(tokens: Array[String], pos: int, result: Dictionar
 		var next: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
 		var next2: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
 		
+		if (token == ">" or token == ">>") and next2 == "{" and not next.is_empty():
+			var desc_container: Dictionary = _get_descendant_container(result, selector)
+			var desc_key: String = token + next
+			_ensure_selector(desc_container, desc_key, known_states)
+			has_descendant_rules = true
+			pos = _parse_props_into(tokens, pos + 3, desc_container, desc_key, ANCESTOR_STATE_PREFIX + state, known_states)
+			continue
+		
+		if next == "{":
+			pos = _find_block_end(tokens, pos + 2)
+			continue
+		
 		if next == ":":
 			if next2 != "" and next2 != "{":
 				var consumed: Array = _consume_value(tokens, pos + 2, known_states)
@@ -1639,6 +1787,10 @@ static func _consume_value(tokens: Array[String], pos: int, known_states: Packed
 	while pos < tokens.size():
 		var t: String = tokens.get(pos)
 		if t == "{" or t == "}":
+			break
+		if t == ">" or t == ">>":
+			break
+		if t == "var" and not parts.is_empty() and pos + 2 < tokens.size() and tokens.get(pos + 2) == ":":
 			break
 		var lookahead: String = tokens.get(pos + 1) if pos + 1 < tokens.size() else ""
 		var lookahead2: String = tokens.get(pos + 2) if pos + 2 < tokens.size() else ""
@@ -1778,7 +1930,7 @@ static func _calc_factor(state: Dictionary) -> Variant:
 
 static func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> void:
 	for state: String in parent_data:
-		if state == "_classes" or state == "_variations":
+		if state == "_classes" or state == "_variations" or state == DESCENDANTS_KEY or state == VARS_KEY:
 			continue
 		if not parent_data.get(state) is Dictionary:
 			continue
@@ -2011,7 +2163,7 @@ static func _resolve_base_composite_patches(selector_entry: Dictionary) -> void:
 	if all_dict is Dictionary:
 		_fold_state_patches(all_dict as Dictionary, {})
 	for state_key: String in selector_entry:
-		if state_key == "all" or state_key == "_classes" or state_key == "_variations":
+		if state_key == "all" or state_key == "_classes" or state_key == "_variations" or state_key == DESCENDANTS_KEY or state_key == VARS_KEY:
 			continue
 		var sd: Variant = selector_entry.get(state_key)
 		if sd is Dictionary:

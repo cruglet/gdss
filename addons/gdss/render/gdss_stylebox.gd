@@ -85,6 +85,10 @@ var _entry_cache_dirty: bool = true
 var _entry_cache_classes: PackedStringArray = []
 var _entry_cache_variation: String = ""
 var _entry_cache_overrides: Variant = null
+var _entry_cache_ancestry: String = ""
+var _scoped_vars: Dictionary = {}
+var _ancestor_states_dirty: bool = true
+var _ancestor_states: bool = false
 var _styled_props_cache: Dictionary = {}
 var _styled_props_dirty: bool = true
 
@@ -119,6 +123,7 @@ var _style_tween_session: int = -1
 var _tween_session: int = 0
 var _nonstyle_dynamic: Array[GdssProp] = []
 var _nonstyle_state: String = "￿"
+var _event_callables: Dictionary = {}
 
 var ref: Node:
 	get:
@@ -175,6 +180,7 @@ var current_state: String = "":
 			_play_sfx(s)
 		current_state = s
 		_apply_overrides(not previous.is_empty())
+		_notify_descendant_rules()
 		if ref != null:
 			_safe_redraw()
 
@@ -220,6 +226,8 @@ func _connect_ref_signals(v: Node) -> void:
 		if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
 			interp.parsed_changed.connect(_on_parsed_changed)
 	else:
+		if not v.is_connected("tree_entered", _on_ref_tree_entered_rt):
+			v.connect("tree_entered", _on_ref_tree_entered_rt)
 		if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
 
@@ -235,6 +243,8 @@ func _disconnect_ref_signals(v: Node) -> void:
 		if v.is_connected("tree_exiting", _on_ref_tree_exiting):
 			v.disconnect("tree_exiting", _on_ref_tree_exiting)
 	else:
+		if v.is_connected("tree_entered", _on_ref_tree_entered_rt):
+			v.disconnect("tree_entered", _on_ref_tree_entered_rt)
 		if v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
 			v.disconnect("tree_exiting", _on_ref_tree_exiting_rt)
 
@@ -284,7 +294,18 @@ func _on_ref_renamed() -> void:
 func _on_ref_tree_entered() -> void:
 	if is_instance_valid(_ref_node):
 		_ref_path = _ref_node.get_path()
+		_repositioned()
 		GdssNodeBinder.apply_mode_tree.call_deferred(_ref_node)
+
+
+func _on_ref_tree_entered_rt() -> void:
+	_repositioned()
+
+
+func _repositioned() -> void:
+	if ref == null:
+		return
+	GdssNodeBinder.reposition(ref)
 
 
 func _on_ref_tree_exiting() -> void:
@@ -298,9 +319,21 @@ func _on_ref_tree_exiting_rt() -> void:
 
 
 func _invalidate_entry_cache() -> void:
+	_invalidate_entry_cache_self()
+	var node: Node = ref
+	if node == null:
+		return
+	for stylebox: GdssStylebox in GdssNodeBinder.get_slots(node).values():
+		if stylebox != null and stylebox != self:
+			stylebox._invalidate_entry_cache_self()
+
+
+func _invalidate_entry_cache_self() -> void:
 	_entry_cache_dirty = true
 	_styled_props_dirty = true
 	_entry_cache = {}
+	_entry_cache_ancestry = ""
+	_ancestor_states_dirty = true
 	_animatable_dirty = true
 	_method_args_cache.clear()
 	_gdss_node = null
@@ -870,7 +903,7 @@ func _on_node_visibility_changed() -> void:
 
 
 func _play_show() -> void:
-	_play_event("on_show")
+	_play_event("on_show()")
 
 
 func _play_event(event_key: String) -> void:
@@ -896,22 +929,39 @@ func _play_sfx(state_key: String) -> void:
 		GDSS.play_sfx(stream as AudioStream)
 
 
-func _ev_pressed() -> void: _play_event("on_pressed")
+func _sync_event_signals(node: Node) -> void:
+	var entry: Dictionary = _resolve_entry()
+	for sig: String in _event_callables.keys():
+		if not entry.has(sig + "()"):
+			_disconnect_event_signal(node, sig)
+	for key: String in entry:
+		var sig: String = key.trim_suffix("()")
+		if key.ends_with("()") and not _event_callables.has(sig) and node.has_signal(sig):
+			var cb: Callable = _play_event.bind(key)
+			var arg_count: int = _signal_arg_count(node, sig)
+			if arg_count > 0:
+				cb = cb.unbind(arg_count)
+			node.connect(sig, cb)
+			_event_callables.set(sig, cb)
 
 
-func _ev_focus() -> void: _play_event("on_focus")
+func _clear_event_signals(node: Node) -> void:
+	for sig: String in _event_callables.keys():
+		_disconnect_event_signal(node, sig)
 
 
-func _ev_blur() -> void: _play_event("on_blur")
+func _disconnect_event_signal(node: Node, sig: String) -> void:
+	var cb: Callable = _event_callables.get(sig)
+	if node.is_connected(sig, cb):
+		node.disconnect(sig, cb)
+	_event_callables.erase(sig)
 
 
-func _ev_mouse_entered() -> void: _play_event("on_mouse_entered")
-
-
-func _ev_mouse_exited() -> void: _play_event("on_mouse_exited")
-
-
-func _ev_toggled(_on: bool) -> void: _play_event("on_toggled")
+static func _signal_arg_count(node: Node, sig: String) -> int:
+	for info: Dictionary in node.get_signal_list():
+		if info.get("name") == sig:
+			return (info.get("args") as Array).size()
+	return 0
 
 
 func _play_hide() -> void:
@@ -919,7 +969,7 @@ func _play_hide() -> void:
 	if node == null:
 		return
 	var node_type: GdssNodeType = _resolve_gdss_node()
-	if node_type == null or not _resolve_entry().has("on_hide") or not node.is_inside_tree():
+	if node_type == null or not _resolve_entry().has("on_hide()") or not node.is_inside_tree():
 		if node != null and node.visible:
 			_self_toggle = true
 			node.visible = false
@@ -927,7 +977,7 @@ func _play_hide() -> void:
 	if not node.visible:
 		_self_toggle = true
 		node.visible = true
-	_start_transition(_resting_state(node_type, node), "on_hide", "on_hide", func() -> void:
+	_start_transition(_resting_state(node_type, node), "on_hide()", "on_hide()", func() -> void:
 		if is_instance_valid(node) and node.visible:
 			_self_toggle = true
 			node.visible = false
@@ -964,14 +1014,56 @@ func _find_class_in_tree(classes: Dictionary, name: String) -> Dictionary:
 	return {}
 
 
-func _merge_entries(base: Dictionary, override: Dictionary) -> Dictionary:
+func _find_class_path(classes: Dictionary, name: String) -> Array[Dictionary]:
+	if classes.has(name):
+		return [classes.get(name)] as Array[Dictionary]
+	for key: String in classes:
+		var nested: Dictionary = classes.get(key).get("_classes", {})
+		if nested.is_empty():
+			continue
+		var found: Array[Dictionary] = _find_class_path(nested, name)
+		if not found.is_empty():
+			var path: Array[Dictionary] = [classes.get(key)] as Array[Dictionary]
+			path.append_array(found)
+			return path
+	return [] as Array[Dictionary]
+
+
+func _absorb_vars(source: Dictionary) -> void:
+	var declared: Variant = source.get(GdssStylesheet.VARS_KEY)
+	if not declared is Dictionary:
+		return
+	for key: String in declared as Dictionary:
+		_scoped_vars.set(key, (declared as Dictionary).get(key))
+
+
+func _merge_descendants(base: Dictionary, override: Dictionary) -> Dictionary:
+	var out: Dictionary = {}
+	for key: String in base:
+		out.set(key, base.get(key))
+	for key: String in override:
+		if out.has(key) and out.get(key) is Dictionary and override.get(key) is Dictionary:
+			out.set(key, _merge_entries(out.get(key), override.get(key), true))
+		else:
+			out.set(key, override.get(key))
+	return out
+
+
+func _merge_entries(base: Dictionary, override: Dictionary, keep_ancestor_states: bool = false) -> Dictionary:
 	var merged: Dictionary = {}
 	for state: String in base:
-		if state == "_classes":
+		if state == "_classes" or state == GdssStylesheet.VARS_KEY:
+			continue
+		if not keep_ancestor_states and state.begins_with(GdssStylesheet.ANCESTOR_STATE_PREFIX):
 			continue
 		merged.set(state, base.get(state).duplicate() if base.get(state) is Dictionary else base.get(state))
 	for state: String in override:
-		if state == "_classes":
+		if state == "_classes" or state == GdssStylesheet.VARS_KEY:
+			continue
+		if not keep_ancestor_states and state.begins_with(GdssStylesheet.ANCESTOR_STATE_PREFIX):
+			continue
+		if state == GdssStylesheet.DESCENDANTS_KEY:
+			merged.set(state, _merge_descendants(merged.get(state, {}), override.get(state)))
 			continue
 		if not merged.has(state):
 			merged.set(state, override.get(state).duplicate() if override.get(state) is Dictionary else override.get(state))
@@ -994,7 +1086,7 @@ func _entry_styled_props(entry: Dictionary) -> Dictionary:
 		return _styled_props_cache
 	_styled_props_cache.clear()
 	for key: String in entry:
-		if key == "_classes" or key == "_variations":
+		if key == "_classes" or key == "_variations" or key == GdssStylesheet.DESCENDANTS_KEY or key == GdssStylesheet.VARS_KEY:
 			continue
 		var sd: Variant = entry.get(key)
 		if sd is Dictionary:
@@ -1007,12 +1099,15 @@ func _entry_styled_props(entry: Dictionary) -> Dictionary:
 func _resolve_entry() -> Dictionary:
 	if ref == null:
 		return {}
+	if GdssStylesheet.parsed.is_empty():
+		return {}
 	if not _entry_cache_dirty and not Engine.is_editor_hint():
 		return _entry_cache
 	var current_classes: PackedStringArray = ref.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray
 	var variation: String = String((ref as Control).theme_type_variation) if ref is Control else ""
 	var override_meta: Variant = ref.get_meta(GDSS.OVERRIDES_META) if ref.has_meta(GDSS.OVERRIDES_META) else null
-	if not _entry_cache_dirty and _entry_cache_classes == current_classes and _entry_cache_variation == variation and _entry_cache_overrides == override_meta:
+	var ancestry: String = _ancestry_key()
+	if not _entry_cache_dirty and _entry_cache_classes == current_classes and _entry_cache_variation == variation and _entry_cache_overrides == override_meta and _entry_cache_ancestry == ancestry:
 		return _entry_cache
 	_styled_props_dirty = true
 	var parsed: Dictionary[String, Dictionary] = GdssStylesheet.parsed
@@ -1021,40 +1116,237 @@ func _resolve_entry() -> Dictionary:
 	var variations: Dictionary = entry.get("_variations", {}) if not entry.is_empty() else {}
 	var has_variation: bool = not variation.is_empty() and variations.has(variation)
 	var override_entry: Dictionary = _build_override_entry(override_meta)
-	if current_classes.is_empty() and not has_variation and override_entry.is_empty():
+	var descendant_layers: Array[Dictionary] = _collect_descendant_layers()
+	_scoped_vars.clear()
+	for layer: Dictionary in descendant_layers:
+		var inherited: Variant = layer.get("vars")
+		if inherited is Dictionary:
+			for key: String in inherited as Dictionary:
+				_scoped_vars.set(key, (inherited as Dictionary).get(key))
+	_absorb_vars(entry)
+	for gdss_class_name: String in current_classes:
+		for step: Dictionary in _find_class_path((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name):
+			_absorb_vars(step)
+	if current_classes.is_empty() and not has_variation and override_entry.is_empty() and descendant_layers.is_empty():
 		_entry_cache = entry
 		_entry_cache_classes = current_classes
 		_entry_cache_variation = variation
 		_entry_cache_overrides = override_meta
+		_entry_cache_ancestry = ancestry
 		_entry_cache_dirty = false
 		return entry
 	if has_variation:
 		entry = _merge_entries(entry, _resolve_override_patches(entry, variations.get(variation)))
+	for layer: Dictionary in descendant_layers:
+		var body: Dictionary = layer.get("entry")
+		if not body.is_empty():
+			entry = _merge_entries(entry, _resolve_override_patches(entry, body))
 	for gdss_class_name: String in current_classes:
-		var override: Dictionary = _find_class_in_tree((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name)
+		var path: Array[Dictionary] = _find_class_path((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name)
+		for step: Dictionary in path:
+			var step_rules: Variant = step.get(GdssStylesheet.DESCENDANTS_KEY)
+			if step_rules is Dictionary and not (step_rules as Dictionary).is_empty():
+				entry = _merge_entries(entry, {GdssStylesheet.DESCENDANTS_KEY: step_rules})
+		var override: Dictionary = path.back() if not path.is_empty() else {}
 		if not override.is_empty():
 			entry = _merge_entries(entry, _resolve_override_patches(entry, override))
+	for layer: Dictionary in descendant_layers:
+		var anc: Dictionary = layer.get("anc")
+		if not anc.is_empty():
+			anc = _resolve_override_patches(entry, anc)
+			entry = _merge_entries(entry, anc)
+			_propagate_all(entry, anc)
 	if not override_entry.is_empty():
 		override_entry = _resolve_override_patches(entry, override_entry)
 		entry = _merge_entries(entry, override_entry)
-		var all_overrides: Variant = override_entry.get("all")
-		if all_overrides is Dictionary:
-			for state_key: String in entry:
-				if state_key == "all" or state_key == "_classes" or state_key == "_variations" or state_key.begins_with("on_"):
-					continue
-				if (override_entry as Dictionary).has(state_key):
-					continue
-				var state_dict: Variant = entry.get(state_key)
-				if not state_dict is Dictionary:
-					continue
-				for prop_name: String in (all_overrides as Dictionary):
-					(state_dict as Dictionary).set(prop_name, (all_overrides as Dictionary).get(prop_name))
+		_propagate_all(entry, override_entry)
 	_entry_cache = entry
 	_entry_cache_classes = current_classes
 	_entry_cache_variation = variation
 	_entry_cache_overrides = override_meta
+	_entry_cache_ancestry = ancestry
 	_entry_cache_dirty = false
 	return entry
+
+
+func _propagate_all(entry: Dictionary, overlay: Dictionary) -> void:
+	var all_overrides: Variant = overlay.get("all")
+	if not all_overrides is Dictionary:
+		return
+	for state_key: String in entry:
+		if state_key == "all" or state_key == "_classes" or state_key == "_variations" or state_key == GdssStylesheet.DESCENDANTS_KEY or state_key == GdssStylesheet.VARS_KEY or state_key.ends_with("()"):
+			continue
+		if overlay.has(state_key):
+			continue
+		var state_dict: Variant = entry.get(state_key)
+		if not state_dict is Dictionary:
+			continue
+		for prop_name: String in (all_overrides as Dictionary):
+			(state_dict as Dictionary).set(prop_name, (all_overrides as Dictionary).get(prop_name))
+
+
+const MAX_ANCESTOR_WALK: int = 32
+
+
+func _ancestry_key() -> String:
+	if not GdssStylesheet.has_descendant_rules or ref == null:
+		return ""
+	var parts: PackedStringArray = []
+	var node: Node = ref.get_parent()
+	var depth: int = 0
+	while node != null and depth < MAX_ANCESTOR_WALK:
+		depth += 1
+		parts.append("%s.%s:%s" % [
+			node.get_class(),
+			String(",").join(node.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray),
+			_ancestor_state(node)])
+		node = node.get_parent()
+	return String("|").join(parts)
+
+
+func _ancestor_state(node: Node) -> String:
+	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(node)
+	if stylebox == null or stylebox == self:
+		return ""
+	return stylebox._get_state()
+
+
+func _collect_descendant_layers() -> Array[Dictionary]:
+	var layers: Array[Dictionary] = []
+	if not GdssStylesheet.has_descendant_rules or ref == null:
+		return layers
+	var self_class: String = ref.get_class()
+	var by_depth: Array[Array] = []
+	var node: Node = ref.get_parent()
+	var depth: int = 0
+	while node != null and depth < MAX_ANCESTOR_WALK:
+		depth += 1
+		var container: Dictionary = _ancestor_descendants(node)
+		if not container.is_empty():
+			var at_depth: Array[Dictionary] = []
+			var keys: PackedStringArray = [">>" + self_class]
+			if depth == 1:
+				keys.append(">" + self_class)
+			for key: String in keys:
+				var rule: Variant = container.get(key)
+				if not rule is Dictionary or (rule as Dictionary).is_empty():
+					continue
+				at_depth.append({
+					"entry": rule as Dictionary,
+					"anc": _ancestor_state_overlay(rule as Dictionary, node),
+					"vars": _ancestor_scoped_vars(node)})
+			if not at_depth.is_empty():
+				by_depth.append(at_depth)
+		node = node.get_parent()
+	by_depth.reverse()
+	for group: Array in by_depth:
+		for layer: Dictionary in group:
+			layers.append(layer)
+	return layers
+
+
+func _ancestor_descendants(node: Node) -> Dictionary:
+	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(node)
+	if stylebox != null and stylebox != self:
+		var resolved: Variant = stylebox._resolve_entry().get(GdssStylesheet.DESCENDANTS_KEY)
+		return resolved if resolved is Dictionary else {}
+	var entry: Dictionary = GdssStylesheet.parsed.get(node.get_class(), {})
+	if entry.is_empty():
+		return {}
+	var container: Variant = entry.get(GdssStylesheet.DESCENDANTS_KEY)
+	var result: Dictionary = container as Dictionary if container is Dictionary else {}
+	for gdss_class_name: String in node.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray:
+		var override: Dictionary = _find_class_in_tree(entry.get("_classes", {}), gdss_class_name)
+		var nested: Variant = override.get(GdssStylesheet.DESCENDANTS_KEY)
+		if nested is Dictionary and not (nested as Dictionary).is_empty():
+			result = _merge_descendants(result, nested as Dictionary)
+	return result
+
+
+func _ancestor_scoped_vars(node: Node) -> Dictionary:
+	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(node)
+	if stylebox == null or stylebox == self:
+		return {}
+	stylebox._resolve_entry()
+	return stylebox._scoped_vars
+
+
+func _ancestor_state_overlay(rule: Dictionary, node: Node) -> Dictionary:
+	var state: String = _ancestor_state(node)
+	if state.is_empty():
+		return {}
+	var props: Variant = rule.get(GdssStylesheet.ANCESTOR_STATE_PREFIX + state)
+	if not props is Dictionary or (props as Dictionary).is_empty():
+		return {}
+	return {"all": (props as Dictionary).duplicate()}
+
+
+func _has_ancestor_state_rules() -> bool:
+	if not _ancestor_states_dirty:
+		return _ancestor_states
+	_ancestor_states = false
+	_ancestor_states_dirty = false
+	var container: Variant = _resolve_entry().get(GdssStylesheet.DESCENDANTS_KEY)
+	if not container is Dictionary:
+		return false
+	for key: String in container as Dictionary:
+		var rule: Variant = (container as Dictionary).get(key)
+		if not rule is Dictionary:
+			continue
+		for state_key: String in rule as Dictionary:
+			if state_key.begins_with(GdssStylesheet.ANCESTOR_STATE_PREFIX):
+				_ancestor_states = true
+				return true
+	return false
+
+
+func _notify_descendant_rules() -> void:
+	if ref == null or not GdssStylesheet.has_descendant_rules:
+		return
+	if not _has_ancestor_state_rules():
+		return
+	_restyle_descendants(ref)
+
+
+static func _restyle_descendants(node: Node) -> void:
+	for child: Node in node.get_children(true):
+		var styleboxes: Array[GdssStylebox] = GdssNodeBinder.get_styleboxes(child)
+		var outgoing: Array[Dictionary] = []
+		for stylebox: GdssStylebox in styleboxes:
+			outgoing.append(stylebox._capture_animatable())
+		for stylebox: GdssStylebox in styleboxes:
+			stylebox._invalidate_entry_cache()
+		for i: int in styleboxes.size():
+			styleboxes.get(i)._restyle_from_ancestor(outgoing.get(i))
+		_restyle_descendants(child)
+
+
+func _capture_animatable() -> Dictionary:
+	var outgoing: Dictionary = {}
+	if ref == null or _applying:
+		return outgoing
+	var state: String = _get_state()
+	var animatable: Dictionary = _get_animatable_props()
+	for prop_name: String in animatable:
+		if _tweened_values.has(prop_name):
+			continue
+		var prop: GdssProp = animatable.get(prop_name)
+		var val: Variant = _get_parsed_val(prop_name, state, prop.get_default_value())
+		if val != null:
+			outgoing.set(prop_name, val)
+	return outgoing
+
+
+func _restyle_from_ancestor(outgoing: Dictionary) -> void:
+	if ref == null or _applying:
+		return
+	var state: String = _get_state()
+	for prop_name: String in outgoing:
+		if GDSS.scaled_duration(_resolve_time(prop_name, state)) > 0.0:
+			_tweened_values.set(prop_name, outgoing.get(prop_name))
+	_start_transition(state, state)
+	_apply_overrides(false)
+	_safe_redraw()
 
 
 func _build_override_entry(override_meta: Variant) -> Dictionary:
@@ -1253,6 +1545,9 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 		if s.begins_with("$") or s.begins_with("__gdss_global__") or s.begins_with("__gdss_instance__"):
 			has_live_ref = true
 			break
+		if s.begins_with("__gdss_local__") and _scoped_vars.has(s.substr("__gdss_local__".length())):
+			has_live_ref = true
+			break
 	var cache_key: String = ""
 	if not has_live_ref:
 		cache_key = method_name + "\n" + "\n".join(PackedStringArray(raw_args))
@@ -1277,6 +1572,8 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 				resolved.append(GdssStylesheet._instance_vars.get(ref.get_instance_id()).get(key, null))
 			else:
 				resolved.append(GdssStylesheet._instance_defaults.get(key, null))
+		elif stripped.begins_with("__gdss_local__"):
+			resolved.append(_resolve_sentinel(stripped, null))
 		elif stripped.begins_with("$"):
 			var key: String = stripped.substr(1)
 			if GdssStylesheet.globals.has(key):
@@ -1362,6 +1659,8 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 		return fallback
 	if s.begins_with("__gdss_local__"):
 		var name: String = s.substr("__gdss_local__".length())
+		if _scoped_vars.has(name):
+			return _resolve_sentinel(_scoped_vars.get(name), fallback)
 		if GdssStylesheet._local_vars.has(name):
 			return GdssStylesheet._local_vars.get(name)
 		return fallback

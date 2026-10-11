@@ -134,6 +134,7 @@ func _reload_parsed() -> void:
 		var val: Variant = parsed_data.get(key)
 		if val is Dictionary:
 			GdssStylesheet.parsed.set(key, val)
+	GdssStylesheet.refresh_descendant_flag()
 	if data.has("local_vars") and data.get("local_vars") is Dictionary:
 		var local_vars: Dictionary = data.get("local_vars")
 		GdssStylesheet._local_vars.clear()
@@ -188,6 +189,7 @@ func _ensure_parsed() -> void:
 		var val: Variant = (raw as Dictionary).get(key)
 		if val is Dictionary:
 			GdssStylesheet.parsed.set(key, val)
+	GdssStylesheet.refresh_descendant_flag()
 	if data.has("global_defaults") and data.get("global_defaults") is Dictionary:
 		for key: String in (data.get("global_defaults") as Dictionary):
 			var val: Variant = (data.get("global_defaults") as Dictionary).get(key)
@@ -202,6 +204,9 @@ func _ensure_parsed() -> void:
 		for key: String in (data.get("local_vars") as Dictionary):
 			GdssStylesheet._local_vars.set(key, (data.get("local_vars") as Dictionary).get(key))
 	_apply_scheme_meta(data)
+	
+	GdssStylesheet.refresh_descendant_flag()
+	_refresh_all_styleboxes()
 
 
 func play_sfx(stream: AudioStream) -> void:
@@ -265,32 +270,10 @@ func _try_bind(canvas_item: Node) -> void:
 	_connect_event_signals(canvas_item)
 
 
-const _EVENT_SIGNALS: Dictionary = {
-	"pressed": ["on_pressed", "_ev_pressed"],
-	"focus_entered": ["on_focus", "_ev_focus"],
-	"focus_exited": ["on_blur", "_ev_blur"],
-	"mouse_entered": ["on_mouse_entered", "_ev_mouse_entered"],
-	"mouse_exited": ["on_mouse_exited", "_ev_mouse_exited"],
-	"toggled": ["on_toggled", "_ev_toggled"],
-}
-
-
 func _connect_event_signals(canvas_item: Node) -> void:
 	var primary: GdssStylebox = GdssNodeBinder.get_primary_stylebox(canvas_item)
-	if primary == null:
-		return
-	var entry: Dictionary = primary._resolve_entry()
-	for sig: String in _EVENT_SIGNALS:
-		if not canvas_item.has_signal(sig):
-			continue
-		var info: Array = _EVENT_SIGNALS.get(sig)
-		var cb: Callable = Callable(primary, info.get(1))
-		var want: bool = not entry.is_empty() and entry.has(info.get(0))
-		var connected: bool = canvas_item.is_connected(sig, cb)
-		if want and not connected:
-			canvas_item.connect(sig, cb)
-		elif connected and not want:
-			canvas_item.disconnect(sig, cb)
+	if primary != null:
+		primary._sync_event_signals(canvas_item)
 
 
 func _disconnect_node_signals(canvas_item: Node) -> void:
@@ -299,15 +282,8 @@ func _disconnect_node_signals(canvas_item: Node) -> void:
 		if canvas_item.visibility_changed.is_connected(vis_cb):
 			canvas_item.visibility_changed.disconnect(vis_cb)
 	var primary: GdssStylebox = GdssNodeBinder.get_primary_stylebox(canvas_item)
-	if primary == null:
-		return
-	for sig: String in _EVENT_SIGNALS:
-		if not canvas_item.has_signal(sig):
-			continue
-		var info: Array = _EVENT_SIGNALS.get(sig)
-		var cb: Callable = Callable(primary, info.get(1))
-		if canvas_item.is_connected(sig, cb):
-			canvas_item.disconnect(sig, cb)
+	if primary != null:
+		primary._clear_event_signals(canvas_item)
 
 
 func _on_styled_node_exited(id: int) -> void:

@@ -106,7 +106,7 @@ func run(t: TC) -> void:
 		t.check_eq(((inner as Dictionary).get("all", {}) as Dictionary).get("corner_radius"), Vector4i(9, 9, 9, 9), "nested class keeps own props")
 	var variations: Variant = (classes.get("Button", {}) as Dictionary).get("_variations")
 	t.check(variations is Dictionary and (variations as Dictionary).has("Flat"), "%Variation routed to _variations")
-	t.check_eq(t.entry_val(classes, "Button", "on_show", "opacity"), 0, "event block stored under event key")
+	t.check_eq(t.entry_val(classes, "Button", "on_show()", "opacity"), 0, "event block stored under event key")
 	var values: Dictionary = t.parse_fixture(FIXTURE_VALUES)
 	var calc_val: Variant = t.entry_val(values, "Button", "all", "font_size")
 	t.check(calc_val is Dictionary and (calc_val as Dictionary).has("__gdss_calc__"), "calc() stored as calc AST")

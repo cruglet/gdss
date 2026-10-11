@@ -14,7 +14,7 @@ Button {
 	:hover {
 		sfx: $SFX_HOVER
 	}
-	on_pressed() {
+	pressed() {
 		sfx: $SFX_HOVER
 	}
 }
@@ -61,7 +61,7 @@ func _check_declaration(t: TC) -> void:
 	var hover: Variant = t.entry_val(result, "Button", "hover", "sfx")
 	t.check(hover is Dictionary, "the state's sfx parses to a loader call")
 	t.check_eq((hover as Dictionary).get("__gdss_method__"), "sound", "sfx uses the sound loader")
-	t.check(t.entry_val(result, "Button", "on_pressed", "sfx") != null, "an event block can carry sfx")
+	t.check(t.entry_val(result, "Button", "pressed()", "sfx") != null, "an event block can carry sfx")
 	t.check(GDSS.get_resource("SFX_HOVER") is AudioStream, "get_resource resolves an audio key")
 	t.check(GDSS.get_resource("NOPE") == null, "an unknown key resolves to null")
 
