@@ -33,6 +33,7 @@ enum Type {
 	FONT,
 	VECTOR2,
 	AUDIO,
+	CLIP_PATH,
 }
 
 enum CursorType {
@@ -76,6 +77,12 @@ enum TransitionFunc {
 	BOUNCE,
 	BACK,
 	SPRING
+}
+
+enum Interpolation {
+	DEFAULT,
+	NEAREST,
+	LINEAR,
 }
 
 enum BlurQuality {
@@ -892,7 +899,12 @@ static func get_resource(key: String) -> Resource:
 	if method == null:
 		return null
 	var args: Array[Variant] = [(entry as Dictionary).get("path")]
-	return method.call_method(args) as Resource
+	for extra: String in str((entry as Dictionary).get("args", "")).split(",", false):
+		args.append(extra.strip_edges())
+	var result: Variant = method.call_method(args)
+	if result is GdssTexture:
+		return (result as GdssTexture).texture
+	return result as Resource
 
 
 static func _redraw_all() -> void:

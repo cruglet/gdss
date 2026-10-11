@@ -7,6 +7,7 @@ enum ParamType {
 	COLOR,
 	STRING,
 	BOOL,
+	ENUM,
 }
 
 
@@ -15,16 +16,19 @@ class Param:
 	var type: ParamType
 	var optional: bool
 	var default_value: Variant
+	var enum_keys: PackedStringArray
 	
-	func _init(p_name: String, p_type: ParamType, p_optional: bool = false, p_default: Variant = null) -> void:
+	func _init(p_name: String, p_type: ParamType, p_optional: bool = false, p_default: Variant = null, p_enum_keys: PackedStringArray = PackedStringArray()) -> void:
 		name = p_name
 		type = p_type
 		optional = p_optional
 		default_value = p_default
+		enum_keys = p_enum_keys
 
 @export var method_name: String = ""
 @export var supported_prop_types: Array[GDSS.Type] = []
 @export var returns_texture: bool = false
+@export var variadic: bool = false
 
 var parameters: Array[Param] = []
 
@@ -34,13 +38,17 @@ func get_code_hint(active_param: int = -1) -> String:
 	for i: int in parameters.size():
 		var param: Param = parameters.get(i)
 		var type_str: String = ParamType.find_key(param.type).to_lower()
+		if param.type == ParamType.ENUM and not param.enum_keys.is_empty():
+			type_str = "|".join(param.enum_keys)
 		if active_param == i:
 			var part: String = param.name + ": " + type_str
-			if param.optional:
+			if param.optional and str(param.default_value) != "":
 				part += " = " + str(param.default_value)
 			parts.append("[" + part + "]")
 		else:
 			parts.append(param.name)
+	if variadic:
+		parts.append("...")
 	return method_name + "(" + ", ".join(parts) + ")"
 
 

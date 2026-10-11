@@ -1927,9 +1927,10 @@ func resource_entries() -> Array[Dictionary]:
 	return _resource_entries_in(lines, _resources_block(lines))
 
 
-func write_resource(old_key: String, key: String, method: String, path: String) -> void:
+func write_resource(old_key: String, key: String, method: String, path: String, options: PackedStringArray = PackedStringArray()) -> void:
 	var lines: PackedStringArray = get_full_source().split("\n")
-	var declaration: String = "\t%s: %s(\"%s\")" % [key, method, path]
+	var suffix: String = "" if options.is_empty() else ", " + ", ".join(options)
+	var declaration: String = "\t%s: %s(\"%s\"%s)" % [key, method, path, suffix]
 	var bounds: Vector2i = _resources_block(lines)
 	if bounds.x == -1:
 		var insert_at: int = _block_insert_line(lines)
@@ -2008,6 +2009,7 @@ func _resource_at(line: String, line_number: int) -> Dictionary:
 		"key": entry.get("key"),
 		"method": value.get_string(1) if value != null else "",
 		"path": value.get_string(2) if value != null else "",
+		"args": value.get_string(3) if value != null else "",
 		"line": line_number,
 	}
 

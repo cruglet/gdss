@@ -126,6 +126,8 @@ func get_default_value() -> Variant:
 			return Vector2.ZERO
 		GDSS.Type.COMPOSITE:
 			return ""
+		GDSS.Type.CLIP_PATH, GDSS.Type.ICON, GDSS.Type.FONT, GDSS.Type.AUDIO:
+			return null
 	return 0
 
 

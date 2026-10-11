@@ -59,6 +59,9 @@ func _build_from_objects() -> void:
 	for key: String in GDSS.CursorType:
 		if not _enum_values.has(key):
 			_enum_values.append(key)
+	for key: String in GDSS.Interpolation:
+		if not _enum_values.has(key):
+			_enum_values.append(key)
 	
 	for obj: GdssNodeType in GDSS._get_node_types().values():
 		var style_name: String = obj.style_name

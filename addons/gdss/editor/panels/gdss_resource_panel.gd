@@ -173,8 +173,62 @@ func _make_row(entry: Dictionary) -> Control:
 	top.add_child(remove)
 	row.add_child(top)
 	row.add_child(_make_picker(entry, method, path))
+	if method == "texture" and not pending:
+		row.add_child(_make_texture_options(entry))
 	row.add_child(HSeparator.new())
 	return row
+
+
+func _make_texture_options(entry: Dictionary) -> Control:
+	var opts: PackedStringArray = _texture_options(entry)
+	var box: HBoxContainer = HBoxContainer.new()
+	box.add_theme_constant_override(&"separation", 6)
+	var interpolation: OptionButton = OptionButton.new()
+	for name: String in GdssTexture.interpolation_names():
+		interpolation.add_item(name.capitalize())
+	interpolation.selected = GdssTexture.parse_interpolation(opts.get(0))
+	interpolation.tooltip_text = "Texture filtering"
+	interpolation.size_flags_horizontal = SIZE_EXPAND_FILL
+	interpolation.item_selected.connect(func(index: int) -> void:
+		_write_texture_options(entry, GdssTexture.interpolation_names().get(index), opts.get(1), opts.get(2)))
+	box.add_child(interpolation)
+	var aspect: CheckBox = CheckBox.new()
+	aspect.text = "Aspect"
+	aspect.tooltip_text = "Fit the texture inside the panel, keeping its proportions"
+	aspect.button_pressed = opts.get(1) == "true"
+	aspect.toggled.connect(func(on: bool) -> void:
+		_write_texture_options(entry, opts.get(0), "true" if on else "false", opts.get(2)))
+	box.add_child(aspect)
+	var repeat: CheckBox = CheckBox.new()
+	repeat.text = "Repeat"
+	repeat.tooltip_text = "Tile the texture instead of clamping at its edges"
+	repeat.button_pressed = opts.get(2) == "true"
+	repeat.toggled.connect(func(on: bool) -> void:
+		_write_texture_options(entry, opts.get(0), opts.get(1), "true" if on else "false"))
+	box.add_child(repeat)
+	return box
+
+
+func _texture_options(entry: Dictionary) -> PackedStringArray:
+	var parsed: PackedStringArray = PackedStringArray(["DEFAULT", "false", "false"])
+	var raw: String = str(entry.get("args", ""))
+	if raw.is_empty():
+		return parsed
+	var parts: PackedStringArray = raw.split(",", false)
+	for i: int in mini(parts.size(), 3):
+		parsed.set(i, parts.get(i).strip_edges())
+	return parsed
+
+
+func _write_texture_options(entry: Dictionary, interpolation: String, aspect: String, repeat: String) -> void:
+	var options: PackedStringArray = PackedStringArray()
+	if repeat == "true" or aspect == "true" or interpolation.to_upper() != "DEFAULT":
+		options.append(interpolation.to_upper())
+	if repeat == "true" or aspect == "true":
+		options.append(aspect)
+	if repeat == "true":
+		options.append(repeat)
+	editor.write_resource(entry.get("key"), entry.get("key"), entry.get("method"), entry.get("path"), options)
 
 
 func _make_picker(entry: Dictionary, method: String, path: String) -> Control:

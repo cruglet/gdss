@@ -258,6 +258,31 @@ func _ensure_hint_panel() -> void:
 	editor.add_child(_hint_panel)
 
 
+func _complete_method_enum_arg(word: String) -> bool:
+	var line: String = editor.get_line(editor.get_caret_line())
+	var col: int = editor.get_caret_column()
+	var paren: int = line.rfind("(", col - 1)
+	if paren == -1 or line.find(")", paren) != -1 and line.find(")", paren) < col - 1:
+		return false
+	var name_start: int = paren - 1
+	while name_start >= 0 and (line[name_start] == "_" or line[name_start].is_valid_identifier()):
+		name_start -= 1
+	var method: GdssMethod = GDSS._get_gdss_methods().get(line.substr(name_start + 1, paren - name_start - 1).strip_edges())
+	if method == null:
+		return false
+	var inside: String = line.substr(paren + 1, col - paren - 1)
+	var active: int = inside.count(",")
+	if active >= method.parameters.size():
+		return false
+	var param: GdssMethod.Param = method.parameters.get(active)
+	if param.type != GdssMethod.ParamType.ENUM:
+		return false
+	for key: String in param.enum_keys:
+		if _matches(key, word):
+			editor.add_code_completion_option(CodeEdit.KIND_ENUM, key, key, _completion_color, _get_icon(&"Curve"))
+	return true
+
+
 func _show_hint(text: String) -> void:
 	_ensure_hint_panel()
 	_hint_label.text = text
@@ -478,6 +503,8 @@ func _complete_states(word: String, style_name: String) -> void:
 
 
 func _complete_values(word: String, style_name: String, prop: String) -> void:
+	if _complete_method_enum_arg(word):
+		return
 	if word.begins_with("$"):
 		var partial: String = word.substr(1)
 		for name: String in _resource_variables:

@@ -42,7 +42,7 @@ static var _re_meta: RegEx = RegEx.create_from_string(r"^@meta\b")
 static var _re_import: RegEx = RegEx.create_from_string(r"^@import\s+([\"'])(.+?)\1")
 static var _re_resources: RegEx = RegEx.create_from_string(r"^@resources\b")
 static var _re_config: RegEx = RegEx.create_from_string(r"^@config\b")
-static var _re_resource_value: RegEx = RegEx.create_from_string(r"^(\w+)\s*\(\s*[\"'](.*?)[\"']\s*\)$")
+static var _re_resource_value: RegEx = RegEx.create_from_string(r"^(\w+)\s*\(\s*[\"'](.*?)[\"']\s*(?:,\s*(.*?))?\s*\)$")
 
 
 static func get_instance() -> GdssStylesheet:
@@ -285,6 +285,10 @@ func _check_method_arg_type(arg: String, param: GdssMethod.Param, method_name: S
 				errors.append(["Argument '%s' in '%s()' expects a color (#hex), got '%s'" % [param.name, method_name, arg], line])
 		GdssMethod.ParamType.STRING:
 			pass
+		GdssMethod.ParamType.ENUM:
+			if not param.enum_keys.has(arg.to_upper()):
+				errors.append(["Argument '%s' in '%s()' expects one of: %s, got '%s'" % [
+					param.name, method_name, ", ".join(param.enum_keys), arg], line])
 
 
 func _check_method_call(value_str: String, method_name: String, prop: GdssProp, known_methods: Dictionary, errors: Array[Array], line: int) -> void:
@@ -315,8 +319,10 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 			required_count += 1
 	var total_count: int = gdss_method.parameters.size()
 	
-	if args.size() < required_count or args.size() > total_count:
-		if required_count == total_count:
+	if args.size() < required_count or (not gdss_method.variadic and args.size() > total_count):
+		if gdss_method.variadic:
+			errors.append(["Method '%s()' expects at least %d argument(s), got %d" % [method_name, required_count, args.size()], line])
+		elif required_count == total_count:
 			errors.append(["Method '%s()' expects %d argument(s), got %d" % [method_name, required_count, args.size()], line])
 		else:
 			errors.append(["Method '%s()' expects %d-%d argument(s), got %d" % [method_name, required_count, total_count, args.size()], line])
@@ -325,8 +331,9 @@ func _check_method_call(value_str: String, method_name: String, prop: GdssProp, 
 	for ai: int in args.size():
 		if args.get(ai).contains("("):
 			_check_method_call(args.get(ai), _method_name_of(args.get(ai)), null, known_methods, errors, line)
-		else:
-			_check_method_arg_type(args.get(ai), gdss_method.parameters.get(ai), method_name, errors, line)
+		elif not gdss_method.parameters.is_empty():
+			var param_index: int = mini(ai, gdss_method.parameters.size() - 1)
+			_check_method_arg_type(args.get(ai), gdss_method.parameters.get(param_index), method_name, errors, line)
 
 
 func _split_top_level_args(args_raw: String) -> Array[String]:
@@ -408,7 +415,7 @@ func _collect_check_resources(blocks: Array) -> void:
 		for entry: Dictionary in block.get("entries"):
 			var value: RegExMatch = _re_resource_value.search(str(entry.get("value_str")).strip_edges())
 			if value != null:
-				_check_resources.set(entry.get("key"), {"method": value.get_string(1), "path": value.get_string(2)})
+				_check_resources.set(entry.get("key"), {"method": value.get_string(1), "path": value.get_string(2), "args": value.get_string(3)})
 
 
 func _check_config_entries(block: Dictionary, errors: Array[Array]) -> void:
@@ -1078,9 +1085,16 @@ static func parse_paths(paths: PackedStringArray) -> Dictionary[String, Dictiona
 static func resource_methods() -> PackedStringArray:
 	var result: PackedStringArray = []
 	for method: GdssMethod in GDSS._get_gdss_methods().values():
-		if method.parameters.size() != 1:
+		if method.parameters.is_empty():
 			continue
-		if method.parameters.get(0).type == GdssMethod.ParamType.STRING:
+		if method.parameters.get(0).type != GdssMethod.ParamType.STRING:
+			continue
+		var callable_with_path: bool = true
+		for i: int in range(1, method.parameters.size()):
+			if not method.parameters.get(i).optional:
+				callable_with_path = false
+				break
+		if callable_with_path:
 			result.append(method.method_name)
 	result.sort()
 	return result
@@ -1411,7 +1425,7 @@ static func _accumulate_blocks(blocks: Array, known_states: PackedStringArray) -
 			for entry: Dictionary in block.get("entries"):
 				var value: RegExMatch = _re_resource_value.search(str(entry.get("value_str")).strip_edges())
 				if value != null:
-					resources.set(entry.get("key"), {"method": value.get_string(1), "path": value.get_string(2)})
+					resources.set(entry.get("key"), {"method": value.get_string(1), "path": value.get_string(2), "args": value.get_string(3)})
 		else:
 			for entry: Dictionary in block.get("entries"):
 				meta.set(entry.get("key"), _parse_meta_value(entry.get("value_str")))
@@ -1463,6 +1477,9 @@ static func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -
 				result.append(str(entry.get("method")))
 				result.append("(")
 				result.append("\"%s\"" % entry.get("path"))
+				for part: String in str(entry.get("args", "")).split(",", false):
+					result.append(",")
+					result.append(part.strip_edges())
 				result.append(")")
 				continue
 			if local_vars.has(key):
