@@ -116,7 +116,8 @@ func _in_view(entry: Dictionary) -> bool:
 		return false
 	if _filter.is_empty():
 		return true
-	return str(entry.get("key")).to_lower().contains(_filter) or str(entry.get("path")).to_lower().contains(_filter)
+	return str(entry.get("key")).to_lower().contains(_filter) \
+		or _path_of(str(entry.get("path"))).to_lower().contains(_filter)
 
 
 func add_resource() -> void:
@@ -160,7 +161,7 @@ func _make_row(entry: Dictionary) -> Control:
 	if not pending and not path.is_empty() and not ResourceLoader.exists(path):
 		var warning: TextureRect = TextureRect.new()
 		warning.texture = _icon(&"NodeWarning")
-		warning.tooltip_text = "%s does not exist" % path
+		warning.tooltip_text = "%s does not exist" % _path_of(path)
 		warning.stretch_mode = TextureRect.STRETCH_KEEP_CENTERED
 		top.add_child(warning)
 	var remove: Button = Button.new()
@@ -296,7 +297,7 @@ func _on_picked(entry: Dictionary, resource: Resource) -> void:
 		key = _unique_key(_key_from_path(path))
 	_pending = {}
 	_focus_key = key
-	editor.write_resource("" if pending else entry.get("key"), key, method, path)
+	editor.write_resource("" if pending else entry.get("key"), key, method, _reference_for(path))
 
 
 func _loader_for(path: String, preferred: String) -> String:
@@ -315,6 +316,18 @@ func _loads(path: String, method_name: String) -> bool:
 		return false
 	var args: Array[Variant] = [path]
 	return method.call_method(args) != null
+
+
+func _reference_for(path: String) -> String:
+	var id: int = ResourceLoader.get_resource_uid(path)
+	return ResourceUID.id_to_text(id) if id != ResourceUID.INVALID_ID else path
+
+
+func _path_of(reference: String) -> String:
+	if not reference.begins_with("uid://"):
+		return reference
+	var id: int = ResourceUID.text_to_id(reference)
+	return ResourceUID.get_id_path(id) if ResourceUID.has_id(id) else reference
 
 
 func _key_from_path(path: String) -> String:

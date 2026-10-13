@@ -454,22 +454,27 @@ func _apply_overrides_unwrapped(node_type: GdssNodeType, control: Variant, clear
 	var entry: Dictionary = _resolve_entry()
 	var state: String = _get_state()
 	var styled: Dictionary = _entry_styled_props(entry)
+	var slot_states: PackedStringArray = node_type.states if node_type.is_static and not _slot_state.is_empty() else PackedStringArray()
+	var is_secondary_slot: bool = not slot_states.is_empty() and _slot_state != slot_states.get(0)
 	for prop: GdssProp in node_type.get_enabled_props():
 		if prop.category == GdssProp.Category.STYLE:
 			if prop.name == "padding":
-				var pad_raw: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-				var padding: Vector4 = Vector4(pad_raw if pad_raw != null else prop.get_default_value())
-				set_content_margin(SIDE_LEFT, padding.x)
-				set_content_margin(SIDE_RIGHT, padding.y)
-				set_content_margin(SIDE_TOP, padding.z)
-				set_content_margin(SIDE_BOTTOM, padding.w)
+				var pad_raw: Variant = _tweened_values.get(prop.name,
+					_get_val_cached(prop.name, entry, state, prop.get_default_value()))
+				_apply_padding(Vector4(pad_raw if pad_raw != null else prop.get_default_value()))
 			continue
-		if not styled.has(prop.name):
+		if is_secondary_slot or not styled.has(prop.name):
 			continue
 		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		if val == null:
 			val = prop.get_default_value()
 		_apply_theme_prop(prop, control, node_type, val)
+		if prop.category == GdssProp.Category.COLOR:
+			for slot: String in slot_states.slice(1):
+				var slot_color: String = prop.name.trim_suffix("color") + slot + "_color"
+				var slot_val: Variant = _get_val_cached(prop.name, entry, slot, val)
+				if node_type.colors.has(slot_color) and slot_val is Color:
+					_override_color_if_custom(control, node_type, slot_color, slot_val)
 	_refresh_font_transform(control, node_type)
 	_applying = false
 
@@ -787,7 +792,8 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 				var fallback: Vector4i = prop.get_default_value() if prop.get_default_value() is Vector4i else Vector4i.ZERO
 				var composite_from_raw: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
 				var from: Vector4 = Vector4(composite_from_raw) if composite_from_raw is Vector4 else Vector4(composite_from_raw as Vector4i)
-				var to: Vector4 = Vector4(_get_parsed_val(prop_name, to_state, fallback) as Vector4i)
+				var composite_to_raw: Variant = _get_parsed_val(prop_name, to_state, fallback)
+				var to: Vector4 = Vector4(composite_to_raw) if composite_to_raw is Vector4 else Vector4(composite_to_raw as Vector4i)
 				if from == to:
 					continue
 				var captured: String = prop_name
@@ -795,6 +801,8 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 				_tweened_values.set(captured, from)
 				pending_tween.tween_method(func(v: Vector4) -> void:
 					_tweened_values.set(captured, v)
+					if captured == "padding":
+						_apply_padding(v)
 					if is_style:
 						_safe_redraw()
 					else:
@@ -830,8 +838,12 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 			
 			GDSS.Type.FLOAT:
 				var fallback: float = float(prop.get_default_value())
-				var from: float = float(_tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback)))
-				var to: float = float(_get_parsed_val(prop_name, to_state, fallback))
+				var float_from: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
+				var float_to: Variant = _get_parsed_val(prop_name, to_state, fallback)
+				if not (float_from is int or float_from is float) or not (float_to is int or float_to is float):
+					continue
+				var from: float = float(float_from)
+				var to: float = float(float_to)
 				if from == to:
 					continue
 				var captured: String = prop_name
@@ -848,8 +860,12 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 			
 			GDSS.Type.INT:
 				var fallback: int = int(prop.get_default_value())
-				var from: int = int(_tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback)))
-				var to: int = int(_get_parsed_val(prop_name, to_state, fallback))
+				var int_from: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
+				var int_to: Variant = _get_parsed_val(prop_name, to_state, fallback)
+				if not (int_from is int or int_from is float) or not (int_to is int or int_to is float):
+					continue
+				var from: int = int(int_from)
+				var to: int = int(int_to)
 				if from == to:
 					continue
 				var captured: String = prop_name
@@ -1473,6 +1489,14 @@ func _refresh_font_transform(control: Variant, node_type: GdssNodeType) -> void:
 	_apply_font_transform(control, node_type,
 		skew if skew is Vector2 else Vector2.ZERO,
 		float(embolden) if embolden is int or embolden is float else 0.0)
+
+
+func _apply_padding(padding: Vector4) -> void:
+	set_content_margin(SIDE_LEFT, padding.x)
+	set_content_margin(SIDE_RIGHT, padding.y)
+	set_content_margin(SIDE_TOP, padding.z)
+	set_content_margin(SIDE_BOTTOM, padding.w)
+
 
 func _splat_shorthand(key: String, value: Variant) -> Variant:
 	if not (value is int or value is float):

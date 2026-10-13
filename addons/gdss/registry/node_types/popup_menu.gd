@@ -8,7 +8,7 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 
 
 func get_only_states() -> PackedStringArray:
-	return ["panel"]
+	return ["panel", "hover"]
 
 
 func get_events() -> PackedStringArray:

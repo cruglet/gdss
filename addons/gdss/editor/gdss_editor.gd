@@ -48,7 +48,6 @@ var _error_target_chunk: int = 0
 var _error_target_line: int = 0
 var _error_bg: Color = Color.RED
 var _all_errors: Array = []
-var _highlighted_lines: PackedInt32Array = []
 var _error_cursor: int = -1
 var _error_timer: Timer
 var _search_bar: VBoxContainer
@@ -504,10 +503,9 @@ func _unique_chunk_name(base: String) -> String:
 func display_errors(errors: Array) -> void:
 	_all_errors = errors
 	_error_cursor = -1
-	for line_index: int in _highlighted_lines:
-		if line_index < code_edit.get_line_count():
+	for line_index: int in code_edit.get_line_count():
+		if code_edit.get_line_background_color(line_index).a > 0.0:
 			code_edit.set_line_background_color(line_index, Color.TRANSPARENT)
-	_highlighted_lines = PackedInt32Array()
 	if errors.is_empty():
 		show_error("", -1)
 		return
@@ -519,7 +517,6 @@ func display_errors(errors: Array) -> void:
 			var local_line: int = full_line - active_start
 			if local_line >= 0 and local_line < code_edit.get_line_count():
 				code_edit.set_line_background_color(local_line, _error_bg)
-				_highlighted_lines.append(local_line)
 	var first: Array = errors.get(0)
 	_error_target_chunk = _chunk_for_line(first.get(1))
 	var chunk_start: int = _chunk_offsets.get(_error_target_chunk) if _error_target_chunk < _chunk_offsets.size() else 0
@@ -2047,9 +2044,13 @@ func _commit_source(source: String) -> void:
 func _apply_full_source(source: String) -> void:
 	var caret_line: int = code_edit.get_caret_line()
 	var caret_column: int = code_edit.get_caret_column()
+	var scroll_v: float = code_edit.scroll_vertical
+	var scroll_h: int = code_edit.scroll_horizontal
 	set_full_source(source)
 	code_edit.set_caret_line(caret_line)
 	code_edit.set_caret_column(caret_column)
+	code_edit.scroll_vertical = scroll_v
+	code_edit.scroll_horizontal = scroll_h
 	_symbol_index_dirty = true
 
 

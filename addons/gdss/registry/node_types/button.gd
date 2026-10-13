@@ -9,6 +9,7 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 	var pressed: bool = button.button_pressed
 	var hovered: bool = button.is_hovered()
 	if hovered and pressed and button.toggle_mode: return "hover_pressed"
+	if pressed and button.toggle_mode and button.has_focus(true): return "focus_pressed"
 	if pressed: return "pressed"
 	if hovered: return "hover"
 	if button.has_focus(true): return "focus"
@@ -16,7 +17,7 @@ func get_active_state(canvas_item: CanvasItem) -> String:
 
 
 func get_extra_states() -> PackedStringArray:
-	return ["hover_pressed"]
+	return ["hover_pressed", "focus_pressed"]
 
 
 func get_events() -> PackedStringArray:

@@ -235,7 +235,7 @@ func _free_sfx_player() -> AudioStreamPlayer:
 func _bind_tree(node: Node) -> void:
 	if node is CanvasItem or node is Window:
 		_try_bind(node)
-	for child: Node in node.get_children():
+	for child: Node in node.get_children(true):
 		_bind_tree(child)
 
 

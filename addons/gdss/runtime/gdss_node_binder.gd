@@ -164,7 +164,7 @@ static func rebind_tree(node: Node) -> void:
 		apply_mode(node)
 	elif node is Window:
 		apply_mode(node)
-	for child: Node in node.get_children():
+	for child: Node in node.get_children(true):
 		rebind_tree(child)
 
 
@@ -173,7 +173,7 @@ static func apply_mode_tree(node: Node) -> void:
 		return
 	if node is CanvasItem or node is Window:
 		apply_mode(node)
-	for child: Node in node.get_children():
+	for child: Node in node.get_children(true):
 		apply_mode_tree(child)
 
 
