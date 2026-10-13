@@ -86,7 +86,7 @@ func _parse_sources() -> Dictionary:
 			break
 	if not has_content:
 		return {}
-	var parsed_data: Dictionary = GdssStylesheet.parse_paths(GdssStorage.get_save_paths())
+	var parsed_data: Dictionary = GdssParser.parse_paths(GdssStorage.get_save_paths())
 	if OS.is_debug_build() and not Engine.is_editor_hint():
 		GdssStorage.write_cache(parsed_data, GdssStylesheet._global_defaults, GdssStylesheet._instance_defaults, GdssStylesheet._local_vars, GdssStylesheet.schemes, GdssStylesheet.meta, GdssStylesheet.resources, GdssStylesheet.config)
 	return {
@@ -124,7 +124,7 @@ func _reload_parsed() -> void:
 	var data: Dictionary = _load_bundle()
 	if not data.has("parsed"):
 		return
-	GdssStylesheet._override_entry_cache.clear()
+	GdssParser._override_entry_cache.clear()
 	var raw: Variant = data.get("parsed")
 	if not raw is Dictionary:
 		return

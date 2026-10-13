@@ -577,9 +577,7 @@ func _on_error_check_timeout() -> void:
 
 
 func _recheck_errors() -> void:
-	var stylesheet: GdssStylesheet = GdssStylesheet.get_instance()
-	if stylesheet != null:
-		display_errors(stylesheet.check_errors(get_full_source()))
+	display_errors(GdssChecker.new().check_errors(get_full_source()))
 	symbol_index()
 	_refresh_occurrences()
 	if _resource_panel != null and _resource_panel.visible:
@@ -1232,7 +1230,7 @@ func upsert_meta_block(block_text: String) -> void:
 	_sync_active_chunk()
 	var replaced: bool = false
 	for chunk: Dictionary in _chunks:
-		var outcome: Dictionary = stylesheet.replace_meta_block(str(chunk.get("content")), block_text)
+		var outcome: Dictionary = GdssAnnotations.replace_meta_block(str(chunk.get("content")), block_text)
 		if outcome.get("found"):
 			chunk.set("content", outcome.get("source"))
 			replaced = true
@@ -1552,13 +1550,12 @@ func _find_colors_in_line(line: String) -> Array[Dictionary]:
 	for m: RegExMatch in _re_hex.search_all(code):
 		if Color.html_is_valid(m.get_string(1)):
 			out.append({"color": Color.html(m.get_string(1)), "from": m.get_start(0), "to": m.get_end(0)})
-	var sentinel: Color = Color(-1, -1, -1, -1)
 	for m: RegExMatch in _re_word.search_all(code):
 		var start: int = m.get_start(0)
 		if not _is_value_position(code, start):
 			continue
-		var col: Color = GdssStylesheet.parse_named_color(m.get_string(0), sentinel)
-		if col != sentinel:
+		var col: Color = GdssColors.named(m.get_string(0), GdssColors.MISSING)
+		if col != GdssColors.MISSING:
 			out.append({"color": col, "from": start, "to": m.get_end(0)})
 	return out
 
@@ -1813,8 +1810,8 @@ func imported_paths(source: String) -> Array[String]:
 
 
 func _gather_imports(source: String, base_dir: String, found: Array[String]) -> void:
-	for entry: Dictionary in GdssStylesheet._collect_imports(source):
-		var resolved: String = GdssStylesheet._resolve_import_path(str(entry.get("path")), base_dir).simplify_path()
+	for entry: Dictionary in GdssAnnotations.collect_imports(source):
+		var resolved: String = GdssAnnotations.resolve_import_path(str(entry.get("path")), base_dir).simplify_path()
 		if resolved.is_empty() or found.has(resolved) or not FileAccess.file_exists(resolved):
 			continue
 		found.append(resolved)
@@ -1977,7 +1974,7 @@ func _resources_block(lines: PackedStringArray) -> Vector2i:
 	for line_number: int in lines.size():
 		var stripped: String = GdssSymbols.strip_comment(lines.get(line_number)).strip_edges()
 		if header == -1:
-			if GdssStylesheet._re_resources.search(stripped) != null:
+			if GdssAnnotations.resources_header.search(stripped) != null:
 				header = line_number
 			continue
 		if stripped.begins_with("}"):
@@ -1998,10 +1995,10 @@ func _resource_entries_in(lines: PackedStringArray, bounds: Vector2i) -> Array[D
 
 func _resource_at(line: String, line_number: int) -> Dictionary:
 	var stripped: String = GdssSymbols.strip_comment(line).strip_edges()
-	var entry: Dictionary = GdssStylesheet._extract_block_entry(stripped, line_number)
+	var entry: Dictionary = GdssAnnotations.extract_block_entry(stripped, line_number)
 	if entry.is_empty() or not str(entry.get("key")).is_valid_identifier():
 		return {}
-	var value: RegExMatch = GdssStylesheet._re_resource_value.search(str(entry.get("value_str")).strip_edges())
+	var value: RegExMatch = GdssAnnotations.resource_value.search(str(entry.get("value_str")).strip_edges())
 	return {
 		"key": entry.get("key"),
 		"method": value.get_string(1) if value != null else "",
@@ -2243,7 +2240,7 @@ func _open_import_at(position: Vector2) -> bool:
 	var entry: GdssSymbols.Ref = symbol_index().find_at(GdssSymbols.DOC, chunk_offset(_active_chunk) + at.y, at.x)
 	if entry == null or entry.kind != GdssSymbols.Kind.IMPORT:
 		return false
-	var resolved: String = GdssStylesheet._resolve_import_path(entry.name, GdssStorage.get_save_path().get_base_dir()).simplify_path()
+	var resolved: String = GdssAnnotations.resolve_import_path(entry.name, GdssStorage.get_save_path().get_base_dir()).simplify_path()
 	if not FileAccess.file_exists(resolved):
 		return false
 	_confirm_unsaved(func() -> void:

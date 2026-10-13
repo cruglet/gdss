@@ -51,7 +51,7 @@ func _init() -> void:
 	root.add_child(header)
 	_tabs = TabBar.new()
 	_tabs.add_tab("All")
-	for name: String in GdssStylesheet.resource_methods():
+	for name: String in GdssAnnotations.resource_methods():
 		_tabs.add_tab(name)
 	_tabs.tab_changed.connect(_on_tab_changed)
 	root.add_child(_tabs)
@@ -121,7 +121,7 @@ func _in_view(entry: Dictionary) -> bool:
 
 
 func add_resource() -> void:
-	var methods: PackedStringArray = GdssStylesheet.resource_methods()
+	var methods: PackedStringArray = GdssAnnotations.resource_methods()
 	if methods.is_empty():
 		return
 	_filter = ""
@@ -246,7 +246,7 @@ func _base_type(method: String) -> String:
 	if not method.is_empty():
 		return BASE_TYPES.get(method, "Resource")
 	var types: PackedStringArray = []
-	for name: String in GdssStylesheet.resource_methods():
+	for name: String in GdssAnnotations.resource_methods():
 		var base: String = BASE_TYPES.get(name, "")
 		if not base.is_empty() and not types.has(base):
 			types.append(base)
@@ -301,7 +301,7 @@ func _on_picked(entry: Dictionary, resource: Resource) -> void:
 
 
 func _loader_for(path: String, preferred: String) -> String:
-	var names: PackedStringArray = GdssStylesheet.resource_methods()
+	var names: PackedStringArray = GdssAnnotations.resource_methods()
 	if not preferred.is_empty() and names.has(preferred) and _loads(path, preferred):
 		return preferred
 	for name: String in names:

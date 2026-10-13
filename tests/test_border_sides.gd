@@ -28,9 +28,9 @@ func run(t: TC) -> void:
 	t.apply_fixture(FIXTURE)
 	var parsed: Dictionary = t.parse_fixture(FIXTURE)
 	var raw: Variant = t.entry_val(parsed, "Panel", "all", "border_color")
-	t.check(raw is Dictionary and (raw as Dictionary).has(GdssStylesheet.COLOR4_KEY), "per-side color folds into the color4 sentinel")
+	t.check(raw is Dictionary and (raw as Dictionary).has(GdssValue.COLOR4_KEY), "per-side color folds into the color4 sentinel")
 	if raw is Dictionary:
-		t.check_eq((raw as Dictionary).get(GdssStylesheet.COLOR4_KEY), ["RED", "RED", "__gdss_global__accent", "RED"], "unnamed sides keep the shorthand value")
+		t.check_eq((raw as Dictionary).get(GdssValue.COLOR4_KEY), ["RED", "RED", "__gdss_global__accent", "RED"], "unnamed sides keep the shorthand value")
 	t.check_eq(t.entry_val(parsed, "Panel", "all", "shadow"), Vector4i(0, 0, 0, 5), "a lone shadow side leaves the others at zero")
 	t.check_eq(t.entry_val(parsed, "PanelContainer", "all", "border_color"), "LIME", "a later shorthand resets every side")
 	
@@ -49,10 +49,9 @@ func run(t: TC) -> void:
 	t.check_eq(hover_stylebox._get_val_cached("border_color", hover_stylebox._resolve_entry(), "hover", null), [Color.RED, Color.LIME, Color("#3b82f6"), Color.RED], "a state patches its own side onto the base sides")
 	hovered.free()
 	
-	var uniform: GdssStylebox = GdssStylebox.new()
-	t.check(uniform._border_side_colors([Color.RED, Color.RED, Color.RED, Color.RED]).is_empty(), "four equal sides stay on the single-ring path")
-	t.check(uniform._border_side_colors([Color.RED, Color.RED, GdssGradient.new(), Color.RED]).is_empty(), "a gradient among the sides drives the whole border")
-	t.check_eq(uniform._border_base([Color.RED, Color.RED, Color.LIME, Color.RED]), Color.RED, "the shorthand value stays the fallback base")
-	t.check_eq(uniform._corner_splits(Vector4.ZERO, 8), PackedInt32Array([0, 1, 2, 3]), "square corners split on the corner point itself")
-	t.check_eq(uniform._corner_splits(Vector4(4, 4, 4, 4), 8), PackedInt32Array([4, 13, 22, 31]), "rounded corners split halfway through the arc")
-	t.check_eq(GdssStylebox._max_side(Vector4(0, 0, 0, 5)), 5.0, "the widest side drives the shadow quad")
+	t.check(GdssRenderer.border_side_colors([Color.RED, Color.RED, Color.RED, Color.RED]).is_empty(), "four equal sides stay on the single-ring path")
+	t.check(GdssRenderer.border_side_colors([Color.RED, Color.RED, GdssGradient.new(), Color.RED]).is_empty(), "a gradient among the sides drives the whole border")
+	t.check_eq(GdssRenderer.border_base([Color.RED, Color.RED, Color.LIME, Color.RED]), Color.RED, "the shorthand value stays the fallback base")
+	t.check_eq(GdssCpuRenderer._corner_splits(Vector4.ZERO, 8), PackedInt32Array([0, 1, 2, 3]), "square corners split on the corner point itself")
+	t.check_eq(GdssCpuRenderer._corner_splits(Vector4(4, 4, 4, 4), 8), PackedInt32Array([4, 13, 22, 31]), "rounded corners split halfway through the arc")
+	t.check_eq(GdssRenderer.max_side(Vector4(0, 0, 0, 5)), 5.0, "the widest side drives the shadow quad")

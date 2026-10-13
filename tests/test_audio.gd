@@ -56,7 +56,7 @@ func _make_tone() -> bool:
 
 
 func _check_declaration(t: TC) -> void:
-	t.check(GdssStylesheet.resource_methods().has("sound"), "sound() is discovered as a loader")
+	t.check(GdssAnnotations.resource_methods().has("sound"), "sound() is discovered as a loader")
 	var result: Dictionary = t.parse_fixture(FIXTURE)
 	var hover: Variant = t.entry_val(result, "Button", "hover", "sfx")
 	t.check(hover is Dictionary, "the state's sfx parses to a loader call")

@@ -41,7 +41,7 @@ func run(t: TC) -> void:
 	await t.await_frames(2)
 	t.check(not GdssNodeBinder._registry.has(clone_id), "freed clone purged")
 	if GDSS.gpu_panels_enabled():
-		t.check(original_stylebox._gpu_ci.is_valid(), "purging the clone leaves the original GPU item alive")
+		t.check(original_stylebox._gpu.canvas_item.is_valid(), "purging the clone leaves the original GPU item alive")
 	RenderingServer.free_rid(ci_a)
 	RenderingServer.free_rid(ci_b)
 	original.free()
@@ -76,7 +76,7 @@ func _detach_foreign(t: TC) -> void:
 	t.check(not pending.has_theme_stylebox_override("normal"), "detach: foreign stylebox dropped from clone")
 	t.check(not pending.has_theme_stylebox_override("hover"), "detach: foreign stylebox dropped from every state")
 	if GDSS.gpu_panels_enabled():
-		t.check(source_stylebox._gpu_parent == source.get_canvas_item(), "detach: source keeps its own GPU item")
+		t.check(source_stylebox._gpu.parent_item == source.get_canvas_item(), "detach: source keeps its own GPU item")
 	GdssNodeBinder.detach_foreign_styleboxes(source)
 	t.check(source.get_theme_stylebox("normal") == source_stylebox, "detach: a node keeps a stylebox bound to itself")
 	pending.free()

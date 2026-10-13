@@ -355,7 +355,7 @@ class GdssOverridesProperty extends EditorProperty:
 		if node_type == null:
 			_status.visible = false
 			return
-		var entry: Dictionary = GdssStylesheet.parse_override_entry(text)
+		var entry: Dictionary = GdssParser.parse_override_entry(text)
 		var props_by_name: Dictionary = node_type.get_props_by_name()
 		var unknown: PackedStringArray = []
 		for state_key: String in entry:

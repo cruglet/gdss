@@ -87,14 +87,11 @@ func free_children() -> void:
 
 
 func parse_fixture(source: String) -> Dictionary:
-	return GdssStylesheet.parse_all(PackedStringArray([source]))
+	return GdssParser.parse_all(PackedStringArray([source]))
 
 
 func validate_fixture(source: String) -> Array[Array]:
-	var interp: GdssStylesheet = GdssStylesheet.new()
-	var errors: Array[Array] = interp.check_errors(source)
-	interp.free()
-	return errors
+	return GdssChecker.new().check_errors(source)
 
 
 func error_messages(errors: Array[Array]) -> PackedStringArray:
@@ -141,7 +138,7 @@ func class_entry(result: Dictionary, selector: String, gdss_class: String) -> Di
 
 
 func _parse_into_stylesheet(sources: PackedStringArray) -> void:
-	var result: Dictionary = GdssStylesheet.parse_all(sources)
+	var result: Dictionary = GdssParser.parse_all(sources)
 	GdssStylesheet.parsed.clear()
 	for key: String in result:
 		GdssStylesheet.parsed.set(key, result.get(key))

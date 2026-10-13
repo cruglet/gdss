@@ -128,23 +128,23 @@ func _check_blur_quality(t: TC) -> void:
 	glass.highlight = 0.4
 	glass.saturation = 1.2
 	GDSS.blur_quality = GDSS.BlurQuality.HIGH
-	t.check(GdssStylebox._at_blur_quality(glass) == glass, "high quality keeps the authored backdrop")
+	t.check(GdssGpuRenderer.at_blur_quality(glass) == glass, "high quality keeps the authored backdrop")
 	GDSS.blur_quality = GDSS.BlurQuality.LOW
-	var low: Variant = GdssStylebox._at_blur_quality(glass)
+	var low: Variant = GdssGpuRenderer.at_blur_quality(glass)
 	t.check(low is GdssBlur and low != glass, "low quality swaps in a degraded backdrop")
 	t.check_eq((low as GdssBlur).refraction, 0.0, "low quality drops the refraction")
 	t.check_eq((low as GdssBlur).highlight, 0.0, "low quality drops the edge highlight")
 	t.check_eq((low as GdssBlur).saturation, 1.0, "low quality drops the saturation shift")
 	t.check_eq((low as GdssBlur).strength, 3.0, "low quality keeps the blur strength")
 	t.check_eq((low as GdssBlur).tint, glass.tint, "low quality keeps the tint")
-	t.check(GdssStylebox._at_blur_quality(glass) == low, "the degraded backdrop is cached per blur")
+	t.check(GdssGpuRenderer.at_blur_quality(glass) == low, "the degraded backdrop is cached per blur")
 	var plain: GdssBlur = GdssBlur.new()
 	plain.tint = Color(0.0, 0.0, 0.0, 0.2)
-	t.check(GdssStylebox._at_blur_quality(plain) == plain, "a plain blur is already its own low-quality form")
+	t.check(GdssGpuRenderer.at_blur_quality(plain) == plain, "a plain blur is already its own low-quality form")
 	GDSS.blur_quality = GDSS.BlurQuality.OFF
-	var off: Variant = GdssStylebox._at_blur_quality(glass)
+	var off: Variant = GdssGpuRenderer.at_blur_quality(glass)
 	t.check(off is Color and (off as Color) == glass.tint, "off falls back to the tint colour")
-	t.check_eq(GdssStylebox._at_blur_quality(Color.RED), Color.RED, "values that are not backdrops pass through")
+	t.check_eq(GdssGpuRenderer.at_blur_quality(Color.RED), Color.RED, "values that are not backdrops pass through")
 	GDSS.blur_quality = GDSS.BlurQuality.HIGH
 
 

@@ -78,7 +78,7 @@ func _rebuild() -> void:
 			var tree_parent: TreeItem = open_blocks.back()
 			var scheme_name: String = ""
 			if label.begins_with("@scheme"):
-				var scheme_match: RegExMatch = GdssStylesheet._re_scheme.search(label)
+				var scheme_match: RegExMatch = GdssAnnotations.scheme_header.search(label)
 				if scheme_match != null:
 					scheme_name = scheme_match.get_string(1)
 					label = "@scheme " + scheme_name

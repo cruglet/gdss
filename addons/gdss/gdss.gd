@@ -261,8 +261,8 @@ static func tween_global_vars(values: Dictionary, tween_time: float = 0.0, trans
 	for key: String in values:
 		from.set(key, GdssStylesheet.globals.get(key, values.get(key)))
 	var tween: Tween = (Engine.get_main_loop() as SceneTree).create_tween()
-	tween.set_trans(GdssStylebox.tween_trans(trans))
-	tween.set_ease(GdssStylebox.tween_ease(ease))
+	tween.set_trans(GdssTransition.tween_trans(trans))
+	tween.set_ease(GdssTransition.tween_ease(ease))
 	tween.tween_method(func(t: float) -> void:
 		for key: String in values:
 			GdssStylesheet.globals.set(key, _lerp_value(from.get(key), values.get(key), t))
@@ -302,8 +302,8 @@ static func set_scheme(name: String, tween_time: float = 0.0, trans: TransitionF
 		var current: Variant = _scheme_value(key)
 		from.set(key, current if current != null else target.get(key))
 	_scheme_tween = (Engine.get_main_loop() as SceneTree).create_tween()
-	_scheme_tween.set_trans(GdssStylebox.tween_trans(trans))
-	_scheme_tween.set_ease(GdssStylebox.tween_ease(ease))
+	_scheme_tween.set_trans(GdssTransition.tween_trans(trans))
+	_scheme_tween.set_ease(GdssTransition.tween_ease(ease))
 	_scheme_tween.tween_method(func(t: float) -> void:
 		for key: String in keys:
 			_apply_scheme_value(key, _lerp_value(from.get(key), target.get(key), t))

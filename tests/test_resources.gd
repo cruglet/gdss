@@ -50,7 +50,7 @@ func run(t: TC) -> void:
 
 
 func _check_declaration(t: TC) -> void:
-	var methods: PackedStringArray = GdssStylesheet.resource_methods()
+	var methods: PackedStringArray = GdssAnnotations.resource_methods()
 	t.check(methods.has("font") and methods.has("texture"), "loader methods are discovered from the registry")
 	t.check(not methods.has("lighten"), "methods that take no path are not loaders")
 	var result: Dictionary = t.parse_fixture(FIXTURE)

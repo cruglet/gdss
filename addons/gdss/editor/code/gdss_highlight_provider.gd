@@ -49,7 +49,7 @@ func _build_from_objects() -> void:
 	_property_meta.clear()
 	_value_functions.clear()
 	_enum_values.clear()
-	_builtin_colors.assign(GdssStylesheet.NAMED_COLORS)
+	_builtin_colors.assign(GdssColors.NAMED)
 	
 	for key: String in GDSS.TransitionType:
 		_enum_values.append(key)

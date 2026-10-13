@@ -37,11 +37,6 @@ static var _re_scheme_head_parent: RegEx = RegEx.create_from_string(r"^\s*@schem
 static var _re_scheme_head_tail: RegEx = RegEx.create_from_string(r"^\s*@scheme\s+\w+\s+(\w*)$")
 static var _re_meta_open: RegEx = RegEx.create_from_string(r"^@meta\b")
 
-const BUILTIN_COLORS: Array[String] = [
-	"RED", "GREEN", "BLUE", "YELLOW", "WHITE", "BLACK",
-	"TRANSPARENT", "ORANGE", "PURPLE", "CYAN", "MAGENTA", "GRAY"
-]
-
 
 func _ready() -> void:
 	gdss_editor = get_parent() as GdssEditor
@@ -611,7 +606,7 @@ func _complete_values(word: String, style_name: String, prop: String) -> void:
 
 
 func _complete_named_colors(word: String) -> void:
-	for c: String in GdssStylesheet.NAMED_COLORS:
+	for c: String in GdssColors.NAMED:
 		if _matches(c, word):
 			editor.add_code_completion_option(CodeEdit.KIND_CONSTANT, c, c, _completion_color, _get_icon(&"Color"))
 
@@ -1049,7 +1044,7 @@ func _complete_config_values(key: String, word: String) -> void:
 
 
 func _complete_resource_loaders(word: String) -> void:
-	for name: String in GdssStylesheet.resource_methods():
+	for name: String in GdssAnnotations.resource_methods():
 		if _matches(name, word):
 			editor.add_code_completion_option(CodeEdit.KIND_FUNCTION, name + "(…)", name + "(\"", _completion_color, _get_icon(&"MemberMethod"))
 
