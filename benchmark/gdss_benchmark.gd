@@ -102,6 +102,7 @@ func _stability_section() -> void:
 		await _wait(4)
 		root.free()
 		await _wait(4)
+	await get_tree().create_timer(1.0).timeout
 	await _wait(10)
 	var object_delta: int = int(Performance.get_monitor(Performance.OBJECT_COUNT)) - objects_before
 	var orphan_delta: int = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) - orphans_before

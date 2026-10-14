@@ -27,6 +27,18 @@ Button {
 }
 """
 
+const FIXTURE_UNCHANGED: String = """
+Button {
+	bg_color: "#202020"
+	font_color: "#ffffff"
+	corner_radius: 4 4 4 4
+	transition_time: 0.2
+	:disabled {
+		bg_color: "#ff0000"
+	}
+}
+"""
+
 
 func _enter_disabled(t: TC, button: Button) -> GdssStylebox:
 	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(button)
@@ -76,3 +88,16 @@ func run(t: TC) -> void:
 	doomed.free()
 	await t.await_frames(2)
 	t.check(not GdssNodeBinder._registry.has(doomed_id), "freeing mid-tween purges cleanly")
+	await _check_only_changed_props_tween(t)
+
+
+func _check_only_changed_props_tween(t: TC) -> void:
+	t.apply_fixture(FIXTURE_UNCHANGED)
+	var button: Button = t.make_styled_button()
+	var stylebox: GdssStylebox = _enter_disabled(t, button)
+	t.check(stylebox._tweened_values.has("bg_color"), "a prop the state changes tweens")
+	t.check(not stylebox._tweened_values.has("font_color"), "a prop shared by both states does not tween")
+	t.check(not stylebox._tweened_values.has("corner_radius"), "a composite shared by both states does not tween")
+	await t.await_seconds(0.35)
+	t.check_eq(stylebox._get_val("bg_color"), Color("#ff0000"), "the changed prop still settles on its target")
+	button.free()

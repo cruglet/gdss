@@ -36,6 +36,11 @@ func _init(redraw: Callable) -> void:
 	_redraw = redraw
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and canvas_item.is_valid():
+		RenderingServer.free_rid(canvas_item)
+
+
 static func _get_shared_shader() -> Shader:
 	if _shader == null:
 		_shader = load("res://addons/gdss/render/shaders/gdss_panel.gdshader") as Shader
@@ -212,13 +217,13 @@ func _fade_to(target: Texture2D, duration: float) -> Texture2D:
 		_fade_value = v
 		_redraw.call()
 	, _fade_value, 1.0 if target != null else 0.0, duration)
-	if target == null:
-		_fade_tween.finished.connect(func() -> void:
-			if _fade_target == null:
-				_fade_texture = null
-				_fade_value = 1.0
-				_redraw.call()
-		)
+	_fade_tween.finished.connect(func() -> void:
+		_fade_tween = null
+		if _fade_target == null:
+			_fade_texture = null
+			_fade_value = 1.0
+			_redraw.call()
+	)
 	return _fade_texture
 
 

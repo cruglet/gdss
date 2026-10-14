@@ -51,6 +51,13 @@ static func time_for(raw: Variant, prop_name: String) -> float:
 	return float(raw) if raw is int or raw is float else 0.0
 
 
+static func time_in(raw: Variant, base_raw: Variant, prop_name: String) -> float:
+	var seconds: float = time_for(raw, prop_name)
+	if seconds >= 0.0:
+		return seconds
+	return maxf(time_for(base_raw, prop_name), 0.0)
+
+
 static func longest_time(raw: Variant) -> float:
 	if not (raw is Dictionary and (raw as Dictionary).has(GdssValue.SCOPED_TIME_KEY)):
 		return float(raw) if raw is int or raw is float else 0.0

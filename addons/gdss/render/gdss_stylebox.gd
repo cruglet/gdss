@@ -7,9 +7,25 @@ func _resolve_time(prop_name: String, state: String) -> float:
 	var seconds: float = GdssTransition.time_for(_get_parsed_val("transition_time", state, 0.0), prop_name)
 	if seconds >= 0.0:
 		return seconds
+	return maxf(GdssTransition.time_for(_get_parsed_val("transition_time", _default_state(), 0.0), prop_name), 0.0)
+
+
+func _default_state() -> String:
 	var node_type: GdssNodeType = _resolve_gdss_node()
-	var base: String = node_type.states.get(0) if node_type and not node_type.states.is_empty() else "all"
-	return maxf(GdssTransition.time_for(_get_parsed_val("transition_time", base, 0.0), prop_name), 0.0)
+	return node_type.states.get(0) if node_type and not node_type.states.is_empty() else "all"
+
+
+func _transition_candidates(from_state: String, to_state: String) -> PackedStringArray:
+	var animatable: Dictionary = _get_animatable_props()
+	var entry: Dictionary = _resolve_entry()
+	var names: Dictionary[String, bool] = {}
+	for source: Variant in [entry.get(from_state), entry.get(to_state), _tweened_values, _tweened_args]:
+		if not source is Dictionary:
+			continue
+		for prop_name: String in source as Dictionary:
+			if animatable.has(prop_name):
+				names.set(prop_name, true)
+	return PackedStringArray(names.keys())
 
 
 var _slot_state: String = ""
@@ -127,8 +143,6 @@ func _notification(what: int) -> void:
 		if _tween != null:
 			_tween.kill()
 			_tween = null
-		if _gpu != null:
-			_gpu.release()
 		if not Engine.is_editor_hint():
 			return
 		var interp: GdssStylesheet = GdssStylesheet.get_instance()
@@ -228,7 +242,7 @@ func _on_ref_tree_entered_rt() -> void:
 
 
 func _repositioned() -> void:
-	if ref == null:
+	if ref == null or not GdssStylesheet.has_descendant_rules:
 		return
 	GdssNodeBinder.reposition(ref)
 
@@ -485,17 +499,18 @@ func _sync_active_state() -> void:
 
 func _start_transition(from_state: String, to_state: String, timing_state: String = "", on_finished: Callable = Callable()) -> void:
 	var ts: String = timing_state if not timing_state.is_empty() else to_state
+	var default_state: String = _default_state()
+	var time_raw: Variant = _get_parsed_val("transition_time", ts, 0.0)
+	var base_time_raw: Variant = _get_parsed_val("transition_time", default_state, 0.0)
 	var transition_time: float = GDSS.scaled_duration(maxf(
-		GdssTransition.longest_time(_get_parsed_val("transition_time", ts, 0.0)),
-		_resolve_time(GdssValue.SCOPED_TIME_ANY, ts)))
+		GdssTransition.longest_time(time_raw),
+		GdssTransition.time_in(time_raw, base_time_raw, GdssValue.SCOPED_TIME_ANY)))
 	if transition_time <= 0.0 or ref == null or not ref.is_inside_tree():
 		_kill_tween()
 		if on_finished.is_valid():
 			on_finished.call()
 		return
 	
-	var node_type: GdssNodeType = _resolve_gdss_node()
-	var default_state: String = node_type.states.get(0) if node_type and not node_type.states.is_empty() else "all"
 	var resolved_from: String = from_state if not from_state.is_empty() else default_state
 	
 	var trans: Tween.TransitionType = GdssTransition.resolve_trans(_get_parsed_val("transition_func", ts, "LINEAR"))
@@ -509,9 +524,9 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	
 	var animatable: Dictionary = _get_animatable_props()
 	
-	for prop_name: String in animatable:
+	for prop_name: String in _transition_candidates(resolved_from, to_state):
 		var prop: GdssProp = animatable.get(prop_name)
-		var prop_time: float = GDSS.scaled_duration(_resolve_time(prop_name, ts))
+		var prop_time: float = GDSS.scaled_duration(GdssTransition.time_in(time_raw, base_time_raw, prop_name))
 		if prop_time <= 0.0:
 			continue
 		var is_style: bool = prop.category == GdssProp.Category.STYLE
