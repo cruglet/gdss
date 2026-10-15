@@ -46,9 +46,7 @@ var _ancestor_states_dirty: bool = true
 var _ancestor_states: bool = false
 var _styled_props_cache: Dictionary = {}
 var _styled_props_dirty: bool = true
-
-var _animatable_cache: Dictionary = {}
-var _animatable_dirty: bool = true
+var _shared: GdssSharedEntry = null
 
 var _method_args_cache: Dictionary = {}
 
@@ -133,6 +131,8 @@ var _tween: Tween = null
 var _state_sync_queued: bool = false
 var _applied_node_props: Dictionary = {}
 var _applied_overrides: Dictionary = {}
+var _live_applied: Dictionary = {}
+var _style_revision: int = 0
 
 var _self_toggle: bool = false
 var _last_visible: bool = true
@@ -188,27 +188,12 @@ func _disconnect_ref_signals(v: Node) -> void:
 			v.disconnect("tree_exiting", _on_ref_tree_exiting_rt)
 
 
-func _apply_dynamic_nonstyle(node_type: GdssNodeType, entry: Dictionary, state: String) -> void:
-	if entry.is_empty() or _applying:
-		return
-	if _nonstyle_state != state:
-		_classify_nonstyle(node_type, entry, state)
-	if _nonstyle_dynamic.is_empty():
-		return
-	_applying = true
-	var control: Variant = ref
-	for prop: GdssProp in _nonstyle_dynamic:
-		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-		if val == null:
-			val = prop.get_default_value()
-		_apply_theme_prop(prop, control, node_type, val)
-	_refresh_font_transform(control, node_type)
-	_applying = false
-
-
 func _classify_nonstyle(node_type: GdssNodeType, entry: Dictionary, state: String) -> void:
 	_nonstyle_state = state
-	_nonstyle_dynamic.clear()
+	if _shared != null and _shared.nonstyle_live.has(state):
+		_nonstyle_dynamic = _shared.nonstyle_live.get(state)
+		return
+	var dynamic: Array[GdssProp] = []
 	var prop_map: Dictionary[String, GdssProp] = node_type.get_props_by_name()
 	var seen: Dictionary[String, bool] = {}
 	for source_state: String in [state, "all"]:
@@ -221,8 +206,15 @@ func _classify_nonstyle(node_type: GdssNodeType, entry: Dictionary, state: Strin
 			var prop: GdssProp = prop_map.get(prop_name)
 			if prop == null or prop.category == GdssProp.Category.STYLE:
 				continue
-			if _is_dynamic_raw(GdssCascade.raw_value(entry, state, prop_name)):
-				_nonstyle_dynamic.append(prop)
+			var raw: Variant = GdssCascade.raw_value(entry, state, prop_name)
+			if not _is_dynamic_raw(raw):
+				continue
+			dynamic.append(prop)
+			if _shared != null and _is_shareable_live(raw):
+				_shared.mark_global_only(state, prop_name)
+	_nonstyle_dynamic = dynamic
+	if _shared != null:
+		_shared.nonstyle_live.set(state, dynamic)
 
 
 func _on_ref_renamed() -> void:
@@ -273,18 +265,18 @@ func _invalidate_entry_cache_self() -> void:
 	_entry_cache = {}
 	_entry_cache_ancestry = ""
 	_ancestor_states_dirty = true
-	_animatable_dirty = true
+	_shared = null
 	_method_args_cache.clear()
 	_gdss_node = null
 	_style_vals_state = "￿"
-	_style_vals_cache.clear()
-	_style_dynamic.clear()
+	_style_vals_cache = {}
+	_style_dynamic = []
 	_style_tween_state = "￿"
 	_style_tween_session = -1
 	_style_vals_tween.clear()
 	_style_dynamic_tween.clear()
 	_nonstyle_state = "￿"
-	_nonstyle_dynamic.clear()
+	_nonstyle_dynamic = []
 
 
 func _resolve_gdss_node() -> GdssNodeType:
@@ -328,11 +320,13 @@ func _clear_overrides() -> void:
 
 
 func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType, val: Variant) -> void:
+	_live_applied.erase(prop.name)
 	if GdssThemeApplier.apply(prop, control, node_type, val, _applied_overrides, _applied_node_props):
 		_refresh_font_transform(control, node_type)
 
 
 func remove_applied_overrides(control: Variant) -> void:
+	_live_applied.clear()
 	GdssThemeApplier.remove_overrides(control, _applied_overrides)
 
 
@@ -445,35 +439,34 @@ func refresh_globals() -> void:
 		_classify_nonstyle(node_type, entry, state)
 	if _nonstyle_dynamic.is_empty():
 		return
+	var values: Array = []
+	var changed: bool = false
+	for prop: GdssProp in _nonstyle_dynamic:
+		var val: Variant = _live_value(prop, entry, state)
+		if val == null:
+			val = prop.get_default_value()
+		values.append(val)
+		if not changed and (not _live_applied.has(prop.name) or _live_applied.get(prop.name) != val):
+			changed = true
+	if not changed:
+		return
 	_applying = true
 	var control: Variant = node
 	control.begin_bulk_theme_override()
-	for prop: GdssProp in _nonstyle_dynamic:
-		var val: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-		if val == null:
-			val = prop.get_default_value()
-		_apply_theme_prop(prop, control, node_type, val)
-	_refresh_font_transform(control, node_type)
+	for i: int in _nonstyle_dynamic.size():
+		var prop: GdssProp = _nonstyle_dynamic.get(i)
+		_apply_theme_prop(prop, control, node_type, values.get(i))
+		_live_applied.set(prop.name, values.get(i))
+	var styled: Dictionary = _entry_styled_props(entry)
+	if styled.has("char_skew") or styled.has("char_embolden"):
+		_refresh_font_transform(control, node_type)
 	control.end_bulk_theme_override()
 	_applying = false
 
 
 func _get_animatable_props() -> Dictionary:
-	if not _animatable_dirty:
-		return _animatable_cache
-	_animatable_cache.clear()
-	if ref == null:
-		return _animatable_cache
-	var node_type: GdssNodeType = _resolve_gdss_node()
-	if node_type == null:
-		return _animatable_cache
-	for prop: GdssProp in node_type.get_enabled_props():
-		match prop.type:
-			GDSS.Type.CLIP_PATH, GDSS.Type.COLOR, GDSS.Type.COMPOSITE4, GDSS.Type.FLOAT, GDSS.Type.INT, GDSS.Type.VECTOR2:
-				if not prop.name.begins_with("transition_"):
-					_animatable_cache.set(prop.name, prop)
-	_animatable_dirty = false
-	return _animatable_cache
+	var node_type: GdssNodeType = _resolve_gdss_node() if ref != null else null
+	return node_type.get_animatable_props() if node_type != null else {}
 
 
 func _safe_redraw() -> void:
@@ -846,17 +839,11 @@ func _absorb_vars(source: Dictionary) -> void:
 
 
 func _entry_styled_props(entry: Dictionary) -> Dictionary:
-	if not _styled_props_dirty:
-		return _styled_props_cache
-	_styled_props_cache.clear()
-	for key: String in entry:
-		if key == "_classes" or key == "_variations" or key == GdssStylesheet.DESCENDANTS_KEY or key == GdssStylesheet.VARS_KEY:
-			continue
-		var sd: Variant = entry.get(key)
-		if sd is Dictionary:
-			for prop_name: String in (sd as Dictionary):
-				_styled_props_cache.set(prop_name, true)
-	_styled_props_dirty = false
+	if _shared != null:
+		return _shared.styled_props()
+	if _styled_props_dirty:
+		_styled_props_cache = GdssCascade.styled_props(entry)
+		_styled_props_dirty = false
 	return _styled_props_cache
 
 
@@ -874,14 +861,38 @@ func _resolve_entry() -> Dictionary:
 	if not _entry_cache_dirty and _entry_cache_classes == current_classes and _entry_cache_variation == variation and _entry_cache_overrides == override_meta and _entry_cache_ancestry == ancestry:
 		return _entry_cache
 	_styled_props_dirty = true
-	var parsed: Dictionary[String, Dictionary] = GdssStylesheet.parsed
 	var selector: String = ref.get_class()
+	var override_entry: Dictionary = GdssCascade.build_override_entry(override_meta)
+	var descendant_layers: Array[Dictionary] = _collect_descendant_layers()
+	var shareable: bool = override_entry.is_empty() and descendant_layers.is_empty()
+	var share_key: String = ",".join(current_classes) + "|" + variation
+	_shared = GdssSharedEntry.find(selector, share_key) if shareable else null
+	if _shared != null:
+		_scoped_vars = _shared.scoped_vars
+		return _cache_entry(_shared.data, current_classes, variation, override_meta, ancestry)
+	var entry: Dictionary = _merge_entry(selector, current_classes, variation, override_entry, descendant_layers)
+	if shareable:
+		_shared = GdssSharedEntry.new(entry, _scoped_vars)
+		GdssSharedEntry.store(selector, share_key, _shared)
+	return _cache_entry(entry, current_classes, variation, override_meta, ancestry)
+
+
+func _cache_entry(entry: Dictionary, classes: PackedStringArray, variation: String, override_meta: Variant, ancestry: String) -> Dictionary:
+	_entry_cache = entry
+	_entry_cache_classes = classes
+	_entry_cache_variation = variation
+	_entry_cache_overrides = override_meta
+	_entry_cache_ancestry = ancestry
+	_entry_cache_dirty = false
+	return entry
+
+
+func _merge_entry(selector: String, current_classes: PackedStringArray, variation: String, override_entry: Dictionary, descendant_layers: Array[Dictionary]) -> Dictionary:
+	var parsed: Dictionary[String, Dictionary] = GdssStylesheet.parsed
 	var entry: Dictionary = parsed.get(selector, {})
 	var variations: Dictionary = entry.get("_variations", {}) if not entry.is_empty() else {}
 	var has_variation: bool = not variation.is_empty() and variations.has(variation)
-	var override_entry: Dictionary = GdssCascade.build_override_entry(override_meta)
-	var descendant_layers: Array[Dictionary] = _collect_descendant_layers()
-	_scoped_vars.clear()
+	_scoped_vars = {}
 	for layer: Dictionary in descendant_layers:
 		var inherited: Variant = layer.get("vars")
 		if inherited is Dictionary:
@@ -892,12 +903,6 @@ func _resolve_entry() -> Dictionary:
 		for step: Dictionary in GdssCascade.find_class_path((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name):
 			_absorb_vars(step)
 	if current_classes.is_empty() and not has_variation and override_entry.is_empty() and descendant_layers.is_empty():
-		_entry_cache = entry
-		_entry_cache_classes = current_classes
-		_entry_cache_variation = variation
-		_entry_cache_overrides = override_meta
-		_entry_cache_ancestry = ancestry
-		_entry_cache_dirty = false
 		return entry
 	if has_variation:
 		entry = GdssCascade.merge_entries(entry, GdssCascade.resolve_override_patches(entry, variations.get(variation)))
@@ -924,12 +929,6 @@ func _resolve_entry() -> Dictionary:
 		override_entry = GdssCascade.resolve_override_patches(entry, override_entry)
 		entry = GdssCascade.merge_entries(entry, override_entry)
 		GdssCascade.propagate_all(entry, override_entry)
-	_entry_cache = entry
-	_entry_cache_classes = current_classes
-	_entry_cache_variation = variation
-	_entry_cache_overrides = override_meta
-	_entry_cache_ancestry = ancestry
-	_entry_cache_dirty = false
 	return entry
 
 
@@ -1385,6 +1384,7 @@ func _get_raw_parsed_val(key: String, state: String) -> Variant:
 
 func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String) -> Dictionary:
 	if not _tweened_values.is_empty():
+		_style_revision += 1
 		if _style_tween_state != state or _style_tween_session != _tween_session:
 			_style_tween_state = state
 			_style_tween_session = _tween_session
@@ -1404,19 +1404,106 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 				_style_vals_tween.set(key, _tweened_values.get(key))
 		return _style_vals_tween
 	if _style_vals_state != state:
-		_style_vals_cache.clear()
-		_style_dynamic.clear()
 		_style_vals_state = state
-		for prop: GdssProp in node_type.get_style_props():
-			var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-			_style_vals_cache.set(prop.name, rv if rv != null else prop.get_default_value())
-			if _is_dynamic_raw(GdssCascade.raw_value(entry, state, prop.name)):
-				_style_dynamic.append(prop)
-		return _style_vals_cache
+		_style_revision += 1
+		if _shared == null:
+			_style_vals_cache = {}
+			_style_dynamic = []
+			for prop: GdssProp in node_type.get_style_props():
+				var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+				_style_vals_cache.set(prop.name, rv if rv != null else prop.get_default_value())
+				if _is_dynamic_raw(GdssCascade.raw_value(entry, state, prop.name)):
+					_style_dynamic.append(prop)
+			return _style_vals_cache
+		if not _shared.style_static.has(state):
+			_share_style_vals(node_type, entry, state)
+		_style_vals_cache = _shared.style_static.get(state).duplicate()
+		_style_dynamic = _shared.style_live.get(state)
+		for prop: GdssProp in _shared.style_per_node.get(state):
+			var nv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+			_style_vals_cache.set(prop.name, nv if nv != null else prop.get_default_value())
 	for prop: GdssProp in _style_dynamic:
-		var dv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-		_style_vals_cache.set(prop.name, dv if dv != null else prop.get_default_value())
+		var dv: Variant = _live_value(prop, entry, state)
+		if dv == null:
+			dv = prop.get_default_value()
+		var previous: Variant = _style_vals_cache.get(prop.name)
+		if typeof(previous) != typeof(dv) or previous != dv:
+			_style_vals_cache.set(prop.name, dv)
+			_style_revision += 1
 	return _style_vals_cache
+
+
+func _share_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String) -> void:
+	var static_vals: Dictionary = {}
+	var live: Array[GdssProp] = []
+	var per_node: Array[GdssProp] = []
+	for prop: GdssProp in node_type.get_style_props():
+		var raw: Variant = GdssCascade.raw_value(entry, state, prop.name)
+		if _is_dynamic_raw(raw):
+			live.append(prop)
+			if _is_shareable_live(raw):
+				_shared.mark_global_only(state, prop.name)
+			continue
+		if _is_node_specific(raw):
+			per_node.append(prop)
+			continue
+		var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+		static_vals.set(prop.name, rv if rv != null else prop.get_default_value())
+	_shared.style_static.set(state, static_vals)
+	_shared.style_live.set(state, live)
+	_shared.style_per_node.set(state, per_node)
+
+
+func _live_value(prop: GdssProp, entry: Dictionary, state: String) -> Variant:
+	if _tweened_values.has(prop.name) or _shared == null or not _shared.is_global_only(state, prop.name):
+		return _get_val_cached(prop.name, entry, state, prop.get_default_value())
+	var shared_values: Dictionary = _shared.global_values(state, GDSS._globals_generation)
+	if shared_values.has(prop.name):
+		return shared_values.get(prop.name)
+	var value: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
+	shared_values.set(prop.name, value)
+	return value
+
+
+static func _is_shareable_live(raw: Variant) -> bool:
+	return not _is_node_specific(raw) and not _may_read_instance(raw)
+
+
+static func _may_read_instance(raw: Variant) -> bool:
+	if raw is String:
+		var s: String = (raw as String).strip_edges()
+		return s.begins_with("__gdss_instance__") or s.begins_with("__gdss_local") or s.begins_with("$")
+	if raw is Array:
+		for item: Variant in raw as Array:
+			if _may_read_instance(item):
+				return true
+		return false
+	if not raw is Dictionary:
+		return false
+	var d: Dictionary = raw as Dictionary
+	if d.has("__gdss_calc__"):
+		return true
+	for key: Variant in d:
+		if _may_read_instance(d.get(key)):
+			return true
+	return false
+
+
+static func _is_node_specific(raw: Variant) -> bool:
+	if raw is String:
+		return (raw as String).begins_with("__gdss_local_method__")
+	if not raw is Dictionary:
+		return false
+	var d: Dictionary = raw as Dictionary
+	if d.has(GdssValue.COLOR4_KEY):
+		for side: Variant in d.get(GdssValue.COLOR4_KEY):
+			if _is_node_specific(side):
+				return true
+		return false
+	if not d.has("__gdss_method__"):
+		return false
+	var method: GdssMethod = GDSS._get_gdss_methods().get(d.get("__gdss_method__"))
+	return method == null or method.returns_texture
 
 
 func _is_dynamic_raw(raw: Variant) -> bool:
@@ -1461,7 +1548,6 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 			_sync_active_state.call_deferred()
 	var entry: Dictionary = _resolve_entry()
 	var state: String = _get_state()
-	_apply_dynamic_nonstyle(node_type, entry, state)
 	var vals: Dictionary = _build_style_vals(node_type, entry, state)
 	var expand: Vector4 = Vector4(vals.get("expand", Vector4i.ZERO))
 	rect = rect.grow_individual(expand.x, expand.z, expand.y, expand.w)
@@ -1470,7 +1556,8 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	if GDSS.gpu_panels_enabled():
 		if _gpu == null:
 			_gpu = GdssGpuRenderer.new(_safe_redraw)
-		_gpu.draw(to_canvas_item, rect, vals, ref, GDSS.scaled_duration(_resolve_time("bg_texture", _get_state())))
+		if not _gpu.is_current(to_canvas_item, rect, _style_revision):
+			_gpu.draw(to_canvas_item, rect, vals, ref, GDSS.scaled_duration(_resolve_time("bg_texture", _get_state())), _style_revision)
 		return
 	_free_gpu_ci()
 	GdssCpuRenderer.draw(to_canvas_item, rect, vals)

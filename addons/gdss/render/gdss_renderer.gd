@@ -38,3 +38,12 @@ static func border_base(src: Variant) -> Variant:
 
 static func max_side(sides: Vector4) -> float:
 	return maxf(maxf(sides.x, sides.y), maxf(sides.z, sides.w))
+
+
+static func skew_transform(rect: Rect2, skew_x: float, skew_y: float) -> Transform2D:
+	if skew_x == 0.0 and skew_y == 0.0:
+		return Transform2D.IDENTITY
+	var center: Vector2 = rect.position + rect.size * 0.5
+	var bx: Vector2 = Vector2(1.0, skew_y)
+	var by: Vector2 = Vector2(skew_x, 1.0)
+	return Transform2D(bx, by, center - (bx * center.x + by * center.y))

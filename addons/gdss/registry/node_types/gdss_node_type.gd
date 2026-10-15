@@ -69,6 +69,9 @@ var _style_props_dirty: bool = true
 var _props_by_name_cache: Dictionary[String, GdssProp] = {}
 var _props_by_name_dirty: bool = true
 
+var _animatable_cache: Dictionary[String, GdssProp] = {}
+var _animatable_source: Array[GdssProp] = []
+
 const _NON_STORED: PackedStringArray = [
 	"states", "icons", "font_sizes", "fonts", "constants", "colors", "theme_defaults",
 	"_states", "_icons", "_font_sizes", "_fonts", "_constants", "_colors", "_theme_defaults",
@@ -271,6 +274,20 @@ func get_enabled_props() -> Array[GdssProp]:
 	_props_cache = props
 	_props_dirty = false
 	return _props_cache
+
+
+func get_animatable_props() -> Dictionary[String, GdssProp]:
+	var props: Array[GdssProp] = get_enabled_props()
+	if is_same(props, _animatable_source):
+		return _animatable_cache
+	_animatable_source = props
+	_animatable_cache = {}
+	for prop: GdssProp in props:
+		match prop.type:
+			GDSS.Type.CLIP_PATH, GDSS.Type.COLOR, GDSS.Type.COMPOSITE4, GDSS.Type.FLOAT, GDSS.Type.INT, GDSS.Type.VECTOR2:
+				if not prop.name.begins_with("transition_"):
+					_animatable_cache.set(prop.name, prop)
+	return _animatable_cache
 
 
 func get_style_props() -> Array[GdssProp]:

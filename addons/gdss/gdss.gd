@@ -174,6 +174,8 @@ static var gpu_panels: bool:
 static var _db: GdssRegistry
 static var _global_flush_scheduled: bool = false
 static var _gpu_panels: int = -1
+static var _globals_generation: int = 0
+static var _redraw_generation: int = 0
 static var _runtime: Node
 static var _scheme_tween: Tween
 
@@ -217,6 +219,7 @@ static func reset_global_var(name: String) -> void:
 
 
 static func _schedule_global_refresh() -> void:
+	_globals_generation += 1
 	if _global_flush_scheduled:
 		return
 	if Engine.get_main_loop() == null:
@@ -908,6 +911,7 @@ static func get_resource(key: String) -> Resource:
 
 
 static func _redraw_all() -> void:
+	_redraw_generation += 1
 	for stylebox: GdssStylebox in GdssNodeBinder.get_all_styleboxes():
 		stylebox._safe_redraw()
 
@@ -921,6 +925,7 @@ static func _restyle_all() -> void:
 
 static func _flush_global_refresh() -> void:
 	_global_flush_scheduled = false
+	_globals_generation += 1
 	var found_dead: bool = false
 	for stylebox: GdssStylebox in GdssNodeBinder.get_all_styleboxes():
 		var item: Node = stylebox.ref

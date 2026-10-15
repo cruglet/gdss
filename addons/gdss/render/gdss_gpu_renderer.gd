@@ -29,6 +29,9 @@ var _fade_target: Texture2D = null
 var _fade_value: float = 1.0
 var _fade_tween: Tween
 var _node: Node = null
+var _drawn_revision: int = -1
+var _drawn_rect: Rect2 = Rect2()
+var _drawn_generation: int = -1
 var _redraw: Callable
 
 
@@ -101,8 +104,16 @@ func _set_param(key: StringName, value: Variant) -> void:
 	_material.set_shader_parameter(key, value)
 
 
-func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_duration: float) -> void:
+func is_current(to_canvas_item: RID, rect: Rect2, revision: int) -> bool:
+	return _emitted and parent_item == to_canvas_item and revision == _drawn_revision and rect == _drawn_rect \
+		and _drawn_generation == GDSS._redraw_generation and _fade_tween == null
+
+
+func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_duration: float, revision: int) -> void:
 	_node = node
+	_drawn_revision = revision
+	_drawn_rect = rect
+	_drawn_generation = GDSS._redraw_generation
 	var bg: Variant = at_blur_quality(vals.get("bg_color", Color.TRANSPARENT))
 	var border_raw: Variant = vals.get("border_color", Color.TRANSPARENT)
 	var border_src: Variant = at_blur_quality(border_base(border_raw))
@@ -156,7 +167,7 @@ func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_d
 	_resolve_fill_texture(vals.get("bg_texture"), bg, fade_duration)
 	_push_fill(bg, pad_min, pad_max)
 	_push_border(border_src, border_sides, pad_min, pad_max)
-	var xform: Transform2D = _skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
+	var xform: Transform2D = skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
 	if not _emitted or quad != _quad or xform != _xform:
 		_quad = quad
 		_xform = xform
@@ -306,12 +317,3 @@ func _push_border(border_src: Variant, border_sides: Array, pad_min: Vector2, pa
 
 func _remap_uv(uv: Vector2, pad_min: Vector2, pad_max: Vector2) -> Vector2:
 	return pad_min + uv * (Vector2.ONE - pad_min - pad_max)
-
-
-func _skew_transform(rect: Rect2, skew_x: float, skew_y: float) -> Transform2D:
-	if skew_x == 0.0 and skew_y == 0.0:
-		return Transform2D.IDENTITY
-	var center: Vector2 = rect.position + rect.size * 0.5
-	var bx: Vector2 = Vector2(1.0, skew_y)
-	var by: Vector2 = Vector2(skew_x, 1.0)
-	return Transform2D(bx, by, center - (bx * center.x + by * center.y))

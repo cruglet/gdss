@@ -298,10 +298,12 @@ static func _triangulate_ring(inner_size: int, outer_size: int) -> PackedInt32Ar
 
 
 static func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 8) -> PackedVector2Array:
-	var key: int = int(rect.position.x * 100.0)
-	key = key * 92821 + int(rect.position.y * 100.0)
-	key = key * 92821 + int(rect.size.x * 100.0)
-	key = key * 92821 + int(rect.size.y * 100.0)
+	return Transform2D(0.0, rect.position) * _local_rounded_rect(rect.size, corner_radii, detail)
+
+
+static func _local_rounded_rect(size: Vector2, corner_radii: Vector4, detail: int) -> PackedVector2Array:
+	var key: int = int(size.x * 100.0)
+	key = key * 92821 + int(size.y * 100.0)
 	key = key * 92821 + int(corner_radii.x * 100.0)
 	key = key * 92821 + int(corner_radii.y * 100.0)
 	key = key * 92821 + int(corner_radii.z * 100.0)
@@ -310,25 +312,21 @@ static func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 
 	if _rr_cache.has(key):
 		return _rr_cache.get(key)
 	var corner_centers: Array[Vector2] = [
-		rect.position + Vector2(corner_radii[0], corner_radii[0]),
-		Vector2(rect.end.x, rect.position.y) + Vector2(-corner_radii[1], corner_radii[1]),
-		rect.end + Vector2(-corner_radii[2], -corner_radii[2]),
-		Vector2(rect.position.x, rect.end.y) + Vector2(corner_radii[3], -corner_radii[3]),
+		Vector2(corner_radii.x, corner_radii.x),
+		Vector2(size.x - corner_radii.y, corner_radii.y),
+		size - Vector2(corner_radii.z, corner_radii.z),
+		Vector2(corner_radii.w, size.y - corner_radii.w),
 	]
-	
+	var corners: Array[Vector2] = [Vector2.ZERO, Vector2(size.x, 0.0), size, Vector2(0.0, size.y)]
 	var points: PackedVector2Array
 	for corner_idx: int in 4:
 		var radius: float = corner_radii[corner_idx]
 		if radius == 0.0:
-			match corner_idx:
-				0: points.append(rect.position)
-				1: points.append(Vector2(rect.end.x, rect.position.y))
-				2: points.append(rect.end)
-				3: points.append(Vector2(rect.position.x, rect.end.y))
-		else:
-			for i: int in range(detail + 1):
-				var theta: float = _corner_start_angles.get(corner_idx) + (PI * 0.5) * i / detail
-				points.append(corner_centers.get(corner_idx) + Vector2(cos(theta), sin(theta)) * radius)
+			points.append(corners.get(corner_idx))
+			continue
+		for i: int in range(detail + 1):
+			var theta: float = _corner_start_angles.get(corner_idx) + (PI * 0.5) * i / detail
+			points.append(corner_centers.get(corner_idx) + Vector2(cos(theta), sin(theta)) * radius)
 	if _rr_cache.size() > 2048:
 		_rr_cache.clear()
 	_rr_cache.set(key, points)
@@ -338,15 +336,7 @@ static func _get_rounded_rect(rect: Rect2, corner_radii: Vector4, detail: int = 
 static func _apply_skew(points: PackedVector2Array, rect: Rect2, skew_x: float, skew_y: float) -> PackedVector2Array:
 	if skew_x == 0.0 and skew_y == 0.0:
 		return points
-	var result: PackedVector2Array = points
-	for i: int in result.size():
-		var p: Vector2 = result.get(i)
-		var t: Vector2 = (p - rect.position) / rect.size
-		result.set(i, Vector2(
-			p.x + skew_x * (t.y - 0.5) * rect.size.y,
-			p.y + skew_y * (t.x - 0.5) * rect.size.x
-		))
-	return result
+	return skew_transform(rect, skew_x, skew_y) * points
 
 
 static func _fit_corners(corners: Vector4, rect: Rect2) -> Vector4:

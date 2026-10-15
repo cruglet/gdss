@@ -136,6 +136,18 @@ static func _base_composite_value(base: Dictionary, state_key: String, prop_name
 	return prop.get_default_value() if prop != null else Vector4i.ZERO
 
 
+static func styled_props(entry: Dictionary) -> Dictionary:
+	var props: Dictionary = {}
+	for key: String in entry:
+		if key == "_classes" or key == "_variations" or key == GdssStylesheet.DESCENDANTS_KEY or key == GdssStylesheet.VARS_KEY:
+			continue
+		var state_dict: Variant = entry.get(key)
+		if state_dict is Dictionary:
+			for prop_name: String in state_dict as Dictionary:
+				props.set(prop_name, true)
+	return props
+
+
 static func raw_value(entry: Dictionary, state: String, key: String) -> Variant:
 	var sd: Variant = entry.get(state)
 	if sd is Dictionary:
