@@ -212,7 +212,7 @@ static func _scan(index: Index, file: String, source: String, declaring: bool) -
 	var frames: Array[String] = []
 	var lines: PackedStringArray = source.split("\n")
 	for line_number: int in lines.size():
-		var raw: String = strip_comment(lines.get(line_number))
+		var raw: String = GdssLexer.cut_comment(lines.get(line_number))
 		scanner.line = line_number
 		scanner.text = lines.get(line_number)
 		var frame: String = frames.back() if not frames.is_empty() else ""
@@ -223,7 +223,7 @@ static func _scan(index: Index, file: String, source: String, declaring: bool) -
 			_scan_declarations(scanner, raw, frame, frames.size(), scheme_match, is_meta or is_resources)
 		else:
 			_scan_references(scanner, raw, frame, scheme_match, is_meta or is_resources)
-		var opened: int = _brace_delta(raw)
+		var opened: int = GdssLexer.brace_delta(raw)
 		if opened > 0:
 			var kind: String = "scheme" if scheme_match != null else ("resources" if is_resources else ("meta" if is_meta else "selector"))
 			for i: int in opened:
@@ -345,40 +345,6 @@ static func _selector_pieces(head: String) -> Array[Vector2i]:
 			pieces.append(Vector2i(from, to))
 		cursor += part.length() + 1
 	return pieces
-
-
-static func strip_comment(line: String) -> String:
-	var in_quote: bool = false
-	var quote_char: String = ""
-	for i: int in line.length():
-		var c: String = line[i]
-		if in_quote:
-			if c == quote_char:
-				in_quote = false
-		elif c == "\"" or c == "'":
-			in_quote = true
-			quote_char = c
-		elif c == "#":
-			return line.substr(0, i)
-	return line
-
-
-static func _brace_delta(line: String) -> int:
-	var depth: int = 0
-	var in_quote: bool = false
-	var quote_char: String = ""
-	for c: String in line:
-		if in_quote:
-			if c == quote_char:
-				in_quote = false
-		elif c == "\"" or c == "'":
-			in_quote = true
-			quote_char = c
-		elif c == "{":
-			depth += 1
-		elif c == "}":
-			depth -= 1
-	return depth
 
 
 static func apply(source: String, refs: Array[Ref], new_name: String) -> String:

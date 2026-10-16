@@ -1972,7 +1972,7 @@ func remove_resource(key: String) -> void:
 func _resources_block(lines: PackedStringArray) -> Vector2i:
 	var header: int = -1
 	for line_number: int in lines.size():
-		var stripped: String = GdssSymbols.strip_comment(lines.get(line_number)).strip_edges()
+		var stripped: String = GdssLexer.cut_comment(lines.get(line_number)).strip_edges()
 		if header == -1:
 			if GdssAnnotations.resources_header.search(stripped) != null:
 				header = line_number
@@ -1994,7 +1994,7 @@ func _resource_entries_in(lines: PackedStringArray, bounds: Vector2i) -> Array[D
 
 
 func _resource_at(line: String, line_number: int) -> Dictionary:
-	var stripped: String = GdssSymbols.strip_comment(line).strip_edges()
+	var stripped: String = GdssLexer.cut_comment(line).strip_edges()
 	var entry: Dictionary = GdssAnnotations.extract_block_entry(stripped, line_number)
 	if entry.is_empty() or not str(entry.get("key")).is_valid_identifier():
 		return {}

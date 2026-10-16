@@ -8,7 +8,8 @@ var _check_resources: Dictionary = {}
 
 func check_errors(source: String) -> Array[Array]:
 	var errors: Array[Array] = []
-	_check_separator_mix(GdssAnnotations.strip_blocks(source).get("cleaned"), errors)
+	if source.contains("="):
+		_check_separator_mix(GdssAnnotations.strip_blocks(source).get("cleaned"), errors)
 	var pre: Dictionary = GdssAnnotations.strip_blocks(GdssLexer.normalize_separators(source))
 	_collect_check_resources(pre.get("blocks"))
 	var lines: PackedStringArray = (pre.get("cleaned") as String).split("\n")
@@ -626,21 +627,10 @@ func _check_annotation_blocks(blocks: Array, declared_globals: Dictionary, decla
 func _line_separator(stripped: String) -> String:
 	if stripped.is_empty() or stripped.ends_with("{") or stripped == "}":
 		return ""
-	var in_quote: bool = false
-	var quote_char: String = ""
-	for i: int in stripped.length():
-		var c: String = stripped[i]
-		if in_quote:
-			if c == quote_char:
-				in_quote = false
-		elif c == "\"" or c == "'":
-			in_quote = true
-			quote_char = c
-		elif c == ":" or c == "=":
-			if stripped.substr(0, i).strip_edges().is_empty():
-				return ""
-			return c
-	return ""
+	var at: int = GdssLexer.find_unquoted(stripped, ":=")
+	if at <= 0 or stripped.substr(0, at).strip_edges().is_empty():
+		return ""
+	return stripped.substr(at, 1)
 
 
 func _check_separator_mix(source: String, errors: Array[Array]) -> void:

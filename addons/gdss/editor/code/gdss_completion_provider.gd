@@ -114,20 +114,7 @@ func _build_from_objects() -> void:
 
 func _caret_in_comment() -> bool:
 	var line: String = editor.get_line(editor.get_caret_line())
-	var col: int = mini(editor.get_caret_column(), line.length())
-	var in_quote: bool = false
-	var quote_char: String = ""
-	for i: int in col:
-		var c: String = line[i]
-		if in_quote:
-			if c == quote_char:
-				in_quote = false
-		elif c == "\"" or c == "'":
-			in_quote = true
-			quote_char = c
-		elif c == "#":
-			return true
-	return false
+	return GdssLexer.comment_start(line.substr(0, mini(editor.get_caret_column(), line.length()))) != -1
 
 
 func _on_text_changed() -> void:
@@ -742,7 +729,7 @@ func _get_context() -> Dictionary:
 			"variant": current_variant
 		}
 	
-	var colon_pos: int = _first_separator(stripped)
+	var colon_pos: int = GdssLexer.find_unquoted(stripped, ":=")
 	if colon_pos != -1:
 		var value_part: String = stripped.substr(colon_pos + 1).strip_edges()
 		if not value_part.is_empty():
@@ -912,81 +899,31 @@ func _get_icon(icon_name: StringName) -> Texture2D:
 	return theme.get_icon(icon_name, &"EditorIcons")
 
 
-func _first_separator(s: String) -> int:
-	var in_quote: bool = false
-	var quote_char: String = ""
-	for i: int in s.length():
-		var c: String = s[i]
-		if in_quote:
-			if c == quote_char:
-				in_quote = false
-		elif c == "\"" or c == "'":
-			in_quote = true
-			quote_char = c
-		elif c == ":" or c == "=":
-			return i
-	return -1
-
-
 func _annotation_block_context() -> String:
 	var caret: int = editor.get_caret_line()
 	var lines: PackedStringArray = editor.text.split("\n")
 	var depth: int = 0
 	var kind: String = ""
 	for i: int in mini(caret + 1, lines.size()):
-		var stripped: String = _strip_comment(lines.get(i)).strip_edges()
+		var stripped: String = GdssLexer.cut_comment(lines.get(i)).strip_edges()
 		if depth == 0:
 			if _re_scheme_open.search(stripped) != null and stripped.contains("{"):
 				kind = "scheme"
-				depth += _brace_count(stripped)
+				depth += GdssLexer.brace_delta(stripped)
 			elif _re_meta_open.search(stripped) != null and stripped.contains("{"):
 				kind = "meta"
-				depth += _brace_count(stripped)
+				depth += GdssLexer.brace_delta(stripped)
 			elif _re_resources.search(stripped) != null and stripped.contains("{"):
 				kind = "resources"
-				depth += _brace_count(stripped)
+				depth += GdssLexer.brace_delta(stripped)
 			elif _re_config.search(stripped) != null and stripped.contains("{"):
 				kind = "config"
-				depth += _brace_count(stripped)
+				depth += GdssLexer.brace_delta(stripped)
 		else:
-			depth += _brace_count(stripped)
+			depth += GdssLexer.brace_delta(stripped)
 			if depth <= 0:
 				kind = ""
 	return kind if depth > 0 else ""
-
-
-func _brace_count(s: String) -> int:
-	var depth: int = 0
-	var in_quote: bool = false
-	var quote_char: String = ""
-	for c: String in s:
-		if in_quote:
-			if c == quote_char:
-				in_quote = false
-		elif c == "\"" or c == "'":
-			in_quote = true
-			quote_char = c
-		elif c == "{":
-			depth += 1
-		elif c == "}":
-			depth -= 1
-	return depth
-
-
-func _strip_comment(line: String) -> String:
-	var in_quote: bool = false
-	var quote_char: String = ""
-	for i: int in line.length():
-		var c: String = line[i]
-		if in_quote:
-			if c == quote_char:
-				in_quote = false
-		elif c == "\"" or c == "'":
-			in_quote = true
-			quote_char = c
-		elif c == "#":
-			return line.substr(0, i)
-	return line
 
 
 func _scheme_header_mode() -> Dictionary:
