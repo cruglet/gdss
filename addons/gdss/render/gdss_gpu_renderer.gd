@@ -3,15 +3,20 @@ class_name GdssGpuRenderer
 extends GdssRenderer
 
 const _SHADOW_CORNER_SPILL: float = 0.4
+const _NONE: Dictionary = {}
 static var _shader: Shader = null
 static var _blur_shader: Shader = null
+static var _shared_materials: Dictionary[int, SharedMaterial] = {}
 
 var canvas_item: RID = RID()
 var parent_item: RID = RID()
 
-var _material: ShaderMaterial = null
 var _is_blur: bool = false
-var _last_params: Dictionary = {}
+var _params: Dictionary = _NONE
+var _private: ShaderMaterial = null
+var _private_params: Dictionary = _NONE
+var _shared: SharedMaterial = null
+var _bound: ShaderMaterial = null
 var _quad: Rect2 = Rect2()
 var _xform: Transform2D = Transform2D.IDENTITY
 var _emitted: bool = false
@@ -35,13 +40,44 @@ var _drawn_generation: int = -1
 var _redraw: Callable
 
 
+class SharedMaterial extends RefCounted:
+	var material: ShaderMaterial = ShaderMaterial.new()
+	var key: int
+	var is_blur: bool
+	var params: Dictionary
+	var users: int = 0
+	
+	func _init(p_key: int, p_shader: Shader, p_is_blur: bool, p_params: Dictionary) -> void:
+		key = p_key
+		is_blur = p_is_blur
+		params = p_params
+		params.make_read_only()
+		material.shader = p_shader
+		for key: StringName in p_params:
+			material.set_shader_parameter(key, p_params.get(key))
+
+
 func _init(redraw: Callable) -> void:
 	_redraw = redraw
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE and canvas_item.is_valid():
+	if what != NOTIFICATION_PREDELETE:
+		return
+	if canvas_item.is_valid():
 		RenderingServer.free_rid(canvas_item)
+	if _shared != null:
+		_shared.users -= 1
+		if _shared.users <= 0:
+			_shared_materials.erase(_shared.key)
+
+
+static func shared_material_count() -> int:
+	return _shared_materials.size()
+
+
+func params() -> Dictionary:
+	return _params
 
 
 static func _get_shared_shader() -> Shader:
@@ -59,18 +95,15 @@ static func _get_blur_shader() -> Shader:
 func _ensure_canvas_item(to_canvas_item: RID, want_blur: bool = false) -> void:
 	if not canvas_item.is_valid():
 		canvas_item = RenderingServer.canvas_item_create()
-		_material = ShaderMaterial.new()
 		_is_blur = want_blur
-		_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
-		RenderingServer.canvas_item_set_material(canvas_item, _material.get_rid())
 		RenderingServer.canvas_item_set_draw_behind_parent(canvas_item, true)
 		RenderingServer.canvas_item_set_copy_to_backbuffer(canvas_item, want_blur, Rect2())
 		parent_item = RID()
+		_bound = null
 	elif _is_blur != want_blur:
 		_is_blur = want_blur
-		_material.shader = _get_blur_shader() if want_blur else _get_shared_shader()
 		RenderingServer.canvas_item_set_copy_to_backbuffer(canvas_item, want_blur, Rect2())
-		_last_params.clear()
+		_private = null
 	if parent_item != to_canvas_item:
 		RenderingServer.canvas_item_set_parent(canvas_item, to_canvas_item)
 		parent_item = to_canvas_item
@@ -92,16 +125,75 @@ func release() -> void:
 		RenderingServer.free_rid(canvas_item)
 		canvas_item = RID()
 		parent_item = RID()
-	_material = null
-	_last_params.clear()
+	_release_shared()
+	_private = null
+	_bound = null
+	_params = _NONE
 	_emitted = false
 
 
 func _set_param(key: StringName, value: Variant) -> void:
-	if _last_params.get(key) == value and _last_params.has(key):
+	_params.set(key, value)
+
+
+func _commit_params(animating: bool) -> void:
+	if animating or not _use_shared():
+		_use_private()
+
+
+func _use_shared() -> bool:
+	var key: int = hash([_is_blur, _params])
+	if _shared != null and _shared.key == key:
+		_params = _shared.params
+		_bind(_shared.material)
+		return true
+	var shared: SharedMaterial = _shared_materials.get(key)
+	if shared != null and (shared.is_blur != _is_blur or shared.params != _params):
+		return false
+	if shared == null:
+		shared = SharedMaterial.new(key, _shader_for(_is_blur), _is_blur, _params)
+		_shared_materials.set(key, shared)
+	shared.users += 1
+	_release_shared()
+	_shared = shared
+	_params = shared.params
+	_private = null
+	_bind(shared.material)
+	return true
+
+
+func _use_private() -> void:
+	_release_shared()
+	if _private == null:
+		_private = ShaderMaterial.new()
+		_private.shader = _shader_for(_is_blur)
+		_private_params = {}
+	for key: StringName in _params:
+		var value: Variant = _params.get(key)
+		if not _private_params.has(key) or _private_params.get(key) != value:
+			_private_params.set(key, value)
+			_private.set_shader_parameter(key, value)
+	_bind(_private)
+
+
+func _release_shared() -> void:
+	if _shared == null:
 		return
-	_last_params.set(key, value)
-	_material.set_shader_parameter(key, value)
+	_shared.users -= 1
+	if _shared.users <= 0:
+		_shared_materials.erase(_shared.key)
+	_shared = null
+
+
+func _bind(material: ShaderMaterial) -> void:
+	if _bound == material:
+		return
+	_bound = material
+	RenderingServer.canvas_item_set_material(canvas_item, material.get_rid())
+
+
+static func _shader_for(blur: bool) -> Shader:
+	return _get_blur_shader() if blur else _get_shared_shader()
 
 
 func is_current(to_canvas_item: RID, rect: Rect2, revision: int) -> bool:
@@ -109,8 +201,9 @@ func is_current(to_canvas_item: RID, rect: Rect2, revision: int) -> bool:
 		and _drawn_generation == GDSS._redraw_generation and _fade_tween == null
 
 
-func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_duration: float, revision: int) -> void:
+func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_duration: float, revision: int, animating: bool = false) -> void:
 	_node = node
+	_params = {}
 	_drawn_revision = revision
 	_drawn_rect = rect
 	_drawn_generation = GDSS._redraw_generation
@@ -138,10 +231,7 @@ func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_d
 			maxf(shadow.w, spill_y) + maxf(shadow_offset.y, 0.0) + 2.0,
 		)
 	var quad: Rect2 = rect.grow_individual(pad.x, pad.z, pad.y, pad.w)
-	var pad_min: Vector2 = Vector2(pad.x / quad.size.x, pad.z / quad.size.y)
-	var pad_max: Vector2 = Vector2(pad.y / quad.size.x, pad.w / quad.size.y)
 	var anti_aliasing: bool = vals.get("anti_aliasing", true)
-	_set_param(&"u_size", quad.size)
 	_set_param(&"u_pad", pad)
 	_set_param(&"u_corner_radius", Vector4(vals.get("corner_radius", Vector4i.ZERO)))
 	_set_param(&"u_border_widths", Vector4(vals.get("border", Vector4i.ZERO)))
@@ -165,16 +255,22 @@ func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_d
 	var scale_src: Variant = vals.get("bg_texture_scale", Vector2.ZERO)
 	_fill_scale = scale_src if scale_src is Vector2 else Vector2.ZERO
 	_resolve_fill_texture(vals.get("bg_texture"), bg, fade_duration)
-	_push_fill(bg, pad_min, pad_max)
-	_push_border(border_src, border_sides, pad_min, pad_max)
+	_push_fill(bg)
+	_push_border(border_src, border_sides)
+	_commit_params(animating or _fade_tween != null)
 	var xform: Transform2D = skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
 	if not _emitted or quad != _quad or xform != _xform:
 		_quad = quad
 		_xform = xform
 		_emitted = true
+		var half: Vector2 = quad.size * 0.5
 		RenderingServer.canvas_item_clear(canvas_item)
 		RenderingServer.canvas_item_set_transform(canvas_item, xform)
-		RenderingServer.canvas_item_add_rect(canvas_item, quad, Color.WHITE)
+		RenderingServer.canvas_item_add_primitive(canvas_item,
+			PackedVector2Array([quad.position, Vector2(quad.end.x, quad.position.y), quad.end, Vector2(quad.position.x, quad.end.y)]),
+			PackedColorArray([Color.WHITE]),
+			PackedVector2Array([-half, Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]),
+			RID())
 
 
 static func at_blur_quality(value: Variant) -> Variant:
@@ -238,7 +334,7 @@ func _fade_to(target: Texture2D, duration: float) -> Texture2D:
 	return _fade_texture
 
 
-func _push_fill(bg: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
+func _push_fill(bg: Variant) -> void:
 	if _fill_texture != null:
 		_set_param(&"u_fill_mode", 3)
 		_set_param(&"u_tex", null if _fill_nearest else _fill_texture)
@@ -258,8 +354,8 @@ func _push_fill(bg: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
 		_set_param(&"u_fill_a", grad.color_a)
 		_set_param(&"u_fill_b", grad.color_b)
 		_set_param(&"u_grad_offsets", grad.offsets)
-		_set_param(&"u_grad_p0", _remap_uv(grad.p0, pad_min, pad_max))
-		_set_param(&"u_grad_p1", _remap_uv(grad.p1, pad_min, pad_max))
+		_set_param(&"u_grad_p0", grad.p0)
+		_set_param(&"u_grad_p1", grad.p1)
 		_set_param(&"u_fill_mode", grad.mode)
 	elif bg is GdssBlur:
 		var blur: GdssBlur = bg as GdssBlur
@@ -269,8 +365,8 @@ func _push_fill(bg: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
 			_set_param(&"u_fill_mode", 5)
 			_set_param(&"u_fill_glass2", Vector4(blur.strength_end, blur.refraction, blur.highlight, blur.saturation))
 			_set_param(&"u_grad_offsets", blur.grad_offsets)
-			_set_param(&"u_grad_p0", _remap_uv(blur.grad_p0, pad_min, pad_max))
-			_set_param(&"u_grad_p1", _remap_uv(blur.grad_p1, pad_min, pad_max))
+			_set_param(&"u_grad_p0", blur.grad_p0)
+			_set_param(&"u_grad_p1", blur.grad_p1)
 		else:
 			_set_param(&"u_fill_mode", 4)
 	elif bg is Color:
@@ -281,7 +377,7 @@ func _push_fill(bg: Variant, pad_min: Vector2, pad_max: Vector2) -> void:
 		_set_param(&"u_fill_a", Color.TRANSPARENT)
 
 
-func _push_border(border_src: Variant, border_sides: Array, pad_min: Vector2, pad_max: Vector2) -> void:
+func _push_border(border_src: Variant, border_sides: Array) -> void:
 	if not border_sides.is_empty():
 		_set_param(&"u_border_mode", 4)
 		_set_param(&"u_border_left", border_sides.get(0))
@@ -294,8 +390,8 @@ func _push_border(border_src: Variant, border_sides: Array, pad_min: Vector2, pa
 		_set_param(&"u_border_mode", 1)
 		_set_param(&"u_border_a", grad.color_a)
 		_set_param(&"u_border_b", grad.color_b)
-		_set_param(&"u_border_p0", _remap_uv(grad.p0, pad_min, pad_max))
-		_set_param(&"u_border_p1", _remap_uv(grad.p1, pad_min, pad_max))
+		_set_param(&"u_border_p0", grad.p0)
+		_set_param(&"u_border_p1", grad.p1)
 	elif border_src is GdssBlur:
 		var blur: GdssBlur = border_src as GdssBlur
 		_set_param(&"u_border_a", blur.tint)
@@ -303,8 +399,8 @@ func _push_border(border_src: Variant, border_sides: Array, pad_min: Vector2, pa
 		if blur.strength_end != blur.strength:
 			_set_param(&"u_border_mode", 3)
 			_set_param(&"u_border_glass2", Vector4(blur.strength_end, blur.refraction, blur.highlight, blur.saturation))
-			_set_param(&"u_border_p0", _remap_uv(blur.grad_p0, pad_min, pad_max))
-			_set_param(&"u_border_p1", _remap_uv(blur.grad_p1, pad_min, pad_max))
+			_set_param(&"u_border_p0", blur.grad_p0)
+			_set_param(&"u_border_p1", blur.grad_p1)
 		else:
 			_set_param(&"u_border_mode", 2)
 	elif border_src is Color:
@@ -313,7 +409,3 @@ func _push_border(border_src: Variant, border_sides: Array, pad_min: Vector2, pa
 	else:
 		_set_param(&"u_border_mode", 0)
 		_set_param(&"u_border_a", Color.TRANSPARENT)
-
-
-func _remap_uv(uv: Vector2, pad_min: Vector2, pad_max: Vector2) -> Vector2:
-	return pad_min + uv * (Vector2.ONE - pad_min - pad_max)

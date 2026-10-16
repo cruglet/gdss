@@ -58,7 +58,7 @@ func _check_redraw_skip(t: TC) -> void:
 	button.disabled = true
 	GDSS.refresh(button)
 	stylebox.draw(ci, rect)
-	t.check_eq(renderer._last_params.get(&"u_fill_a"), Color("#ff0000"), "a state change reaches the shader")
+	t.check_eq(renderer.params().get(&"u_fill_a"), Color("#ff0000"), "a state change reaches the shader")
 	var quality: GDSS.BlurQuality = GDSS.blur_quality
 	GDSS.blur_quality = GDSS.BlurQuality.LOW
 	t.check(not renderer.is_current(ci, rect, stylebox._style_revision), "a render setting change forces a redraw")

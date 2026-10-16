@@ -1,7 +1,6 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-uniform vec2 u_size = vec2(100.0, 40.0);
 uniform vec4 u_pad = vec4(0.0);
 uniform vec4 u_corner_radius = vec4(0.0);
 uniform vec4 u_border_widths = vec4(0.0);
@@ -44,6 +43,15 @@ const float EPS = 0.0001;
 const int CLIP_MAX = 32;
 uniform vec2 u_clip[CLIP_MAX];
 uniform int u_clip_count = 0;
+
+varying vec2 v_local;
+varying vec2 v_quad_half;
+
+
+void vertex() {
+	v_local = UV;
+	v_quad_half = abs(UV);
+}
 
 
 vec3 box_q(vec2 p, vec2 b, vec4 r) {
@@ -90,8 +98,9 @@ float clip_sd(vec2 pt, vec2 full) {
 
 
 void fragment() {
-	vec2 half_size = u_size * 0.5 - vec2(u_pad.x + u_pad.y, u_pad.z + u_pad.w) * 0.5;
-	vec2 p = (UV - 0.5) * u_size - vec2(u_pad.x - u_pad.y, u_pad.z - u_pad.w) * 0.5;
+	vec2 half_size = v_quad_half - vec2(u_pad.x + u_pad.y, u_pad.z + u_pad.w) * 0.5;
+	vec2 p = v_local - vec2(u_pad.x - u_pad.y, u_pad.z - u_pad.w) * 0.5;
+	vec2 rect_uv = p / max(half_size * 2.0, vec2(EPS)) + 0.5;
 	
 	vec2 full = half_size * 2.0;
 	vec4 cr = u_corner_radius;
@@ -127,10 +136,10 @@ void fragment() {
 	if (u_fill_mode == 1) {
 		vec2 dir = u_grad_p1 - u_grad_p0;
 		float denom = max(dot(dir, dir), EPS);
-		float t = clamp(dot(UV - u_grad_p0, dir) / denom, 0.0, 1.0);
+		float t = clamp(dot(rect_uv - u_grad_p0, dir) / denom, 0.0, 1.0);
 		fill_col = sample_gradient(u_fill_a, u_fill_b, u_grad_offsets, t);
 	} else if (u_fill_mode == 2) {
-		float t = clamp(length(UV - u_grad_p0)
+		float t = clamp(length(rect_uv - u_grad_p0)
 			/ max(length(u_grad_p1 - u_grad_p0), EPS), 0.0, 1.0);
 		fill_col = sample_gradient(u_fill_a, u_fill_b, u_grad_offsets, t);
 	} else if (u_fill_mode == 3) {
@@ -171,7 +180,7 @@ void fragment() {
 	if (u_border_mode == 1) {
 		vec2 dir = u_border_p1 - u_border_p0;
 		float denom = max(dot(dir, dir), EPS);
-		float t = clamp(dot(UV - u_border_p0, dir) / denom, 0.0, 1.0);
+		float t = clamp(dot(rect_uv - u_border_p0, dir) / denom, 0.0, 1.0);
 		border_col = mix(u_border_a, u_border_b, t);
 	} else if (u_border_mode == 4) {
 		border_col = (q_outer.x > q_outer.y)

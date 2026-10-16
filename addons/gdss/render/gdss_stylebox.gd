@@ -2,6 +2,9 @@
 class_name GdssStylebox
 extends StyleBox
 
+const _NONE: Dictionary = {}
+const _NO_PROPS: Array[GdssProp] = []
+
 
 func _resolve_time(prop_name: String, state: String) -> float:
 	var seconds: float = GdssTransition.time_for(_get_parsed_val("transition_time", state, 0.0), prop_name)
@@ -35,35 +38,35 @@ var _ref_node: Node = null
 var _ref_node_rt: Node = null
 var _applying: bool = false
 
-var _entry_cache: Dictionary = {}
+var _entry_cache: Dictionary = _NONE
 var _entry_cache_dirty: bool = true
 var _entry_cache_classes: PackedStringArray = []
 var _entry_cache_variation: String = ""
 var _entry_cache_overrides: Variant = null
 var _entry_cache_ancestry: String = ""
-var _scoped_vars: Dictionary = {}
+var _scoped_vars: Dictionary = _NONE
 var _ancestor_states_dirty: bool = true
 var _ancestor_states: bool = false
-var _styled_props_cache: Dictionary = {}
+var _styled_props_cache: Dictionary = _NONE
 var _styled_props_dirty: bool = true
 var _shared: GdssSharedEntry = null
 
-var _method_args_cache: Dictionary = {}
+var _method_args_cache: Dictionary = _NONE
 
 var _gdss_node: GdssNodeType = null
 
 var _gpu: GdssGpuRenderer = null
-var _style_vals_cache: Dictionary = {}
-var _style_dynamic: Array[GdssProp] = []
+var _style_vals_cache: Dictionary = _NONE
+var _style_dynamic: Array[GdssProp] = _NO_PROPS
 var _style_vals_state: String = "￿"
-var _style_vals_tween: Dictionary = {}
-var _style_dynamic_tween: Array[GdssProp] = []
+var _style_vals_tween: Dictionary = _NONE
+var _style_dynamic_tween: Array[GdssProp] = _NO_PROPS
 var _style_tween_state: String = "￿"
 var _style_tween_session: int = -1
 var _tween_session: int = 0
-var _nonstyle_dynamic: Array[GdssProp] = []
+var _nonstyle_dynamic: Array[GdssProp] = _NO_PROPS
 var _nonstyle_state: String = "￿"
-var _event_callables: Dictionary = {}
+var _event_callables: Dictionary = _NONE
 
 var ref: Node:
 	get:
@@ -125,13 +128,13 @@ var current_state: String = "":
 			_safe_redraw()
 
 
-var _tweened_values: Dictionary[String, Variant] = {}
-var _tweened_args: Dictionary[String, Array] = {}
+var _tweened_values: Dictionary = _NONE
+var _tweened_args: Dictionary = _NONE
 var _tween: Tween = null
 var _state_sync_queued: bool = false
-var _applied_node_props: Dictionary = {}
-var _applied_overrides: Dictionary = {}
-var _live_applied: Dictionary = {}
+var _applied_node_props: Dictionary = _NONE
+var _applied_overrides: Dictionary = _NONE
+var _live_applied: Dictionary = _NONE
 var _style_revision: int = 0
 
 var _self_toggle: bool = false
@@ -262,21 +265,21 @@ func _invalidate_entry_cache() -> void:
 func _invalidate_entry_cache_self() -> void:
 	_entry_cache_dirty = true
 	_styled_props_dirty = true
-	_entry_cache = {}
+	_entry_cache = _NONE
 	_entry_cache_ancestry = ""
 	_ancestor_states_dirty = true
 	_shared = null
-	_method_args_cache.clear()
+	_method_args_cache = _NONE
 	_gdss_node = null
 	_style_vals_state = "￿"
-	_style_vals_cache = {}
-	_style_dynamic = []
+	_style_vals_cache = _NONE
+	_style_dynamic = _NO_PROPS
 	_style_tween_state = "￿"
 	_style_tween_session = -1
-	_style_vals_tween.clear()
-	_style_dynamic_tween.clear()
+	_style_vals_tween = _NONE
+	_style_dynamic_tween = _NO_PROPS
 	_nonstyle_state = "￿"
-	_nonstyle_dynamic = []
+	_nonstyle_dynamic = _NO_PROPS
 
 
 func _resolve_gdss_node() -> GdssNodeType:
@@ -320,14 +323,39 @@ func _clear_overrides() -> void:
 
 
 func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType, val: Variant) -> void:
+	if prop.category == GdssProp.Category.NODE_PROPERTY:
+		_applied_node_props = _writable(_applied_node_props)
+	else:
+		_applied_overrides = _writable(_applied_overrides)
 	_live_applied.erase(prop.name)
 	if GdssThemeApplier.apply(prop, control, node_type, val, _applied_overrides, _applied_node_props):
 		_refresh_font_transform(control, node_type)
 
 
 func remove_applied_overrides(control: Variant) -> void:
-	_live_applied.clear()
+	_live_applied = _NONE
+	if _applied_overrides.is_empty():
+		return
 	GdssThemeApplier.remove_overrides(control, _applied_overrides)
+
+
+func _override_slot_color(control: Variant, node_type: GdssNodeType, key: String, value: Color) -> void:
+	_applied_overrides = _writable(_applied_overrides)
+	GdssThemeApplier.override_color(control, node_type, key, value, _applied_overrides)
+
+
+static func _writable(source: Dictionary) -> Dictionary:
+	return {} if source.is_read_only() else source
+
+
+func _set_tweened(prop_name: String, value: Variant) -> void:
+	_tweened_values = _writable(_tweened_values)
+	_tweened_values.set(prop_name, value)
+
+
+func _set_tweened_args(prop_name: String, args: Array[Variant]) -> void:
+	_tweened_args = _writable(_tweened_args)
+	_tweened_args.set(prop_name, args)
 
 
 func _reset_node_props(node_type: GdssNodeType, control: Variant, skip_tweened: bool) -> void:
@@ -387,7 +415,7 @@ func _apply_overrides_unwrapped(node_type: GdssNodeType, control: Variant, clear
 				var slot_color: String = prop.name.trim_suffix("color") + slot + "_color"
 				var slot_val: Variant = _get_val_cached(prop.name, entry, slot, val)
 				if node_type.colors.has(slot_color) and slot_val is Color:
-					GdssThemeApplier.override_color(control, node_type, slot_color, slot_val, _applied_overrides)
+					_override_slot_color(control, node_type, slot_color, slot_val)
 	_refresh_font_transform(control, node_type)
 	_applying = false
 
@@ -411,8 +439,8 @@ func _kill_tween() -> void:
 	if _tween != null:
 		_tween.kill()
 		_tween = null
-	_tweened_values.clear()
-	_tweened_args.clear()
+	_tweened_values = _NONE
+	_tweened_args = _NONE
 
 
 func reapply() -> void:
@@ -456,6 +484,7 @@ func refresh_globals() -> void:
 	for i: int in _nonstyle_dynamic.size():
 		var prop: GdssProp = _nonstyle_dynamic.get(i)
 		_apply_theme_prop(prop, control, node_type, values.get(i))
+		_live_applied = _writable(_live_applied)
 		_live_applied.set(prop.name, values.get(i))
 	var styled: Dictionary = _entry_styled_props(entry)
 	if styled.has("char_skew") or styled.has("char_embolden"):
@@ -537,8 +566,8 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	_tween_session += 1
 	_tween.finished.connect(func() -> void:
 		_tween = null
-		_tweened_values.clear()
-		_tweened_args.clear()
+		_tweened_values = _NONE
+		_tweened_args = _NONE
 		if ref != null:
 			_apply_overrides()
 			_safe_redraw()
@@ -566,10 +595,10 @@ func _tween_method_args(tween: Tween, prop: GdssProp, from_state: String, to_sta
 
 func _step_method_tween(t: float, prop_name: String, method: GdssMethod, from_args: Array[Variant], to_args: Array[Variant]) -> void:
 	var args: Array[Variant] = method.interpolate_args(from_args, to_args, t)
-	_tweened_args.set(prop_name, args)
+	_set_tweened_args(prop_name, args)
 	var result: Variant = method.call_method(args, ref.get_instance_id() if ref != null else -1, "tween:" + prop_name)
 	if result != null:
-		_tweened_values.set(prop_name, result)
+		_set_tweened(prop_name, result)
 	_safe_redraw()
 
 
@@ -581,7 +610,7 @@ func _tween_value(tween: Tween, prop: GdssProp, from_state: String, to_state: St
 		return false
 	var from: Variant = pair.front()
 	var to: Variant = pair.back()
-	_tweened_values.set(prop.name, from)
+	_set_tweened(prop.name, from)
 	if from is Array:
 		tween.tween_method(_step_sides_tween.bind(prop.name, from, to), 0.0, 1.0, duration)
 	elif from is int:
@@ -594,7 +623,7 @@ func _tween_value(tween: Tween, prop: GdssProp, from_state: String, to_state: St
 func _step_value_tween(value: Variant, prop: GdssProp, as_int: bool) -> void:
 	if as_int:
 		value = int(round(value))
-	_tweened_values.set(prop.name, value)
+	_set_tweened(prop.name, value)
 	if prop.name == "padding":
 		_apply_padding(value)
 	if prop.category == GdssProp.Category.STYLE:
@@ -604,7 +633,7 @@ func _step_value_tween(value: Variant, prop: GdssProp, as_int: bool) -> void:
 
 
 func _step_sides_tween(t: float, prop_name: String, from: Array, to: Array) -> void:
-	_tweened_values.set(prop_name, GdssTransition.lerp_value(from, to, t))
+	_set_tweened(prop_name, GdssTransition.lerp_value(from, to, t))
 	_safe_redraw()
 
 
@@ -675,6 +704,7 @@ func _sync_event_signals(node: Node) -> void:
 			if arg_count > 0:
 				cb = cb.unbind(arg_count)
 			node.connect(sig, cb)
+			_event_callables = _writable(_event_callables)
 			_event_callables.set(sig, cb)
 
 
@@ -739,6 +769,7 @@ func _absorb_vars(source: Dictionary) -> void:
 	if not declared is Dictionary:
 		return
 	for key: String in declared as Dictionary:
+		_scoped_vars = _writable(_scoped_vars)
 		_scoped_vars.set(key, (declared as Dictionary).get(key))
 
 
@@ -796,11 +827,12 @@ func _merge_entry(selector: String, current_classes: PackedStringArray, variatio
 	var entry: Dictionary = parsed.get(selector, {})
 	var variations: Dictionary = entry.get(GdssValue.VARIATIONS_KEY, {}) if not entry.is_empty() else {}
 	var has_variation: bool = not variation.is_empty() and variations.has(variation)
-	_scoped_vars = {}
+	_scoped_vars = _NONE
 	for layer: Dictionary in descendant_layers:
 		var inherited: Variant = layer.get("vars")
 		if inherited is Dictionary:
 			for key: String in inherited as Dictionary:
+				_scoped_vars = _writable(_scoped_vars)
 				_scoped_vars.set(key, (inherited as Dictionary).get(key))
 	_absorb_vars(entry)
 	for gdss_class_name: String in current_classes:
@@ -994,7 +1026,7 @@ func _restyle_from_ancestor(outgoing: Dictionary) -> void:
 	var state: String = _get_state()
 	for prop_name: String in outgoing:
 		if GDSS.scaled_duration(_resolve_time(prop_name, state)) > 0.0:
-			_tweened_values.set(prop_name, outgoing.get(prop_name))
+			_set_tweened(prop_name, outgoing.get(prop_name))
 	_start_transition(state, state)
 	_apply_overrides(false)
 	_safe_redraw()
@@ -1148,6 +1180,7 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 					resolved_arg = named
 			resolved.append(resolved_arg)
 	if not has_live_ref:
+		_method_args_cache = _writable(_method_args_cache)
 		_method_args_cache.set(cache_key, resolved)
 	return resolved
 
@@ -1279,8 +1312,8 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 		if _style_tween_state != state or _style_tween_session != _tween_session:
 			_style_tween_state = state
 			_style_tween_session = _tween_session
-			_style_vals_tween.clear()
-			_style_dynamic_tween.clear()
+			_style_vals_tween = {}
+			_style_dynamic_tween = []
 			for prop: GdssProp in node_type.get_style_props():
 				var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 				_style_vals_tween.set(prop.name, fv if fv != null else prop.get_default_value())
@@ -1294,6 +1327,11 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 			if _style_vals_tween.has(key):
 				_style_vals_tween.set(key, _tweened_values.get(key))
 		return _style_vals_tween
+	if _shared != null:
+		if not _shared.style_static.has(state):
+			_share_style_vals(node_type, entry, state)
+		if _shared.fully_shared.get(state):
+			return _adopt_shared_vals(entry, state)
 	if _style_vals_state != state:
 		_style_vals_state = state
 		_style_revision += 1
@@ -1306,10 +1344,8 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 				if GdssValue.is_live(GdssCascade.raw_value(entry, state, prop.name)):
 					_style_dynamic.append(prop)
 			return _style_vals_cache
-		if not _shared.style_static.has(state):
-			_share_style_vals(node_type, entry, state)
-		_style_vals_cache = _shared.style_static.get(state).duplicate()
 		_style_dynamic = _shared.style_live.get(state)
+		_style_vals_cache = _shared.style_static.get(state).duplicate()
 		for prop: GdssProp in _shared.style_per_node.get(state):
 			var nv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 			_style_vals_cache.set(prop.name, nv if nv != null else prop.get_default_value())
@@ -1324,22 +1360,47 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 	return _style_vals_cache
 
 
+func _adopt_shared_vals(entry: Dictionary, state: String) -> Dictionary:
+	var live: Array = _shared.style_live.get(state)
+	var values: Variant = _shared.style_static.get(state)
+	if not live.is_empty():
+		values = _shared.full_values(state, GDSS._globals_generation)
+		if values == null:
+			var built: Dictionary = (_shared.style_static.get(state) as Dictionary).duplicate()
+			for prop: GdssProp in live:
+				var value: Variant = _live_value(prop, entry, state)
+				built.set(prop.name, value if value != null else prop.get_default_value())
+			_shared.store_full_values(state, GDSS._globals_generation, built)
+			values = built
+	if not is_same(values, _style_vals_cache):
+		_style_vals_cache = values
+		_style_revision += 1
+	_style_vals_state = state
+	_style_dynamic = live
+	return _style_vals_cache
+
+
 func _share_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String) -> void:
 	var static_vals: Dictionary = {}
 	var live: Array[GdssProp] = []
 	var per_node: Array[GdssProp] = []
+	var all_shareable: bool = true
 	for prop: GdssProp in node_type.get_style_props():
 		var raw: Variant = GdssCascade.raw_value(entry, state, prop.name)
 		if GdssValue.is_live(raw):
 			live.append(prop)
 			if GdssValue.is_shareable_live(raw):
 				_shared.mark_global_only(state, prop.name)
+			else:
+				all_shareable = false
 			continue
 		if GdssValue.is_node_specific(raw):
 			per_node.append(prop)
 			continue
 		var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 		static_vals.set(prop.name, rv if rv != null else prop.get_default_value())
+	static_vals.make_read_only()
+	_shared.fully_shared.set(state, all_shareable and per_node.is_empty())
 	_shared.style_static.set(state, static_vals)
 	_shared.style_live.set(state, live)
 	_shared.style_per_node.set(state, per_node)
@@ -1378,7 +1439,7 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 		if _gpu == null:
 			_gpu = GdssGpuRenderer.new(_safe_redraw)
 		if not _gpu.is_current(to_canvas_item, rect, _style_revision):
-			_gpu.draw(to_canvas_item, rect, vals, ref, GDSS.scaled_duration(_resolve_time("bg_texture", _get_state())), _style_revision)
+			_gpu.draw(to_canvas_item, rect, vals, ref, GDSS.scaled_duration(_resolve_time("bg_texture", _get_state())), _style_revision, not _tweened_values.is_empty())
 		return
 	_free_gpu_ci()
 	GdssCpuRenderer.draw(to_canvas_item, rect, vals)

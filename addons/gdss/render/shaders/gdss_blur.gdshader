@@ -1,7 +1,6 @@
 shader_type canvas_item;
 render_mode unshaded;
 
-uniform vec2 u_size = vec2(100.0, 40.0);
 uniform vec4 u_pad = vec4(0.0);
 uniform vec4 u_corner_radius = vec4(0.0);
 uniform vec4 u_border_widths = vec4(0.0);
@@ -62,9 +61,13 @@ const int BLUR_TAPS = 24;
 const float GOLDEN_ANGLE = 2.39996323;
 
 varying float v_canvas_scale;
+varying vec2 v_local;
+varying vec2 v_quad_half;
 
 
 void vertex() {
+	v_local = UV;
+	v_quad_half = abs(UV);
 	v_canvas_scale = length(vec2(CANVAS_MATRIX[0].x, CANVAS_MATRIX[0].y));
 }
 
@@ -155,8 +158,9 @@ float clip_sd(vec2 pt, vec2 full) {
 
 
 void fragment() {
-	vec2 half_size = u_size * 0.5 - vec2(u_pad.x + u_pad.y, u_pad.z + u_pad.w) * 0.5;
-	vec2 p = (UV - 0.5) * u_size - vec2(u_pad.x - u_pad.y, u_pad.z - u_pad.w) * 0.5;
+	vec2 half_size = v_quad_half - vec2(u_pad.x + u_pad.y, u_pad.z + u_pad.w) * 0.5;
+	vec2 p = v_local - vec2(u_pad.x - u_pad.y, u_pad.z - u_pad.w) * 0.5;
+	vec2 rect_uv = p / max(half_size * 2.0, vec2(EPS)) + 0.5;
 	
 	vec2 full = half_size * 2.0;
 	vec4 cr = u_corner_radius;
@@ -192,10 +196,10 @@ void fragment() {
 	if (u_fill_mode == 1) {
 		vec2 dir = u_grad_p1 - u_grad_p0;
 		float denom = max(dot(dir, dir), EPS);
-		float t = clamp(dot(UV - u_grad_p0, dir) / denom, 0.0, 1.0);
+		float t = clamp(dot(rect_uv - u_grad_p0, dir) / denom, 0.0, 1.0);
 		fill_col = sample_gradient(u_fill_a, u_fill_b, u_grad_offsets, t);
 	} else if (u_fill_mode == 2) {
-		float t = clamp(length(UV - u_grad_p0)
+		float t = clamp(length(rect_uv - u_grad_p0)
 			/ max(length(u_grad_p1 - u_grad_p0), EPS), 0.0, 1.0);
 		fill_col = sample_gradient(u_fill_a, u_fill_b, u_grad_offsets, t);
 	} else if (u_fill_mode == 3) {
@@ -229,15 +233,15 @@ void fragment() {
 			? (img.rgb * img.a + u_fill_a.rgb * u_fill_a.a * (1.0 - img.a)) / img_a
 			: img.rgb, img_a);
 	} else if (u_fill_mode == 4) {
-		fill_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_fill_a, u_fill_glass, SCREEN_PIXEL_SIZE);
+		fill_col = glass(SCREEN_UV, rect_uv, p, half_size, d_outer, u_fill_a, u_fill_glass, SCREEN_PIXEL_SIZE);
 	} else if (u_fill_mode == 5) {
 		vec2 dir = u_grad_p1 - u_grad_p0;
 		float denom = max(dot(dir, dir), EPS);
-		float t = clamp(dot(UV - u_grad_p0, dir) / denom, 0.0, 1.0);
+		float t = clamp(dot(rect_uv - u_grad_p0, dir) / denom, 0.0, 1.0);
 		float span = max(u_grad_offsets.y - u_grad_offsets.x, EPS);
 		float k = clamp((t - u_grad_offsets.x) / span, 0.0, 1.0);
 		vec4 g = vec4(mix(u_fill_glass.x, u_fill_glass2.x, k), u_fill_glass.yzw);
-		fill_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_fill_a, g, SCREEN_PIXEL_SIZE);
+		fill_col = glass(SCREEN_UV, rect_uv, p, half_size, d_outer, u_fill_a, g, SCREEN_PIXEL_SIZE);
 	} else {
 		fill_col = u_fill_a;
 	}
@@ -246,16 +250,16 @@ void fragment() {
 	if (u_border_mode == 1) {
 		vec2 dir = u_border_p1 - u_border_p0;
 		float denom = max(dot(dir, dir), EPS);
-		float t = clamp(dot(UV - u_border_p0, dir) / denom, 0.0, 1.0);
+		float t = clamp(dot(rect_uv - u_border_p0, dir) / denom, 0.0, 1.0);
 		border_col = mix(u_border_a, u_border_b, t);
 	} else if (u_border_mode == 2) {
-		border_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_border_a, u_border_glass, SCREEN_PIXEL_SIZE);
+		border_col = glass(SCREEN_UV, rect_uv, p, half_size, d_outer, u_border_a, u_border_glass, SCREEN_PIXEL_SIZE);
 	} else if (u_border_mode == 3) {
 		vec2 dir = u_border_p1 - u_border_p0;
 		float denom = max(dot(dir, dir), EPS);
-		float t = clamp(dot(UV - u_border_p0, dir) / denom, 0.0, 1.0);
+		float t = clamp(dot(rect_uv - u_border_p0, dir) / denom, 0.0, 1.0);
 		vec4 g = vec4(mix(u_border_glass.x, u_border_glass2.x, t), u_border_glass.yzw);
-		border_col = glass(SCREEN_UV, UV, p, half_size, d_outer, u_border_a, g, SCREEN_PIXEL_SIZE);
+		border_col = glass(SCREEN_UV, rect_uv, p, half_size, d_outer, u_border_a, g, SCREEN_PIXEL_SIZE);
 	} else if (u_border_mode == 4) {
 		border_col = (q_outer.x > q_outer.y)
 			? (p.x < 0.0 ? u_border_left : u_border_right)

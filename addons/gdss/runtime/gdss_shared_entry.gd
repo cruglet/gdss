@@ -9,6 +9,9 @@ var scoped_vars: Dictionary
 var style_static: Dictionary[String, Dictionary] = {}
 var style_live: Dictionary[String, Array] = {}
 var style_per_node: Dictionary[String, Array] = {}
+var fully_shared: Dictionary[String, bool] = {}
+var _full_values: Dictionary[String, Dictionary] = {}
+var _full_generations: Dictionary[String, int] = {}
 var nonstyle_live: Dictionary[String, Array] = {}
 var global_only: Dictionary[String, Dictionary] = {}
 var _global_generation: int = -1
@@ -60,6 +63,18 @@ func global_values(state: String, generation: int) -> Dictionary:
 	if not _global_vals.has(state):
 		_global_vals.set(state, {})
 	return _global_vals.get(state)
+
+
+func full_values(state: String, generation: int) -> Variant:
+	if _full_generations.get(state, -1) != generation:
+		return null
+	return _full_values.get(state)
+
+
+func store_full_values(state: String, generation: int, values: Dictionary) -> void:
+	values.make_read_only()
+	_full_values.set(state, values)
+	_full_generations.set(state, generation)
 
 
 func styled_props() -> Dictionary:
