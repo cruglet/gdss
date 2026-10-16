@@ -359,7 +359,7 @@ class GdssOverridesProperty extends EditorProperty:
 		var props_by_name: Dictionary = node_type.get_props_by_name()
 		var unknown: PackedStringArray = []
 		for state_key: String in entry:
-			if state_key == "_classes" or state_key == "_variations" or state_key == GdssStylesheet.DESCENDANTS_KEY:
+			if state_key == GdssValue.CLASSES_KEY or state_key == GdssValue.VARIATIONS_KEY or state_key == GdssValue.DESCENDANTS_KEY:
 				continue
 			var state_dict: Variant = entry.get(state_key)
 			if not state_dict is Dictionary:

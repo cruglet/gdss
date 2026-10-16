@@ -268,7 +268,7 @@ static func tween_global_vars(values: Dictionary, tween_time: float = 0.0, trans
 	tween.set_ease(GdssTransition.tween_ease(ease))
 	tween.tween_method(func(t: float) -> void:
 		for key: String in values:
-			GdssStylesheet.globals.set(key, _lerp_value(from.get(key), values.get(key), t))
+			GdssStylesheet.globals.set(key, GdssTransition.lerp_value(from.get(key), values.get(key), t))
 		_flush_global_refresh()
 	, 0.0, 1.0, duration)
 
@@ -309,7 +309,7 @@ static func set_scheme(name: String, tween_time: float = 0.0, trans: TransitionF
 	_scheme_tween.set_ease(GdssTransition.tween_ease(ease))
 	_scheme_tween.tween_method(func(t: float) -> void:
 		for key: String in keys:
-			_apply_scheme_value(key, _lerp_value(from.get(key), target.get(key), t))
+			_apply_scheme_value(key, GdssTransition.lerp_value(from.get(key), target.get(key), t))
 		_flush_global_refresh()
 	, 0.0, 1.0, duration)
 	_scheme_tween.finished.connect(func() -> void:
@@ -380,21 +380,6 @@ static func on_globals_changed(callable: Callable) -> void:
 static func on_parsed_reloaded(callable: Callable) -> void:
 	if is_instance_valid(_runtime) and _runtime.has_signal(&"parsed_reloaded"):
 		_runtime.parsed_reloaded.connect(callable)
-
-
-static func _lerp_value(from_val: Variant, to_val: Variant, t: float) -> Variant:
-	if from_val is Color and to_val is Color:
-		return (from_val as Color).lerp(to_val as Color, t)
-	if from_val is Vector4i and to_val is Vector4i:
-		return Vector4i(Vector4(from_val as Vector4i).lerp(Vector4(to_val as Vector4i), t))
-	if from_val is Vector2 and to_val is Vector2:
-		return (from_val as Vector2).lerp(to_val as Vector2, t)
-	if (from_val is float or from_val is int) and (to_val is float or to_val is int):
-		var result: float = lerpf(float(from_val), float(to_val), t)
-		if from_val is int and to_val is int:
-			return int(round(result))
-		return result
-	return to_val
 
 
 static func _invalidate_texture_cache() -> void:

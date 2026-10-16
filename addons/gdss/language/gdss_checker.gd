@@ -4,243 +4,259 @@ extends RefCounted
 
 static var _re_bad_annotation: RegEx = RegEx.create_from_string(r"^@(\w+)")
 var _check_resources: Dictionary = {}
+var _errors: Array[Array] = []
+var _known_selectors: Dictionary[String, GdssNodeType] = {}
+var _known_states: PackedStringArray = []
+var _known_methods: Dictionary = {}
+var _brace_depth: int = 0
+var _brace_open_lines: Array[int] = []
+var _frames: Array[Frame] = []
+var _declared_vars: Dictionary = {}
+var _file_level_vars: Dictionary = {}
+var _declared_globals: Dictionary = {}
+var _declared_instances: Dictionary = {}
+
+
+class Frame extends RefCounted:
+	var selector: String
+	var type: String
+	var in_event: bool
+	
+	func _init(p_selector: String, p_type: String, p_in_event: bool) -> void:
+		selector = p_selector
+		type = p_type
+		in_event = p_in_event
 
 
 func check_errors(source: String) -> Array[Array]:
-	var errors: Array[Array] = []
+	_errors = []
 	if source.contains("="):
-		_check_separator_mix(GdssAnnotations.strip_blocks(source).get("cleaned"), errors)
+		_check_separator_mix(GdssAnnotations.strip_blocks(source).get("cleaned"), _errors)
 	var pre: Dictionary = GdssAnnotations.strip_blocks(GdssLexer.normalize_separators(source))
 	_collect_check_resources(pre.get("blocks"))
 	var lines: PackedStringArray = (pre.get("cleaned") as String).split("\n")
-	var known_selectors: Array = GDSS._get_node_types().keys()
-	var known_states: PackedStringArray = GdssParser.get_known_states()
-	var known_methods: Dictionary = GDSS._get_gdss_methods()
-	var brace_depth: int = 0
-	var brace_open_lines: Array[int] = []
-	var selector_stack: Array[String] = []
-	var type_stack: Array[String] = []
-	var event_stack: Array[bool] = []
-	var declared_vars: Dictionary = {}
-	var file_level_vars: Dictionary = {}
-	var declared_globals: Dictionary = {}
-	for pre_line: String in lines:
-		var pre_stripped: String = GdssLexer.strip_comment(pre_line.strip_edges())
-		for rx_pre: RegEx in [GdssAnnotations.local_var, GdssAnnotations.global_var, GdssAnnotations.instance_var]:
-			var pre_match: RegExMatch = rx_pre.search(pre_stripped)
-			if pre_match:
-				declared_vars.set(pre_match.get_string(1), true)
+	_begin_scan(lines)
+	for line_index: int in lines.size():
+		var line_text: String = GdssLexer.strip_comment(lines.get(line_index).strip_edges())
+		for statement: String in GdssLexer.split_statements(line_text):
+			_check_statement(statement.strip_edges(), line_index)
+	for line: int in _brace_open_lines:
+		_errors.append(["Unclosed brace '{'", line])
+	_check_annotation_blocks(pre.get("blocks"), _declared_globals, _declared_instances, _errors)
+	_check_imports(source)
+	return _errors
+
+
+func _begin_scan(lines: PackedStringArray) -> void:
+	_known_selectors = GDSS._get_node_types()
+	_known_states = GdssParser.get_known_states()
+	_known_methods = GDSS._get_gdss_methods()
+	_brace_depth = 0
+	_brace_open_lines = []
+	_frames = []
+	_declared_vars = {}
+	_file_level_vars = {}
+	_declared_globals = {}
+	_declared_instances = {}
+	for line: String in lines:
+		var stripped: String = GdssLexer.strip_comment(line.strip_edges())
+		for declaration: RegEx in [GdssAnnotations.local_var, GdssAnnotations.global_var, GdssAnnotations.instance_var]:
+			var found: RegExMatch = declaration.search(stripped)
+			if found:
+				_declared_vars.set(found.get_string(1), true)
 				break
-	var declared_instances: Dictionary = {}
-	
-	var statements: Array[Array] = []
-	for line_idx: int in lines.size():
-		var line_text: String = GdssLexer.strip_comment(lines.get(line_idx).strip_edges())
-		for raw_stmt: String in GdssLexer.split_statements(line_text):
-			statements.append([raw_stmt.strip_edges(), line_idx])
-	
-	for entry: Array in statements:
-		var stripped: String = entry.get(0)
-		var i: int = entry.get(1)
-		
-		if stripped.is_empty():
-			continue
-		
-		if stripped.begins_with("@global") or stripped.begins_with("@instance"):
-			var is_global: bool = stripped.begins_with("@global")
-			var rx: RegEx = GdssAnnotations.global_var if is_global else GdssAnnotations.instance_var
-			var m: RegExMatch = rx.search(stripped)
-			if not m:
-				var label: String = "@global" if is_global else "@instance"
-				errors.append(["Invalid %s var declaration. Expected: %s var name: value" % [label, label], i])
-			else:
-				var val_str: String = m.get_string(2).strip_edges()
-				if val_str.is_empty():
-					errors.append(["Variable '%s' has no value" % m.get_string(1), i])
-				else:
-					if file_level_vars.has(m.get_string(1)):
-						errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
-					file_level_vars.set(m.get_string(1), true)
-					declared_vars.set(m.get_string(1), true)
-					if is_global:
-						declared_globals.set(m.get_string(1), true)
-					if not _is_quoted_literal(val_str) and val_str.contains("("):
-						var method_name: String = _method_name_of(val_str)
-						_check_method_call(val_str, method_name, null, known_methods, errors, i)
-			continue
-		
-		if stripped.begins_with("var "):
-			var m: RegExMatch = GdssAnnotations.local_var.search(stripped)
-			if not m:
-				errors.append(["Invalid var declaration. Expected: var name: value", i])
-			else:
-				var val_str: String = m.get_string(2).strip_edges()
-				if val_str.is_empty():
-					errors.append(["Variable '%s' has no value" % m.get_string(1), i])
-				else:
-					if brace_depth == 0:
-						if file_level_vars.has(m.get_string(1)):
-							errors.append(["Variable '%s' is already declared" % m.get_string(1), i])
-						file_level_vars.set(m.get_string(1), true)
-					declared_vars.set(m.get_string(1), true)
-					if not _is_quoted_literal(val_str) and val_str.contains("("):
-						var method_name: String = _method_name_of(val_str)
-						_check_method_call(val_str, method_name, null, known_methods, errors, i)
-			continue
-		
-		if stripped.begins_with("@"):
-			var am: RegExMatch = _re_bad_annotation.search(stripped)
-			var annotation_name: String = am.get_string(1) if am else stripped
-			errors.append(["Unknown annotation '@%s'" % annotation_name, i])
-			continue
-		
-		for ch: String in stripped:
-			if ch == "{":
-				brace_depth += 1
-				brace_open_lines.append(i)
-			elif ch == "}":
-				brace_depth -= 1
-				if brace_depth < 0:
-					errors.append(["Unexpected closing brace '}'", i])
-					brace_depth = 0
-				else:
-					if not brace_open_lines.is_empty():
-						brace_open_lines.pop_back()
-					if not selector_stack.is_empty():
-						selector_stack.pop_back()
-					if not type_stack.is_empty():
-						type_stack.pop_back()
-					if not event_stack.is_empty():
-						event_stack.pop_back()
-		
-		if stripped.ends_with("{"):
-			var selector_part: String = stripped.trim_suffix("{").strip_edges()
-			var colon_pos: int = -1
-			for ci: int in selector_part.length():
-				if selector_part[ci] == ":":
-					colon_pos = ci
-					break
-			
-			var base_part: String = selector_part.substr(0, colon_pos if colon_pos != -1 else selector_part.length()).strip_edges()
-			var state_part: String = selector_part.substr(colon_pos + 1).strip_edges().to_lower() if colon_pos != -1 else ""
-			
-			var frame_selector: String = ""
-			var frame_type: String = ""
-			var has_selector: bool = false
-			var is_combinator: bool = false
-			for sel: String in base_part.split(","):
-				var s: String = sel.strip_edges()
-				if s.is_empty():
-					continue
-				if s.begins_with(">"):
-					var combinator: String = ">>" if s.begins_with(">>") else ">"
-					var matched: String = s.substr(combinator.length()).strip_edges()
-					if brace_depth == 1:
-						errors.append(["Combinator '%s' needs an enclosing selector to be relative to" % combinator, i])
-					elif matched.is_empty():
-						errors.append(["Combinator '%s' names no node type" % combinator, i])
-					elif not known_selectors.has(matched):
-						errors.append(["Unknown selector '%s'" % matched, i])
-					else:
-						frame_type = matched
-					is_combinator = true
-					frame_selector = combinator + matched
-					has_selector = true
-					continue
-				if brace_depth == 1 and not known_selectors.has(s):
-					errors.append(["Unknown selector '%s'" % s, i])
-				frame_selector = s
-				has_selector = true
-			var enclosing_type: String = type_stack.back() if not type_stack.is_empty() else ""
-			if has_selector:
-				selector_stack.append(frame_selector)
-				if is_combinator:
-					type_stack.append(frame_type if not frame_type.is_empty() else enclosing_type)
-				elif brace_depth == 1 and known_selectors.has(frame_selector):
-					type_stack.append(frame_selector)
-				else:
-					type_stack.append(enclosing_type)
-				event_stack.append(frame_selector.ends_with("()"))
-			else:
-				selector_stack.append(selector_stack.back() if not selector_stack.is_empty() else "")
-				type_stack.append(enclosing_type)
-				event_stack.append(event_stack.back() if not event_stack.is_empty() else false)
-			
-			for raw_state: String in (":" + state_part).split(",", false):
-				var state_name: String = raw_state.strip_edges().trim_prefix(":").strip_edges()
-				if not state_name.is_empty() and not state_name.begins_with(":") and not known_states.has(state_name):
-					errors.append(["Unknown state ':%s'" % state_name, i])
-			continue
-		
-		if stripped == "}":
-			continue
-		
-		if brace_depth == 0:
-			errors.append(["Unexpected token outside of any block: '%s'" % stripped, i])
-			continue
-		
-		if stripped.contains(":"):
-			var colon_idx: int = stripped.find(":")
-			var prop_name: String = stripped.substr(0, colon_idx).strip_edges()
-			var value_str: String = stripped.substr(colon_idx + 1).strip_edges()
-			
-			if prop_name.is_empty():
-				errors.append(["Empty property name", i])
+
+
+func _check_statement(stripped: String, line: int) -> void:
+	if stripped.is_empty():
+		return
+	if stripped.begins_with("@global") or stripped.begins_with("@instance"):
+		_check_annotated_var(stripped, line)
+		return
+	if stripped.begins_with("var "):
+		_check_local_var(stripped, line)
+		return
+	if stripped.begins_with("@"):
+		var annotation: RegExMatch = _re_bad_annotation.search(stripped)
+		_errors.append(["Unknown annotation '@%s'" % (annotation.get_string(1) if annotation else stripped), line])
+		return
+	_track_braces(stripped, line)
+	if stripped.ends_with("{"):
+		_open_block(stripped.trim_suffix("{").strip_edges(), line)
+		return
+	if stripped == "}":
+		return
+	if _brace_depth == 0:
+		_errors.append(["Unexpected token outside of any block: '%s'" % stripped, line])
+		return
+	if stripped.contains(":"):
+		_check_property(stripped, line)
+		return
+	var context: String = _frame().selector
+	if context.is_empty():
+		_errors.append(["Stray token '%s': expected a property or block" % stripped, line])
+	else:
+		_errors.append(["Stray token '%s' in '%s': expected a property or block" % [stripped, context], line])
+
+
+func _check_annotated_var(stripped: String, line: int) -> void:
+	var is_global: bool = stripped.begins_with("@global")
+	var found: RegExMatch = (GdssAnnotations.global_var if is_global else GdssAnnotations.instance_var).search(stripped)
+	if not found:
+		var label: String = "@global" if is_global else "@instance"
+		_errors.append(["Invalid %s var declaration. Expected: %s var name: value" % [label, label], line])
+		return
+	var name: String = found.get_string(1)
+	var value: String = found.get_string(2).strip_edges()
+	if value.is_empty():
+		_errors.append(["Variable '%s' has no value" % name, line])
+		return
+	if _file_level_vars.has(name):
+		_errors.append(["Variable '%s' is already declared" % name, line])
+	_file_level_vars.set(name, true)
+	_declared_vars.set(name, true)
+	if is_global:
+		_declared_globals.set(name, true)
+	else:
+		_declared_instances.set(name, true)
+	_check_declared_value(value, line)
+
+
+func _check_local_var(stripped: String, line: int) -> void:
+	var found: RegExMatch = GdssAnnotations.local_var.search(stripped)
+	if not found:
+		_errors.append(["Invalid var declaration. Expected: var name: value", line])
+		return
+	var name: String = found.get_string(1)
+	var value: String = found.get_string(2).strip_edges()
+	if value.is_empty():
+		_errors.append(["Variable '%s' has no value" % name, line])
+		return
+	if _brace_depth == 0:
+		if _file_level_vars.has(name):
+			_errors.append(["Variable '%s' is already declared" % name, line])
+		_file_level_vars.set(name, true)
+	_declared_vars.set(name, true)
+	_check_declared_value(value, line)
+
+
+func _check_declared_value(value: String, line: int) -> void:
+	if not _is_quoted_literal(value) and value.contains("("):
+		_check_method_call(value, _method_name_of(value), null, _known_methods, _errors, line)
+
+
+func _track_braces(stripped: String, line: int) -> void:
+	for i: int in stripped.length():
+		var c: String = stripped.substr(i, 1)
+		if c == "{":
+			_brace_depth += 1
+			_brace_open_lines.append(line)
+		elif c == "}":
+			_brace_depth -= 1
+			if _brace_depth < 0:
+				_errors.append(["Unexpected closing brace '}'", line])
+				_brace_depth = 0
 				continue
-			
-			if value_str.is_empty():
-				errors.append(["Property '%s' has no value" % prop_name, i])
-				continue
-			
-			var current_selector: String = selector_stack.back() if not selector_stack.is_empty() else ""
-			var current_type: String = type_stack.back() if not type_stack.is_empty() else ""
-			var in_event: bool = event_stack.back() if not event_stack.is_empty() else false
-			var node_type: GdssNodeType = GDSS._get_node_types().get(current_type) if not current_type.is_empty() else null
-			
-			if node_type != null:
-				var resolved_name: String = GdssParser.resolve_deprecated(prop_name, i)
-				var all_props: Array[GdssProp] = node_type.get_enabled_props()
-				var matched_prop: GdssProp = null
-				for p: GdssProp in all_props:
-					if p.name == resolved_name or p.composite_of.has(resolved_name) or p.category_subproperties.has(resolved_name):
-						matched_prop = p
-						break
-				
-				if matched_prop == null and in_event and resolved_name.begins_with("transition_"):
-					matched_prop = GDSS.get_registry().property_list.get(resolved_name)
-				
-				if matched_prop == null:
-					errors.append(["Unknown property '%s' for selector '%s'" % [prop_name, current_selector], i])
-				else:
-					_check_prop_value(value_str, matched_prop, resolved_name, known_methods, declared_vars, errors, i)
+			if not _brace_open_lines.is_empty():
+				_brace_open_lines.pop_back()
+			if not _frames.is_empty():
+				_frames.pop_back()
+
+
+func _open_block(header: String, line: int) -> void:
+	var colon: int = header.find(":")
+	var base_part: String = header.substr(0, colon if colon != -1 else header.length()).strip_edges()
+	var state_part: String = header.substr(colon + 1).strip_edges().to_lower() if colon != -1 else ""
+	var enclosing: Frame = _frame()
+	var selector: String = ""
+	var matched_type: String = ""
+	var is_combinator: bool = false
+	for raw_selector: String in base_part.split(","):
+		var candidate: String = raw_selector.strip_edges()
+		if candidate.is_empty():
+			continue
+		if candidate.begins_with(">"):
+			var combinator: String = ">>" if candidate.begins_with(">>") else ">"
+			var target: String = candidate.substr(combinator.length()).strip_edges()
+			if _brace_depth == 1:
+				_errors.append(["Combinator '%s' needs an enclosing selector to be relative to" % combinator, line])
+			elif target.is_empty():
+				_errors.append(["Combinator '%s' names no node type" % combinator, line])
+			elif not _known_selectors.has(target):
+				_errors.append(["Unknown selector '%s'" % target, line])
 			else:
-				if value_str.begins_with("$"):
-					var var_name: String = value_str.substr(1)
-					if _is_undefined_var(var_name, declared_vars):
-						errors.append(["Undefined variable '$%s'" % var_name, i])
-				elif not _is_quoted_literal(value_str) and value_str.contains("("):
-					var method_name: String = _method_name_of(value_str)
-					if method_name == "calc":
-						_check_calc_value(value_str, declared_vars, errors, i)
-					else:
-						_check_method_call(value_str, method_name, null, known_methods, errors, i)
+				matched_type = target
+			is_combinator = true
+			selector = combinator + target
+			continue
+		if _brace_depth == 1 and not _known_selectors.has(candidate):
+			_errors.append(["Unknown selector '%s'" % candidate, line])
+		selector = candidate
+	if selector.is_empty():
+		_frames.append(Frame.new(enclosing.selector, enclosing.type, enclosing.in_event))
+	elif is_combinator:
+		_frames.append(Frame.new(selector, matched_type if not matched_type.is_empty() else enclosing.type, selector.ends_with("()")))
+	elif _brace_depth == 1 and _known_selectors.has(selector):
+		_frames.append(Frame.new(selector, selector, selector.ends_with("()")))
+	else:
+		_frames.append(Frame.new(selector, enclosing.type, selector.ends_with("()")))
+	for raw_state: String in (":" + state_part).split(",", false):
+		var state_name: String = raw_state.strip_edges().trim_prefix(":").strip_edges()
+		if not state_name.is_empty() and not state_name.begins_with(":") and not _known_states.has(state_name):
+			_errors.append(["Unknown state ':%s'" % state_name, line])
+
+
+func _check_property(stripped: String, line: int) -> void:
+	var colon: int = stripped.find(":")
+	var prop_name: String = stripped.substr(0, colon).strip_edges()
+	var value: String = stripped.substr(colon + 1).strip_edges()
+	if prop_name.is_empty():
+		_errors.append(["Empty property name", line])
+		return
+	if value.is_empty():
+		_errors.append(["Property '%s' has no value" % prop_name, line])
+		return
+	var frame: Frame = _frame()
+	var node_type: GdssNodeType = _known_selectors.get(frame.type) if not frame.type.is_empty() else null
+	if node_type == null:
+		_check_untyped_value(value, line)
+		return
+	var resolved_name: String = GdssParser.resolve_deprecated(prop_name, line)
+	var matched: GdssProp = null
+	for prop: GdssProp in node_type.get_enabled_props():
+		if prop.name == resolved_name or prop.composite_of.has(resolved_name) or prop.category_subproperties.has(resolved_name):
+			matched = prop
+			break
+	if matched == null and frame.in_event and resolved_name.begins_with("transition_"):
+		matched = GDSS.get_registry().property_list.get(resolved_name)
+	if matched == null:
+		_errors.append(["Unknown property '%s' for selector '%s'" % [prop_name, frame.selector], line])
+		return
+	_check_prop_value(value, matched, resolved_name, _known_methods, _declared_vars, _errors, line)
+
+
+func _check_untyped_value(value: String, line: int) -> void:
+	if value.begins_with("$"):
+		var var_name: String = value.substr(1)
+		if _is_undefined_var(var_name, _declared_vars):
+			_errors.append(["Undefined variable '$%s'" % var_name, line])
+	elif not _is_quoted_literal(value) and value.contains("("):
+		var method_name: String = _method_name_of(value)
+		if method_name == "calc":
+			_check_calc_value(value, _declared_vars, _errors, line)
 		else:
-			var stray_ctx: String = selector_stack.back() if not selector_stack.is_empty() else ""
-			if stray_ctx.is_empty():
-				errors.append(["Stray token '%s': expected a property or block" % stripped, i])
-			else:
-				errors.append(["Stray token '%s' in '%s': expected a property or block" % [stripped, stray_ctx], i])
-	
-	for line: int in brace_open_lines:
-		errors.append(["Unclosed brace '{'", line])
-	
-	_check_annotation_blocks(pre.get("blocks"), declared_globals, declared_instances, errors)
+			_check_method_call(value, method_name, null, _known_methods, _errors, line)
+
+
+func _check_imports(source: String) -> void:
 	for entry: Dictionary in GdssAnnotations.collect_imports(source):
 		var resolved: String = GdssAnnotations.resolve_import_path(entry.get("path"), GdssStorage.get_save_path().get_base_dir())
 		if not FileAccess.file_exists(resolved):
-			errors.append(["Imported file not found: '%s'" % entry.get("path"), entry.get("line")])
-	
-	return errors
+			_errors.append(["Imported file not found: '%s'" % entry.get("path"), entry.get("line")])
+
+
+func _frame() -> Frame:
+	return _frames.back() if not _frames.is_empty() else Frame.new("", "", false)
 
 
 func _method_name_of(call_text: String) -> String:

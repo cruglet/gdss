@@ -161,3 +161,5 @@ func run(t: TC) -> void:
 	t.check(not t.has_error_containing(equals_only, "mixes"), "a sheet using only '=' is accepted")
 	var colons_only: Array[Array] = t.validate_fixture("Button {\n\tbg_color: RED\n}")
 	t.check(not t.has_error_containing(colons_only, "mixes"), "a sheet using only ':' is accepted")
+	var instance_scheme: Array[Array] = t.validate_fixture("@instance var fresh_unsaved_ink: \"#000000\"\n@scheme light {\n\tfresh_unsaved_ink: \"#ffffff\"\n}\nButton {\n\tfont_color: $fresh_unsaved_ink\n}")
+	t.check(not t.has_error_containing(instance_scheme, "not an @global or @instance var"), "a scheme may override an @instance var declared in the unsaved source")

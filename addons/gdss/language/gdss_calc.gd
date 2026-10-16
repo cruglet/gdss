@@ -2,6 +2,30 @@
 class_name GdssCalc
 extends RefCounted
 
+const OP_KEY: String = "calc_op"
+const LEFT_KEY: String = "l"
+const RIGHT_KEY: String = "r"
+const NEGATE_KEY: String = "calc_neg"
+const NUMBER_KEY: String = "calc_num"
+const REF_KEY: String = "calc_ref"
+const _OPERATORS: String = "+-*/()"
+
+
+class Cursor extends RefCounted:
+	var tokens: Array[String]
+	var index: int = 0
+	
+	func _init(p_tokens: Array[String]) -> void:
+		tokens = p_tokens
+	
+	func peek() -> String:
+		return tokens.get(index) if index < tokens.size() else ""
+	
+	func advance() -> String:
+		var token: String = peek()
+		index += 1
+		return token
+
 
 static func parse(tokens: Array[String], pos: int) -> Array:
 	var depth: int = 0
@@ -14,93 +38,76 @@ static func parse(tokens: Array[String], pos: int) -> Array:
 			if depth == 0:
 				break
 		close += 1
-	var inner: Array[String] = tokens.slice(pos + 2, close)
-	var lexed: Array[String] = lex(" ".join(inner))
-	var state: Dictionary = {"toks": lexed, "i": 0}
-	var ast: Variant = _expr(state)
-	return [{"__gdss_calc__": ast}, close + 1]
+	var cursor: Cursor = Cursor.new(lex(" ".join(tokens.slice(pos + 2, close))))
+	return [{GdssValue.CALC_KEY: _expr(cursor)}, close + 1]
 
 
 static func lex(raw: String) -> Array[String]:
 	var out: Array[String] = []
-	var i: int = 0
 	var n: int = raw.length()
-	while i < n:
-		var ch: String = raw[i]
-		if ch == " " or ch == "\t":
-			i += 1
+	var start: int = -1
+	for i: int in n:
+		var c: String = raw.substr(i, 1)
+		var separator: bool = c == " " or c == "\t"
+		var operator: bool = _OPERATORS.contains(c)
+		if not separator and not operator:
+			if start == -1:
+				start = i
 			continue
-		if ch == "+" or ch == "-" or ch == "*" or ch == "/" or ch == "(" or ch == ")":
-			out.append(ch)
-			i += 1
-			continue
-		var start: int = i
-		while i < n:
-			var c: String = raw[i]
-			if c == " " or c == "\t" or c == "+" or c == "-" or c == "*" or c == "/" or c == "(" or c == ")":
-				break
-			i += 1
-		out.append(raw.substr(start, i - start))
+		if start != -1:
+			out.append(raw.substr(start, i - start))
+			start = -1
+		if operator:
+			out.append(c)
+	if start != -1:
+		out.append(raw.substr(start))
 	return out
 
 
-static func _peek(state: Dictionary) -> String:
-	return state.get("toks").get(state.get("i")) if state.get("i") < (state.get("toks") as Array).size() else ""
-
-
-static func _advance(state: Dictionary) -> String:
-	var t: String = _peek(state)
-	state.set("i", state.get("i") + 1)
-	return t
-
-
-static func _expr(state: Dictionary) -> Variant:
-	var node: Variant = _term(state)
-	while _peek(state) == "+" or _peek(state) == "-":
-		var op: String = _advance(state)
-		node = {"calc_op": op, "l": node, "r": _term(state)}
+static func _expr(cursor: Cursor) -> Variant:
+	var node: Variant = _term(cursor)
+	while cursor.peek() == "+" or cursor.peek() == "-":
+		var op: String = cursor.advance()
+		node = {OP_KEY: op, LEFT_KEY: node, RIGHT_KEY: _term(cursor)}
 	return node
 
 
-static func _term(state: Dictionary) -> Variant:
-	var node: Variant = _factor(state)
-	while _peek(state) == "*" or _peek(state) == "/":
-		var op: String = _advance(state)
-		node = {"calc_op": op, "l": node, "r": _factor(state)}
+static func _term(cursor: Cursor) -> Variant:
+	var node: Variant = _factor(cursor)
+	while cursor.peek() == "*" or cursor.peek() == "/":
+		var op: String = cursor.advance()
+		node = {OP_KEY: op, LEFT_KEY: node, RIGHT_KEY: _factor(cursor)}
 	return node
 
 
-static func _factor(state: Dictionary) -> Variant:
-	var t: String = _peek(state)
-	if t == "-":
-		_advance(state)
-		return {"calc_neg": _factor(state)}
-	if t == "(":
-		_advance(state)
-		var node: Variant = _expr(state)
-		if _peek(state) == ")":
-			_advance(state)
+static func _factor(cursor: Cursor) -> Variant:
+	var token: String = cursor.advance()
+	if token == "-":
+		return {NEGATE_KEY: _factor(cursor)}
+	if token == "(":
+		var node: Variant = _expr(cursor)
+		if cursor.peek() == ")":
+			cursor.advance()
 		return node
-	_advance(state)
-	if t.is_valid_float() or t.is_valid_int():
-		return {"calc_num": float(t)}
-	return {"calc_ref": t}
+	if token.is_valid_float() or token.is_valid_int():
+		return {NUMBER_KEY: float(token)}
+	return {REF_KEY: token}
 
 
 static func evaluate(node: Variant, resolve_ref: Callable) -> float:
 	if not node is Dictionary:
 		return 0.0
 	var d: Dictionary = node as Dictionary
-	if d.has("calc_num"):
-		return float(d.get("calc_num"))
-	if d.has("calc_ref"):
-		return resolve_ref.call(d.get("calc_ref"))
-	if d.has("calc_neg"):
-		return -evaluate(d.get("calc_neg"), resolve_ref)
-	if d.has("calc_op"):
-		var l: float = evaluate(d.get("l"), resolve_ref)
-		var r: float = evaluate(d.get("r"), resolve_ref)
-		match d.get("calc_op"):
+	if d.has(NUMBER_KEY):
+		return float(d.get(NUMBER_KEY))
+	if d.has(REF_KEY):
+		return resolve_ref.call(d.get(REF_KEY))
+	if d.has(NEGATE_KEY):
+		return -evaluate(d.get(NEGATE_KEY), resolve_ref)
+	if d.has(OP_KEY):
+		var l: float = evaluate(d.get(LEFT_KEY), resolve_ref)
+		var r: float = evaluate(d.get(RIGHT_KEY), resolve_ref)
+		match d.get(OP_KEY):
 			"+": return l + r
 			"-": return l - r
 			"*": return l * r
@@ -112,11 +119,11 @@ static func has_dynamic_ref(node: Variant) -> bool:
 	if not node is Dictionary:
 		return false
 	var d: Dictionary = node as Dictionary
-	if d.has("calc_ref"):
-		var r: String = d.get("calc_ref")
-		return r.begins_with("__gdss_global__") or r.begins_with("__gdss_instance__") or r.begins_with("$")
-	if d.has("calc_neg"):
-		return has_dynamic_ref(d.get("calc_neg"))
-	if d.has("calc_op"):
-		return has_dynamic_ref(d.get("l")) or has_dynamic_ref(d.get("r"))
+	if d.has(REF_KEY):
+		var r: String = d.get(REF_KEY)
+		return r.begins_with(GdssValue.GLOBAL_REF) or r.begins_with(GdssValue.INSTANCE_REF) or r.begins_with("$")
+	if d.has(NEGATE_KEY):
+		return has_dynamic_ref(d.get(NEGATE_KEY))
+	if d.has(OP_KEY):
+		return has_dynamic_ref(d.get(LEFT_KEY)) or has_dynamic_ref(d.get(RIGHT_KEY))
 	return false

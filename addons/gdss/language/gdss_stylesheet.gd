@@ -23,10 +23,6 @@ var _last_modified: int = 0
 var _saving: bool = false
 static var _inst: GdssStylesheet
 
-const SCHEME_PARENT_KEY: String = "__gdss_extends__"
-const DESCENDANTS_KEY: String = "_descendants"
-const ANCESTOR_STATE_PREFIX: String = "@"
-const VARS_KEY: String = "_vars"
 static var has_descendant_rules: bool = false
 
 
@@ -43,10 +39,10 @@ static func _entries_use_combinators(entries: Dictionary) -> bool:
 		var entry: Variant = entries.get(key)
 		if not entry is Dictionary:
 			continue
-		var container: Variant = (entry as Dictionary).get(DESCENDANTS_KEY)
+		var container: Variant = (entry as Dictionary).get(GdssValue.DESCENDANTS_KEY)
 		if container is Dictionary and not (container as Dictionary).is_empty():
 			return true
-		for nested_key: String in ["_classes", "_variations"]:
+		for nested_key: String in [GdssValue.CLASSES_KEY, GdssValue.VARIATIONS_KEY]:
 			var nested: Variant = (entry as Dictionary).get(nested_key)
 			if nested is Dictionary and _entries_use_combinators(nested as Dictionary):
 				return true
@@ -57,7 +53,7 @@ static func get_class_names(node_type: String) -> PackedStringArray:
 	var names: PackedStringArray = []
 	if not parsed.has(node_type):
 		return names
-	_collect_class_names(parsed.get(node_type).get("_classes", {}), names)
+	_collect_class_names(parsed.get(node_type).get(GdssValue.CLASSES_KEY, {}), names)
 	names.sort()
 	return names
 
@@ -68,7 +64,7 @@ static func _collect_class_names(classes: Dictionary, names: PackedStringArray) 
 			names.append(class_key)
 		var entry: Variant = classes.get(class_key)
 		if entry is Dictionary:
-			_collect_class_names((entry as Dictionary).get("_classes", {}), names)
+			_collect_class_names((entry as Dictionary).get(GdssValue.CLASSES_KEY, {}), names)
 
 
 func _ready() -> void:
@@ -218,7 +214,7 @@ static func resolve_scheme(name: String) -> Dictionary:
 	for scheme_name: String in _scheme_chain(name):
 		var deltas: Dictionary = schemes.get(scheme_name, {})
 		for key: String in deltas:
-			if key != SCHEME_PARENT_KEY:
+			if key != GdssValue.SCHEME_PARENT_KEY:
 				result.set(key, deltas.get(key))
 	return result
 
@@ -228,7 +224,7 @@ static func _scheme_chain(name: String) -> PackedStringArray:
 	var current: String = name
 	while not current.is_empty() and schemes.has(current) and not chain.has(current):
 		chain.append(current)
-		current = str((schemes.get(current, {}) as Dictionary).get(SCHEME_PARENT_KEY, ""))
+		current = str((schemes.get(current, {}) as Dictionary).get(GdssValue.SCHEME_PARENT_KEY, ""))
 	chain.reverse()
 	return chain
 
@@ -237,6 +233,6 @@ static func scheme_keys() -> PackedStringArray:
 	var keys: Dictionary = {}
 	for scheme_name: String in schemes:
 		for key: String in (schemes.get(scheme_name) as Dictionary):
-			if key != SCHEME_PARENT_KEY:
+			if key != GdssValue.SCHEME_PARENT_KEY:
 				keys.set(key, true)
 	return PackedStringArray(keys.keys())

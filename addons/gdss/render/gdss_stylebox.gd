@@ -207,10 +207,10 @@ func _classify_nonstyle(node_type: GdssNodeType, entry: Dictionary, state: Strin
 			if prop == null or prop.category == GdssProp.Category.STYLE:
 				continue
 			var raw: Variant = GdssCascade.raw_value(entry, state, prop_name)
-			if not _is_dynamic_raw(raw):
+			if not GdssValue.is_live(raw):
 				continue
 			dynamic.append(prop)
-			if _shared != null and _is_shareable_live(raw):
+			if _shared != null and GdssValue.is_shareable_live(raw):
 				_shared.mark_global_only(state, prop_name)
 	_nonstyle_dynamic = dynamic
 	if _shared != null:
@@ -516,170 +516,13 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 	pending_tween.set_ease(ease)
 	
 	var animatable: Dictionary = _get_animatable_props()
-	
 	for prop_name: String in _transition_candidates(resolved_from, to_state):
 		var prop: GdssProp = animatable.get(prop_name)
 		var prop_time: float = GDSS.scaled_duration(GdssTransition.time_in(time_raw, base_time_raw, prop_name))
 		if prop_time <= 0.0:
 			continue
-		var is_style: bool = prop.category == GdssProp.Category.STYLE
-		
-		var from_raw: Variant = _get_raw_parsed_val(prop_name, resolved_from)
-		var to_raw: Variant = _get_raw_parsed_val(prop_name, to_state)
-		
-		if from_raw is Dictionary and (from_raw as Dictionary).has("__gdss_method__") and \
-		   to_raw is Dictionary and (to_raw as Dictionary).has("__gdss_method__") and \
-		   (from_raw as Dictionary).get("__gdss_method__") == (to_raw as Dictionary).get("__gdss_method__"):
-			var mn: String = (from_raw as Dictionary).get("__gdss_method__")
-			var method: GdssMethod = GDSS._get_gdss_methods().get(mn)
-			if method != null and not method.get_tweenable_args().is_empty():
-				var from_args: Array[Variant] = _tweened_args.get(prop_name, _resolve_method_args(from_raw as Dictionary))
-				var to_args: Array[Variant] = _resolve_method_args(to_raw as Dictionary)
-				var captured_prop: String = prop_name
-				var captured_method: GdssMethod = method
-				var node_id: int = ref.get_instance_id() if ref != null else -1
-				pending_tween.tween_method(func(t: float) -> void:
-					var interp_args: Array[Variant] = captured_method.interpolate_args(from_args, to_args, t)
-					_tweened_args.set(captured_prop, interp_args)
-					var result: Variant = captured_method.call_method(interp_args, node_id, "tween:" + captured_prop)
-					if result != null:
-						_tweened_values.set(captured_prop, result)
-					_safe_redraw()
-				, 0.0, 1.0, prop_time)
-				tweener_count += 1
-				continue
-		
-		match prop.type:
-			GDSS.Type.COLOR:
-				var fallback: Color = prop.get_default_value() if prop.get_default_value() is Color else Color.TRANSPARENT
-				var from_val: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
-				var to_val: Variant = _get_parsed_val(prop_name, to_state, fallback)
-				if from_val is Array or to_val is Array:
-					var sides_from: Array = GdssRenderer.side_colors(from_val, fallback)
-					var sides_to: Array = GdssRenderer.side_colors(to_val, fallback)
-					if sides_from == sides_to:
-						continue
-					var captured_sides: String = prop_name
-					_tweened_values.set(captured_sides, sides_from)
-					pending_tween.tween_method(func(t: float) -> void:
-						var lerped: Array = []
-						for side: int in 4:
-							lerped.append((sides_from.get(side) as Color).lerp(sides_to.get(side), t))
-						_tweened_values.set(captured_sides, lerped)
-						_safe_redraw()
-					, 0.0, 1.0, prop_time)
-					tweener_count += 1
-					continue
-				if not from_val is Color or not to_val is Color:
-					continue
-				var from: Color = from_val as Color
-				var to: Color = to_val as Color
-				if from == to:
-					continue
-				var captured: String = prop_name
-				var captured_prop: GdssProp = prop
-				_tweened_values.set(captured, from)
-				pending_tween.tween_method(func(v: Color) -> void:
-					_tweened_values.set(captured, v)
-					if is_style:
-						_safe_redraw()
-					else:
-						_apply_single_override(captured_prop, v)
-				, from, to, prop_time)
-				tweener_count += 1
-			
-			GDSS.Type.COMPOSITE4:
-				var fallback: Vector4i = prop.get_default_value() if prop.get_default_value() is Vector4i else Vector4i.ZERO
-				var composite_from_raw: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
-				var from: Vector4 = Vector4(composite_from_raw) if composite_from_raw is Vector4 else Vector4(composite_from_raw as Vector4i)
-				var composite_to_raw: Variant = _get_parsed_val(prop_name, to_state, fallback)
-				var to: Vector4 = Vector4(composite_to_raw) if composite_to_raw is Vector4 else Vector4(composite_to_raw as Vector4i)
-				if from == to:
-					continue
-				var captured: String = prop_name
-				var captured_prop: GdssProp = prop
-				_tweened_values.set(captured, from)
-				pending_tween.tween_method(func(v: Vector4) -> void:
-					_tweened_values.set(captured, v)
-					if captured == "padding":
-						_apply_padding(v)
-					if is_style:
-						_safe_redraw()
-					else:
-						_apply_single_override(captured_prop, v)
-				, from, to, prop_time)
-				tweener_count += 1
-			
-			GDSS.Type.VECTOR2:
-				var fallback: Vector2 = prop.get_default_value() if prop.get_default_value() is Vector2 else Vector2.ZERO
-				var from_val: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
-				var to_val: Variant = _get_parsed_val(prop_name, to_state, fallback)
-				if from_val is int or from_val is float:
-					from_val = Vector2(float(from_val), float(from_val))
-				if to_val is int or to_val is float:
-					to_val = Vector2(float(to_val), float(to_val))
-				if not from_val is Vector2 or not to_val is Vector2:
-					continue
-				var from: Vector2 = from_val as Vector2
-				var to: Vector2 = to_val as Vector2
-				if from == to:
-					continue
-				var captured: String = prop_name
-				var captured_prop: GdssProp = prop
-				_tweened_values.set(captured, from)
-				pending_tween.tween_method(func(v: Vector2) -> void:
-					_tweened_values.set(captured, v)
-					if is_style:
-						_safe_redraw()
-					else:
-						_apply_single_override(captured_prop, v)
-				, from, to, prop_time)
-				tweener_count += 1
-			
-			GDSS.Type.FLOAT:
-				var fallback: float = float(prop.get_default_value())
-				var float_from: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
-				var float_to: Variant = _get_parsed_val(prop_name, to_state, fallback)
-				if not (float_from is int or float_from is float) or not (float_to is int or float_to is float):
-					continue
-				var from: float = float(float_from)
-				var to: float = float(float_to)
-				if from == to:
-					continue
-				var captured: String = prop_name
-				var captured_prop: GdssProp = prop
-				_tweened_values.set(captured, from)
-				pending_tween.tween_method(func(v: float) -> void:
-					_tweened_values.set(captured, v)
-					if is_style:
-						_safe_redraw()
-					else:
-						_apply_single_override(captured_prop, v)
-				, from, to, prop_time)
-				tweener_count += 1
-			
-			GDSS.Type.INT:
-				var fallback: int = int(prop.get_default_value())
-				var int_from: Variant = _tweened_values.get(prop_name, _get_parsed_val(prop_name, resolved_from, fallback))
-				var int_to: Variant = _get_parsed_val(prop_name, to_state, fallback)
-				if not (int_from is int or int_from is float) or not (int_to is int or int_to is float):
-					continue
-				var from: int = int(int_from)
-				var to: int = int(int_to)
-				if from == to:
-					continue
-				var captured: String = prop_name
-				var captured_prop: GdssProp = prop
-				_tweened_values.set(captured, from)
-				pending_tween.tween_method(func(v: float) -> void:
-					_tweened_values.set(captured, int(v))
-					if is_style:
-						_safe_redraw()
-					else:
-						_apply_single_override(captured_prop, int(v))
-				, float(from), float(to), prop_time)
-				tweener_count += 1
-	
+		if _tween_method_args(pending_tween, prop, resolved_from, to_state, prop_time) or _tween_value(pending_tween, prop, resolved_from, to_state, prop_time):
+			tweener_count += 1
 	
 	if tweener_count == 0:
 		pending_tween.kill()
@@ -702,6 +545,67 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 		if on_finished.is_valid():
 			on_finished.call()
 	)
+
+
+func _tween_method_args(tween: Tween, prop: GdssProp, from_state: String, to_state: String, duration: float) -> bool:
+	var from_raw: Variant = _get_raw_parsed_val(prop.name, from_state)
+	var to_raw: Variant = _get_raw_parsed_val(prop.name, to_state)
+	if not (from_raw is Dictionary and to_raw is Dictionary):
+		return false
+	var method_name: Variant = (from_raw as Dictionary).get(GdssValue.METHOD_KEY)
+	if method_name == null or method_name != (to_raw as Dictionary).get(GdssValue.METHOD_KEY):
+		return false
+	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
+	if method == null or method.get_tweenable_args().is_empty():
+		return false
+	var from_args: Array[Variant] = _tweened_args.get(prop.name, _resolve_method_args(from_raw as Dictionary))
+	var to_args: Array[Variant] = _resolve_method_args(to_raw as Dictionary)
+	tween.tween_method(_step_method_tween.bind(prop.name, method, from_args, to_args), 0.0, 1.0, duration)
+	return true
+
+
+func _step_method_tween(t: float, prop_name: String, method: GdssMethod, from_args: Array[Variant], to_args: Array[Variant]) -> void:
+	var args: Array[Variant] = method.interpolate_args(from_args, to_args, t)
+	_tweened_args.set(prop_name, args)
+	var result: Variant = method.call_method(args, ref.get_instance_id() if ref != null else -1, "tween:" + prop_name)
+	if result != null:
+		_tweened_values.set(prop_name, result)
+	_safe_redraw()
+
+
+func _tween_value(tween: Tween, prop: GdssProp, from_state: String, to_state: String, duration: float) -> bool:
+	var fallback: Variant = GdssTransition.tween_fallback(prop)
+	var from_value: Variant = _tweened_values.get(prop.name, _get_parsed_val(prop.name, from_state, fallback))
+	var pair: Array = GdssTransition.tween_pair(prop.type, from_value, _get_parsed_val(prop.name, to_state, fallback), fallback)
+	if pair.is_empty():
+		return false
+	var from: Variant = pair.front()
+	var to: Variant = pair.back()
+	_tweened_values.set(prop.name, from)
+	if from is Array:
+		tween.tween_method(_step_sides_tween.bind(prop.name, from, to), 0.0, 1.0, duration)
+	elif from is int:
+		tween.tween_method(_step_value_tween.bind(prop, true), float(from), float(to), duration)
+	else:
+		tween.tween_method(_step_value_tween.bind(prop, false), from, to, duration)
+	return true
+
+
+func _step_value_tween(value: Variant, prop: GdssProp, as_int: bool) -> void:
+	if as_int:
+		value = int(round(value))
+	_tweened_values.set(prop.name, value)
+	if prop.name == "padding":
+		_apply_padding(value)
+	if prop.category == GdssProp.Category.STYLE:
+		_safe_redraw()
+	else:
+		_apply_single_override(prop, value)
+
+
+func _step_sides_tween(t: float, prop_name: String, from: Array, to: Array) -> void:
+	_tweened_values.set(prop_name, GdssTransition.lerp_value(from, to, t))
+	_safe_redraw()
 
 
 func _resting_state(node_type: GdssNodeType, node: Node) -> String:
@@ -831,7 +735,7 @@ func _request_visible(want_visible: bool) -> void:
 
 
 func _absorb_vars(source: Dictionary) -> void:
-	var declared: Variant = source.get(GdssStylesheet.VARS_KEY)
+	var declared: Variant = source.get(GdssValue.VARS_KEY)
 	if not declared is Dictionary:
 		return
 	for key: String in declared as Dictionary:
@@ -890,7 +794,7 @@ func _cache_entry(entry: Dictionary, classes: PackedStringArray, variation: Stri
 func _merge_entry(selector: String, current_classes: PackedStringArray, variation: String, override_entry: Dictionary, descendant_layers: Array[Dictionary]) -> Dictionary:
 	var parsed: Dictionary[String, Dictionary] = GdssStylesheet.parsed
 	var entry: Dictionary = parsed.get(selector, {})
-	var variations: Dictionary = entry.get("_variations", {}) if not entry.is_empty() else {}
+	var variations: Dictionary = entry.get(GdssValue.VARIATIONS_KEY, {}) if not entry.is_empty() else {}
 	var has_variation: bool = not variation.is_empty() and variations.has(variation)
 	_scoped_vars = {}
 	for layer: Dictionary in descendant_layers:
@@ -900,7 +804,7 @@ func _merge_entry(selector: String, current_classes: PackedStringArray, variatio
 				_scoped_vars.set(key, (inherited as Dictionary).get(key))
 	_absorb_vars(entry)
 	for gdss_class_name: String in current_classes:
-		for step: Dictionary in GdssCascade.find_class_path((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name):
+		for step: Dictionary in GdssCascade.find_class_path((parsed.get(selector, {}) as Dictionary).get(GdssValue.CLASSES_KEY, {}), gdss_class_name):
 			_absorb_vars(step)
 	if current_classes.is_empty() and not has_variation and override_entry.is_empty() and descendant_layers.is_empty():
 		return entry
@@ -911,11 +815,11 @@ func _merge_entry(selector: String, current_classes: PackedStringArray, variatio
 		if not body.is_empty():
 			entry = GdssCascade.merge_entries(entry, GdssCascade.resolve_override_patches(entry, body))
 	for gdss_class_name: String in current_classes:
-		var path: Array[Dictionary] = GdssCascade.find_class_path((parsed.get(selector, {}) as Dictionary).get("_classes", {}), gdss_class_name)
+		var path: Array[Dictionary] = GdssCascade.find_class_path((parsed.get(selector, {}) as Dictionary).get(GdssValue.CLASSES_KEY, {}), gdss_class_name)
 		for step: Dictionary in path:
-			var step_rules: Variant = step.get(GdssStylesheet.DESCENDANTS_KEY)
+			var step_rules: Variant = step.get(GdssValue.DESCENDANTS_KEY)
 			if step_rules is Dictionary and not (step_rules as Dictionary).is_empty():
-				entry = GdssCascade.merge_entries(entry, {GdssStylesheet.DESCENDANTS_KEY: step_rules})
+				entry = GdssCascade.merge_entries(entry, {GdssValue.DESCENDANTS_KEY: step_rules})
 		var override: Dictionary = path.back() if not path.is_empty() else {}
 		if not override.is_empty():
 			entry = GdssCascade.merge_entries(entry, GdssCascade.resolve_override_patches(entry, override))
@@ -995,16 +899,16 @@ func _collect_descendant_layers() -> Array[Dictionary]:
 func _ancestor_descendants(node: Node) -> Dictionary:
 	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(node)
 	if stylebox != null and stylebox != self:
-		var resolved: Variant = stylebox._resolve_entry().get(GdssStylesheet.DESCENDANTS_KEY)
+		var resolved: Variant = stylebox._resolve_entry().get(GdssValue.DESCENDANTS_KEY)
 		return resolved if resolved is Dictionary else {}
 	var entry: Dictionary = GdssStylesheet.parsed.get(node.get_class(), {})
 	if entry.is_empty():
 		return {}
-	var container: Variant = entry.get(GdssStylesheet.DESCENDANTS_KEY)
+	var container: Variant = entry.get(GdssValue.DESCENDANTS_KEY)
 	var result: Dictionary = container as Dictionary if container is Dictionary else {}
 	for gdss_class_name: String in node.get_meta(GDSS.CLASSES_META, PackedStringArray()) as PackedStringArray:
-		var override: Dictionary = GdssCascade.find_class(entry.get("_classes", {}), gdss_class_name)
-		var nested: Variant = override.get(GdssStylesheet.DESCENDANTS_KEY)
+		var override: Dictionary = GdssCascade.find_class(entry.get(GdssValue.CLASSES_KEY, {}), gdss_class_name)
+		var nested: Variant = override.get(GdssValue.DESCENDANTS_KEY)
 		if nested is Dictionary and not (nested as Dictionary).is_empty():
 			result = GdssCascade.merge_descendants(result, nested as Dictionary)
 	return result
@@ -1022,7 +926,7 @@ func _ancestor_state_overlay(rule: Dictionary, node: Node) -> Dictionary:
 	var state: String = _ancestor_state(node)
 	if state.is_empty():
 		return {}
-	var props: Variant = rule.get(GdssStylesheet.ANCESTOR_STATE_PREFIX + state)
+	var props: Variant = rule.get(GdssValue.ANCESTOR_STATE_PREFIX + state)
 	if not props is Dictionary or (props as Dictionary).is_empty():
 		return {}
 	return {"all": (props as Dictionary).duplicate()}
@@ -1033,7 +937,7 @@ func _has_ancestor_state_rules() -> bool:
 		return _ancestor_states
 	_ancestor_states = false
 	_ancestor_states_dirty = false
-	var container: Variant = _resolve_entry().get(GdssStylesheet.DESCENDANTS_KEY)
+	var container: Variant = _resolve_entry().get(GdssValue.DESCENDANTS_KEY)
 	if not container is Dictionary:
 		return false
 	for key: String in container as Dictionary:
@@ -1041,7 +945,7 @@ func _has_ancestor_state_rules() -> bool:
 		if not rule is Dictionary:
 			continue
 		for state_key: String in rule as Dictionary:
-			if state_key.begins_with(GdssStylesheet.ANCESTOR_STATE_PREFIX):
+			if state_key.begins_with(GdssValue.ANCESTOR_STATE_PREFIX):
 				_ancestor_states = true
 				return true
 	return false
@@ -1097,11 +1001,11 @@ func _restyle_from_ancestor(outgoing: Dictionary) -> void:
 
 
 func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> Variant:
-	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4__"):
-		var parts: Array = (raw as Dictionary).get("__gdss_composite4__")
+	if raw is Dictionary and (raw as Dictionary).has(GdssValue.COMPOSITE4_KEY):
+		var parts: Array = (raw as Dictionary).get(GdssValue.COMPOSITE4_KEY)
 		return Vector4i(_resolve_composite_part(parts.get(0)), _resolve_composite_part(parts.get(1)), _resolve_composite_part(parts.get(2)), _resolve_composite_part(parts.get(3)))
-	if raw is Dictionary and (raw as Dictionary).has("__gdss_composite2__"):
-		var parts2: Array = (raw as Dictionary).get("__gdss_composite2__")
+	if raw is Dictionary and (raw as Dictionary).has(GdssValue.COMPOSITE2_KEY):
+		var parts2: Array = (raw as Dictionary).get(GdssValue.COMPOSITE2_KEY)
 		return Vector2(_resolve_composite_part_f(parts2.front()), _resolve_composite_part_f(parts2.back()))
 	if raw is Dictionary and (raw as Dictionary).has(GdssValue.COLOR4_KEY):
 		var sides: Array = (raw as Dictionary).get(GdssValue.COLOR4_KEY)
@@ -1109,12 +1013,12 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 		for side: Variant in sides:
 			resolved_sides.append(_resolve_value(side, fallback, state_key))
 		return resolved_sides
-	if raw is Dictionary and (raw as Dictionary).has("__gdss_calc__"):
-		return GdssCalc.evaluate((raw as Dictionary).get("__gdss_calc__"), _calc_ref_value)
+	if raw is Dictionary and (raw as Dictionary).has(GdssValue.CALC_KEY):
+		return GdssCalc.evaluate((raw as Dictionary).get(GdssValue.CALC_KEY), _calc_ref_value)
 	raw = _resolve_sentinel(raw, fallback)
 	if raw is Dictionary:
 		var d: Dictionary = raw as Dictionary
-		if d.has("__gdss_method__"):
+		if d.has(GdssValue.METHOD_KEY):
 			return _call_method(d, fallback, state_key)
 	if raw is String:
 		var s: String = raw as String
@@ -1122,7 +1026,7 @@ func _resolve_value(raw: Variant, fallback: Variant, state_key: String = "") -> 
 			if Color.html_is_valid(s):
 				return Color.html(s)
 			return raw
-		if not s.begins_with("__gdss_"):
+		if not s.begins_with(GdssValue.REF_PREFIX):
 			var named: Color = GdssColors.named(s, GdssColors.MISSING)
 			if named != GdssColors.MISSING:
 				return named
@@ -1148,28 +1052,15 @@ func _apply_padding(padding: Vector4) -> void:
 	set_content_margin(SIDE_BOTTOM, padding.w)
 
 
-func _splat_shorthand(key: String, value: Variant) -> Variant:
-	if not (value is int or value is float):
-		return value
-	var prop: GdssProp = GDSS.get_registry().property_list.get(key)
-	if prop == null:
-		return value
-	if prop.type == GDSS.Type.COMPOSITE4:
-		return Vector4i(int(value), int(value), int(value), int(value))
-	if prop.type == GDSS.Type.VECTOR2:
-		return Vector2(float(value), float(value))
-	return value
-
-
 func _calc_ref_value(token: String) -> float:
 	var t: String = token
 	if t.begins_with("$"):
-		t = "__gdss_global__" + t.substr(1)
+		t = GdssValue.GLOBAL_REF + t.substr(1)
 	var resolved: Variant = _resolve_sentinel(t, null)
 	if resolved == null and token.begins_with("$"):
-		resolved = _resolve_sentinel("__gdss_instance__" + token.substr(1), null)
+		resolved = _resolve_sentinel(GdssValue.INSTANCE_REF + token.substr(1), null)
 		if resolved == null:
-			resolved = _resolve_sentinel("__gdss_local__" + token.substr(1), null)
+			resolved = _resolve_sentinel(GdssValue.LOCAL_REF + token.substr(1), null)
 	if resolved is int or resolved is float:
 		return float(resolved)
 	if resolved is String and (resolved as String).is_valid_float():
@@ -1200,7 +1091,7 @@ func _resolve_composite_part_f(part: String) -> float:
 
 
 func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Array[Variant]:
-	var method_name: String = descriptor.get("__gdss_method__")
+	var method_name: String = descriptor.get(GdssValue.METHOD_KEY)
 	var raw_args: Array = descriptor.get("args", [])
 	var has_live_ref: bool = false
 	for raw: Variant in raw_args:
@@ -1208,10 +1099,10 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 			has_live_ref = true
 			break
 		var s: String = (raw as String).strip_edges()
-		if s.begins_with("$") or s.begins_with("__gdss_global__") or s.begins_with("__gdss_instance__"):
+		if s.begins_with("$") or s.begins_with(GdssValue.GLOBAL_REF) or s.begins_with(GdssValue.INSTANCE_REF):
 			has_live_ref = true
 			break
-		if s.begins_with("__gdss_local__") and _scoped_vars.has(s.substr("__gdss_local__".length())):
+		if s.begins_with(GdssValue.LOCAL_REF) and _scoped_vars.has(s.substr(GdssValue.LOCAL_REF.length())):
 			has_live_ref = true
 			break
 	var cache_key: String = ""
@@ -1229,16 +1120,16 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 		var stripped: String = (raw_args.get(arg_index) as String).strip_edges()
 		if stripped == "pass":
 			resolved.append(method.parameters.get(arg_index).default_value if method != null and arg_index < method.parameters.size() else null)
-		elif stripped.begins_with("__gdss_global__"):
-			var key: String = stripped.substr("__gdss_global__".length())
+		elif stripped.begins_with(GdssValue.GLOBAL_REF):
+			var key: String = stripped.substr(GdssValue.GLOBAL_REF.length())
 			resolved.append(GdssStylesheet.globals.get(key, null))
-		elif stripped.begins_with("__gdss_instance__"):
-			var key: String = stripped.substr("__gdss_instance__".length())
+		elif stripped.begins_with(GdssValue.INSTANCE_REF):
+			var key: String = stripped.substr(GdssValue.INSTANCE_REF.length())
 			if ref != null and GdssStylesheet._instance_vars.has(ref.get_instance_id()):
 				resolved.append(GdssStylesheet._instance_vars.get(ref.get_instance_id()).get(key, null))
 			else:
 				resolved.append(GdssStylesheet._instance_defaults.get(key, null))
-		elif stripped.begins_with("__gdss_local__"):
+		elif stripped.begins_with(GdssValue.LOCAL_REF):
 			resolved.append(_resolve_sentinel(stripped, null))
 		elif stripped.begins_with("$"):
 			var key: String = stripped.substr(1)
@@ -1262,7 +1153,7 @@ func _resolve_method_args(descriptor: Dictionary, state_key: String = "") -> Arr
 
 
 func _call_method(descriptor: Dictionary, fallback: Variant, state_key: String = "") -> Variant:
-	var name: String = descriptor.get("__gdss_method__")
+	var name: String = descriptor.get(GdssValue.METHOD_KEY)
 	var method: GdssMethod = GDSS._get_gdss_methods().get(name)
 	if method == null:
 		return fallback
@@ -1285,7 +1176,7 @@ func _get_parsed_val(key: String, state: String, fallback: Variant) -> Variant:
 		raw = entry.get("all").get(key)
 	else:
 		return fallback
-	return _splat_shorthand(key, _resolve_value(raw, fallback, state))
+	return GdssValue.splat_shorthand(key, _resolve_value(raw, fallback, state))
 
 
 func _get_state() -> String:
@@ -1305,17 +1196,17 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 	if not raw is String:
 		return raw
 	var s: String = raw as String
-	if not s.begins_with("__gdss_"):
+	if not s.begins_with(GdssValue.REF_PREFIX):
 		return raw
-	if s.begins_with("__gdss_global__"):
-		var name: String = s.substr("__gdss_global__".length())
+	if s.begins_with(GdssValue.GLOBAL_REF):
+		var name: String = s.substr(GdssValue.GLOBAL_REF.length())
 		if GdssStylesheet.globals.has(name):
 			return GdssStylesheet.globals.get(name)
 		if GdssStylesheet._global_defaults.has(name):
 			return GdssStylesheet._global_defaults.get(name)
 		return fallback
-	if s.begins_with("__gdss_instance__"):
-		var name: String = s.substr("__gdss_instance__".length())
+	if s.begins_with(GdssValue.INSTANCE_REF):
+		var name: String = s.substr(GdssValue.INSTANCE_REF.length())
 		if ref != null:
 			var id: int = ref.get_instance_id()
 			if GdssStylesheet._instance_vars.has(id) and GdssStylesheet._instance_vars.get(id).has(name):
@@ -1323,15 +1214,15 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 		if GdssStylesheet._instance_defaults.has(name):
 			return GdssStylesheet._instance_defaults.get(name)
 		return fallback
-	if s.begins_with("__gdss_local__"):
-		var name: String = s.substr("__gdss_local__".length())
+	if s.begins_with(GdssValue.LOCAL_REF):
+		var name: String = s.substr(GdssValue.LOCAL_REF.length())
 		if _scoped_vars.has(name):
 			return _resolve_sentinel(_scoped_vars.get(name), fallback)
 		if GdssStylesheet._local_vars.has(name):
 			return GdssStylesheet._local_vars.get(name)
 		return fallback
-	if s.begins_with("__gdss_local_method__"):
-		var name: String = s.substr("__gdss_local_method__".length())
+	if s.begins_with(GdssValue.LOCAL_METHOD_REF):
+		var name: String = s.substr(GdssValue.LOCAL_METHOD_REF.length())
 		if GdssStylesheet._local_vars.has(name):
 			return GdssStylesheet._local_vars.get(name)
 		return fallback
@@ -1361,7 +1252,7 @@ func _get_val_cached(key: String, entry: Dictionary, state: String, fallback: Va
 			raw = (ad as Dictionary).get(key)
 		if raw == null:
 			return fallback
-	return _splat_shorthand(key, _resolve_value(raw, fallback, state))
+	return GdssValue.splat_shorthand(key, _resolve_value(raw, fallback, state))
 
 
 func _get_raw_parsed_val(key: String, state: String) -> Variant:
@@ -1376,8 +1267,8 @@ func _get_raw_parsed_val(key: String, state: String) -> Variant:
 	else:
 		return null
 	raw = _resolve_sentinel(raw, null)
-	if raw is String and (raw as String).begins_with("__gdss_local_method__"):
-		var local_key: String = (raw as String).substr("__gdss_local_method__".length())
+	if raw is String and (raw as String).begins_with(GdssValue.LOCAL_METHOD_REF):
+		var local_key: String = (raw as String).substr(GdssValue.LOCAL_METHOD_REF.length())
 		return GdssStylesheet._local_vars.get(local_key, null)
 	return raw
 
@@ -1393,7 +1284,7 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 			for prop: GdssProp in node_type.get_style_props():
 				var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 				_style_vals_tween.set(prop.name, fv if fv != null else prop.get_default_value())
-				if _is_dynamic_raw(GdssCascade.raw_value(entry, state, prop.name)):
+				if GdssValue.is_live(GdssCascade.raw_value(entry, state, prop.name)):
 					_style_dynamic_tween.append(prop)
 			return _style_vals_tween
 		for prop: GdssProp in _style_dynamic_tween:
@@ -1412,7 +1303,7 @@ func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 			for prop: GdssProp in node_type.get_style_props():
 				var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 				_style_vals_cache.set(prop.name, rv if rv != null else prop.get_default_value())
-				if _is_dynamic_raw(GdssCascade.raw_value(entry, state, prop.name)):
+				if GdssValue.is_live(GdssCascade.raw_value(entry, state, prop.name)):
 					_style_dynamic.append(prop)
 			return _style_vals_cache
 		if not _shared.style_static.has(state):
@@ -1439,12 +1330,12 @@ func _share_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 	var per_node: Array[GdssProp] = []
 	for prop: GdssProp in node_type.get_style_props():
 		var raw: Variant = GdssCascade.raw_value(entry, state, prop.name)
-		if _is_dynamic_raw(raw):
+		if GdssValue.is_live(raw):
 			live.append(prop)
-			if _is_shareable_live(raw):
+			if GdssValue.is_shareable_live(raw):
 				_shared.mark_global_only(state, prop.name)
 			continue
-		if _is_node_specific(raw):
+		if GdssValue.is_node_specific(raw):
 			per_node.append(prop)
 			continue
 		var rv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
@@ -1463,76 +1354,6 @@ func _live_value(prop: GdssProp, entry: Dictionary, state: String) -> Variant:
 	var value: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
 	shared_values.set(prop.name, value)
 	return value
-
-
-static func _is_shareable_live(raw: Variant) -> bool:
-	return not _is_node_specific(raw) and not _may_read_instance(raw)
-
-
-static func _may_read_instance(raw: Variant) -> bool:
-	if raw is String:
-		var s: String = (raw as String).strip_edges()
-		return s.begins_with("__gdss_instance__") or s.begins_with("__gdss_local") or s.begins_with("$")
-	if raw is Array:
-		for item: Variant in raw as Array:
-			if _may_read_instance(item):
-				return true
-		return false
-	if not raw is Dictionary:
-		return false
-	var d: Dictionary = raw as Dictionary
-	if d.has("__gdss_calc__"):
-		return true
-	for key: Variant in d:
-		if _may_read_instance(d.get(key)):
-			return true
-	return false
-
-
-static func _is_node_specific(raw: Variant) -> bool:
-	if raw is String:
-		return (raw as String).begins_with("__gdss_local_method__")
-	if not raw is Dictionary:
-		return false
-	var d: Dictionary = raw as Dictionary
-	if d.has(GdssValue.COLOR4_KEY):
-		for side: Variant in d.get(GdssValue.COLOR4_KEY):
-			if _is_node_specific(side):
-				return true
-		return false
-	if not d.has("__gdss_method__"):
-		return false
-	var method: GdssMethod = GDSS._get_gdss_methods().get(d.get("__gdss_method__"))
-	return method == null or method.returns_texture
-
-
-func _is_dynamic_raw(raw: Variant) -> bool:
-	if raw is String:
-		var s: String = raw as String
-		return s.begins_with("__gdss_global__") or s.begins_with("__gdss_instance__")
-	if raw is Dictionary:
-		var d: Dictionary = raw as Dictionary
-		if d.has("__gdss_composite4__") or d.has("__gdss_composite2__"):
-			for part: Variant in d.get("__gdss_composite4__", d.get("__gdss_composite2__")):
-				if part is String and ((part as String).begins_with("__gdss_global__") or (part as String).begins_with("__gdss_instance__")):
-					return true
-			return false
-		if d.has(GdssValue.COLOR4_KEY):
-			for side: Variant in d.get(GdssValue.COLOR4_KEY):
-				if _is_dynamic_raw(side):
-					return true
-			return false
-		if d.has("__gdss_calc__"):
-			return GdssCalc.has_dynamic_ref(d.get("__gdss_calc__"))
-		if not d.has("__gdss_method__"):
-			return false
-		for arg: Variant in d.get("args", []):
-			if not arg is String:
-				continue
-			var a: String = (arg as String).strip_edges()
-			if a.begins_with("__gdss_global__") or a.begins_with("__gdss_instance__") or a.begins_with("$"):
-				return true
-	return false
 
 
 func _draw(to_canvas_item: RID, rect: Rect2) -> void:

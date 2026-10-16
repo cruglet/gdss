@@ -423,7 +423,7 @@ func _render_fps(button_class: String, backdrop: Texture2D) -> float:
 
 func _has_button_class(name: String) -> bool:
 	var btn: Dictionary = GdssStylesheet.parsed.get("Button", {})
-	var classes: Dictionary = btn.get("_classes", {})
+	var classes: Dictionary = btn.get(GdssValue.CLASSES_KEY, {})
 	return classes.has(name)
 
 
@@ -585,10 +585,10 @@ func _inject_bench_classes() -> void:
 	var btn: Dictionary = GdssStylesheet.parsed.get("Button", {})
 	if btn.is_empty():
 		return
-	var classes: Dictionary = btn.get("_classes", {})
-	classes.set("BenchGradient", {"all": {"bg_color": {"__gdss_method__": "linear_gradient", "args": ["RED", "BLUE", "90"]}}, "_classes": {}})
-	classes.set("BenchModulate", {"all": {}, "disabled": {"modulate": Color(1, 0.4, 0.4, 1), "opacity": 0.6}, "_classes": {}})
-	btn.set("_classes", classes)
+	var classes: Dictionary = btn.get(GdssValue.CLASSES_KEY, {})
+	classes.set("BenchGradient", {"all": {"bg_color": {GdssValue.METHOD_KEY: "linear_gradient", "args": ["RED", "BLUE", "90"]}}, GdssValue.CLASSES_KEY: {}})
+	classes.set("BenchModulate", {"all": {}, "disabled": {"modulate": Color(1, 0.4, 0.4, 1), "opacity": 0.6}, GdssValue.CLASSES_KEY: {}})
+	btn.set(GdssValue.CLASSES_KEY, classes)
 
 
 func _build_gdss(n: int, visible_grid: bool) -> Node:

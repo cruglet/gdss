@@ -7,7 +7,7 @@ static func find_class(classes: Dictionary, name: String) -> Dictionary:
 	if classes.has(name):
 		return classes.get(name)
 	for key: String in classes:
-		var nested: Dictionary = classes.get(key).get("_classes", {})
+		var nested: Dictionary = classes.get(key).get(GdssValue.CLASSES_KEY, {})
 		if nested.is_empty():
 			continue
 		var found: Dictionary = find_class(nested, name)
@@ -20,7 +20,7 @@ static func find_class_path(classes: Dictionary, name: String) -> Array[Dictiona
 	if classes.has(name):
 		return [classes.get(name)] as Array[Dictionary]
 	for key: String in classes:
-		var nested: Dictionary = classes.get(key).get("_classes", {})
+		var nested: Dictionary = classes.get(key).get(GdssValue.CLASSES_KEY, {})
 		if nested.is_empty():
 			continue
 		var found: Array[Dictionary] = find_class_path(nested, name)
@@ -46,17 +46,17 @@ static func merge_descendants(base: Dictionary, override: Dictionary) -> Diction
 static func merge_entries(base: Dictionary, override: Dictionary, keep_ancestor_states: bool = false) -> Dictionary:
 	var merged: Dictionary = {}
 	for state: String in base:
-		if state == "_classes" or state == GdssStylesheet.VARS_KEY:
+		if state == GdssValue.CLASSES_KEY or state == GdssValue.VARS_KEY:
 			continue
-		if not keep_ancestor_states and state.begins_with(GdssStylesheet.ANCESTOR_STATE_PREFIX):
+		if not keep_ancestor_states and state.begins_with(GdssValue.ANCESTOR_STATE_PREFIX):
 			continue
 		merged.set(state, base.get(state).duplicate() if base.get(state) is Dictionary else base.get(state))
 	for state: String in override:
-		if state == "_classes" or state == GdssStylesheet.VARS_KEY:
+		if state == GdssValue.CLASSES_KEY or state == GdssValue.VARS_KEY:
 			continue
-		if not keep_ancestor_states and state.begins_with(GdssStylesheet.ANCESTOR_STATE_PREFIX):
+		if not keep_ancestor_states and state.begins_with(GdssValue.ANCESTOR_STATE_PREFIX):
 			continue
-		if state == GdssStylesheet.DESCENDANTS_KEY:
+		if state == GdssValue.DESCENDANTS_KEY:
 			merged.set(state, merge_descendants(merged.get(state, {}), override.get(state)))
 			continue
 		if not merged.has(state):
@@ -71,7 +71,7 @@ static func merge_entries(base: Dictionary, override: Dictionary, keep_ancestor_
 				merged.get(state).set(key, override.get(state).get(key))
 		else:
 			merged.set(state, override.get(state))
-	merged.set("_classes", override.get("_classes", {}))
+	merged.set(GdssValue.CLASSES_KEY, override.get(GdssValue.CLASSES_KEY, {}))
 	return merged
 
 
@@ -80,7 +80,7 @@ static func propagate_all(entry: Dictionary, overlay: Dictionary) -> void:
 	if not all_overrides is Dictionary:
 		return
 	for state_key: String in entry:
-		if state_key == "all" or state_key == "_classes" or state_key == "_variations" or state_key == GdssStylesheet.DESCENDANTS_KEY or state_key == GdssStylesheet.VARS_KEY or state_key.ends_with("()"):
+		if state_key == "all" or state_key == GdssValue.CLASSES_KEY or state_key == GdssValue.VARIATIONS_KEY or state_key == GdssValue.DESCENDANTS_KEY or state_key == GdssValue.VARS_KEY or state_key.ends_with("()"):
 			continue
 		if overlay.has(state_key):
 			continue
@@ -107,7 +107,7 @@ static func resolve_override_patches(base: Dictionary, override_entry: Dictionar
 			continue
 		for prop_name: String in (state_dict as Dictionary):
 			var raw: Variant = (state_dict as Dictionary).get(prop_name)
-			if raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__"):
+			if raw is Dictionary and (raw as Dictionary).has(GdssValue.COMPOSITE4_PATCH_KEY):
 				has_patch = true
 	if not has_patch:
 		return override_entry
@@ -118,9 +118,9 @@ static func resolve_override_patches(base: Dictionary, override_entry: Dictionar
 			continue
 		for prop_name: String in (state_dict as Dictionary):
 			var raw: Variant = (state_dict as Dictionary).get(prop_name)
-			if not (raw is Dictionary and (raw as Dictionary).has("__gdss_composite4_patch__")):
+			if not (raw is Dictionary and (raw as Dictionary).has(GdssValue.COMPOSITE4_PATCH_KEY)):
 				continue
-			var patch: Dictionary = (raw as Dictionary).get("__gdss_composite4_patch__")
+			var patch: Dictionary = (raw as Dictionary).get(GdssValue.COMPOSITE4_PATCH_KEY)
 			var scratch: Dictionary = {prop_name: _base_composite_value(base, state_key, prop_name)}
 			for index: Variant in patch:
 				GdssValue.fold_composite_component(scratch, prop_name, int(index), patch.get(index))
@@ -139,7 +139,7 @@ static func _base_composite_value(base: Dictionary, state_key: String, prop_name
 static func styled_props(entry: Dictionary) -> Dictionary:
 	var props: Dictionary = {}
 	for key: String in entry:
-		if key == "_classes" or key == "_variations" or key == GdssStylesheet.DESCENDANTS_KEY or key == GdssStylesheet.VARS_KEY:
+		if key == GdssValue.CLASSES_KEY or key == GdssValue.VARIATIONS_KEY or key == GdssValue.DESCENDANTS_KEY or key == GdssValue.VARS_KEY:
 			continue
 		var state_dict: Variant = entry.get(key)
 		if state_dict is Dictionary:

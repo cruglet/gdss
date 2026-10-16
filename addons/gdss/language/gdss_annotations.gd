@@ -90,7 +90,7 @@ static func accumulate_blocks(blocks: Array, known_states: PackedStringArray) ->
 				GdssStylesheet.schemes.set(name, {})
 			var parent: String = str(block.get("parent", ""))
 			if not parent.is_empty():
-				GdssStylesheet.schemes.get(name).set(GdssStylesheet.SCHEME_PARENT_KEY, parent)
+				GdssStylesheet.schemes.get(name).set(GdssValue.SCHEME_PARENT_KEY, parent)
 			for entry: Dictionary in block.get("entries"):
 				var value_str: String = entry.get("value_str")
 				if value_str.is_empty():

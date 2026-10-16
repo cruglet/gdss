@@ -2,6 +2,8 @@
 class_name GdssParser
 extends RefCounted
 
+const _OVERRIDE_SELECTOR: String = "__override__"
+
 static var _cached_states: PackedStringArray = []
 static var _composite_map: Dictionary = {}
 static var _override_entry_cache: Dictionary = {}
@@ -39,15 +41,15 @@ static func parse_override_entry(text: String) -> Dictionary:
 	var known_states: PackedStringArray = get_known_states()
 	var tokens: Array[String] = _substitute_globals(GdssLexer.tokenize(GdssLexer.normalize_separators(text)), GdssStylesheet._local_vars)
 	var container: Dictionary = {}
-	_ensure_selector(container, "__override__", known_states)
+	_ensure_selector(container, _OVERRIDE_SELECTOR, known_states)
 	_patch_composites = true
-	_parse_block(tokens, 0, container, "__override__", known_states, true)
+	_parse_block(tokens, 0, container, _OVERRIDE_SELECTOR, known_states, true)
 	_patch_composites = false
-	var entry: Dictionary = container.get("__override__", {})
-	entry.erase("_classes")
-	entry.erase("_variations")
-	entry.erase(GdssStylesheet.DESCENDANTS_KEY)
-	entry.erase(GdssStylesheet.VARS_KEY)
+	var entry: Dictionary = container.get(_OVERRIDE_SELECTOR, {})
+	entry.erase(GdssValue.CLASSES_KEY)
+	entry.erase(GdssValue.VARIATIONS_KEY)
+	entry.erase(GdssValue.DESCENDANTS_KEY)
+	entry.erase(GdssValue.VARS_KEY)
 	if _override_entry_cache.size() > 512:
 		_override_entry_cache.clear()
 	_override_entry_cache.set(text, entry)
@@ -134,17 +136,17 @@ static func _substitute_globals(tokens: Array[String], local_vars: Dictionary) -
 			if local_vars.has(key):
 				var val: Variant = local_vars.get(key)
 				if val is Dictionary:
-					result.append("__gdss_local_method__" + key)
+					result.append(GdssValue.LOCAL_METHOD_REF + key)
 				else:
-					result.append("__gdss_local__" + key)
+					result.append(GdssValue.LOCAL_REF + key)
 				continue
 			if GdssStylesheet.globals.has(key):
-				result.append("__gdss_global__" + key)
+				result.append(GdssValue.GLOBAL_REF + key)
 				continue
 			if GdssStylesheet._instance_defaults.has(key):
-				result.append("__gdss_instance__" + key)
+				result.append(GdssValue.INSTANCE_REF + key)
 				continue
-			result.append("__gdss_local__" + key)
+			result.append(GdssValue.LOCAL_REF + key)
 			continue
 		result.append(token)
 	return result
@@ -177,7 +179,7 @@ static func _collect_selector_group(tokens: Array[String], pos: int, known_state
 static func _ensure_selector(result: Dictionary, selector: String, _known_states: PackedStringArray) -> void:
 	if result.has(selector):
 		return
-	result.set(selector, {"all": {}, "_classes": {}})
+	result.set(selector, {"all": {}, GdssValue.CLASSES_KEY: {}})
 
 
 static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, parent_selector: String, known_states: PackedStringArray, owner_is_base_type: bool = false) -> int:
@@ -305,33 +307,33 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 static func _get_child_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
-	if not result.get(parent_selector).has("_classes"):
-		result.get(parent_selector).set("_classes", {})
-	return result.get(parent_selector).get("_classes")
+	if not result.get(parent_selector).has(GdssValue.CLASSES_KEY):
+		result.get(parent_selector).set(GdssValue.CLASSES_KEY, {})
+	return result.get(parent_selector).get(GdssValue.CLASSES_KEY)
 
 
 static func _get_variation_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
-	if not result.get(parent_selector).has("_variations"):
-		result.get(parent_selector).set("_variations", {})
-	return result.get(parent_selector).get("_variations")
+	if not result.get(parent_selector).has(GdssValue.VARIATIONS_KEY):
+		result.get(parent_selector).set(GdssValue.VARIATIONS_KEY, {})
+	return result.get(parent_selector).get(GdssValue.VARIATIONS_KEY)
 
 
 static func _get_vars_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return {}
-	if not result.get(parent_selector).has(GdssStylesheet.VARS_KEY):
-		result.get(parent_selector).set(GdssStylesheet.VARS_KEY, {})
-	return result.get(parent_selector).get(GdssStylesheet.VARS_KEY)
+	if not result.get(parent_selector).has(GdssValue.VARS_KEY):
+		result.get(parent_selector).set(GdssValue.VARS_KEY, {})
+	return result.get(parent_selector).get(GdssValue.VARS_KEY)
 
 
 static func _get_descendant_container(result: Dictionary, parent_selector: String) -> Dictionary:
 	if parent_selector.is_empty():
 		return result
-	if not result.get(parent_selector).has(GdssStylesheet.DESCENDANTS_KEY):
-		result.get(parent_selector).set(GdssStylesheet.DESCENDANTS_KEY, {})
-	return result.get(parent_selector).get(GdssStylesheet.DESCENDANTS_KEY)
+	if not result.get(parent_selector).has(GdssValue.DESCENDANTS_KEY):
+		result.get(parent_selector).set(GdssValue.DESCENDANTS_KEY, {})
+	return result.get(parent_selector).get(GdssValue.DESCENDANTS_KEY)
 
 
 static func _has_comma_before_brace(tokens: Array[String], pos: int) -> bool:
@@ -380,7 +382,7 @@ static func _parse_props_into(tokens: Array[String], pos: int, result: Dictionar
 			var desc_key: String = token + next
 			_ensure_selector(desc_container, desc_key, known_states)
 			GdssStylesheet.has_descendant_rules = true
-			pos = _parse_props_into(tokens, pos + 3, desc_container, desc_key, GdssStylesheet.ANCESTOR_STATE_PREFIX + state, known_states)
+			pos = _parse_props_into(tokens, pos + 3, desc_container, desc_key, GdssValue.ANCESTOR_STATE_PREFIX + state, known_states)
 			continue
 		
 		if next == "{":
@@ -460,12 +462,12 @@ static func _parse_method_call(tokens: Array[String], pos: int) -> Array:
 		pos += 1
 	if not current_parts.is_empty():
 		args.append(" ".join(current_parts))
-	return [{"__gdss_method__": method_name, "args": args}, pos]
+	return [{GdssValue.METHOD_KEY: method_name, "args": args}, pos]
 
 
 static func _inherit(result: Dictionary, child: String, parent_data: Dictionary) -> void:
 	for state: String in parent_data:
-		if state == "_classes" or state == "_variations" or state == GdssStylesheet.DESCENDANTS_KEY or state == GdssStylesheet.VARS_KEY:
+		if state == GdssValue.CLASSES_KEY or state == GdssValue.VARIATIONS_KEY or state == GdssValue.DESCENDANTS_KEY or state == GdssValue.VARS_KEY:
 			continue
 		if not parent_data.get(state) is Dictionary:
 			continue
@@ -492,24 +494,24 @@ static func _parse_value(parts: Array[String]) -> Variant:
 		for p: String in parts:
 			if not p.is_valid_int() and not p.is_valid_float():
 				all_numeric = false
-			if not p.is_valid_int() and not p.begins_with("__gdss_global__") and not p.begins_with("__gdss_local__") and not p.begins_with("__gdss_instance__"):
+			if not p.is_valid_int() and not p.begins_with(GdssValue.GLOBAL_REF) and not p.begins_with(GdssValue.LOCAL_REF) and not p.begins_with(GdssValue.INSTANCE_REF):
 				all_int_resolvable = false
 		if all_numeric:
 			return Vector4i(int(parts.get(0)), int(parts.get(1)), int(parts.get(2)), int(parts.get(3)))
 		if all_int_resolvable:
-			return {"__gdss_composite4__": [parts.get(0), parts.get(1), parts.get(2), parts.get(3)]}
+			return {GdssValue.COMPOSITE4_KEY: [parts.get(0), parts.get(1), parts.get(2), parts.get(3)]}
 	if parts.size() == 2:
 		var both_numeric: bool = true
 		var both_float_resolvable: bool = true
 		for p: String in parts:
 			if not p.is_valid_float():
 				both_numeric = false
-				if not p.begins_with("__gdss_global__") and not p.begins_with("__gdss_local__") and not p.begins_with("__gdss_instance__"):
+				if not p.begins_with(GdssValue.GLOBAL_REF) and not p.begins_with(GdssValue.LOCAL_REF) and not p.begins_with(GdssValue.INSTANCE_REF):
 					both_float_resolvable = false
 		if both_numeric:
 			return Vector2(float(parts.front()), float(parts.back()))
 		if both_float_resolvable:
-			return {"__gdss_composite2__": [parts.front(), parts.back()]}
+			return {GdssValue.COMPOSITE2_KEY: [parts.front(), parts.back()]}
 	if parts.size() == 1:
 		var token: String = parts.get(0).trim_prefix("\"").trim_suffix("\"").trim_prefix("'").trim_suffix("'")
 		if token.to_lower() == "true":
@@ -586,7 +588,7 @@ static func _set_prop(result: Dictionary, selector: String, state: String, prop:
 		return
 	var registered: GdssProp = GDSS.get_registry().property_list.get(prop)
 	if registered != null:
-		if value is String and not (value as String).begins_with("__gdss_"):
+		if value is String and not (value as String).begins_with(GdssValue.REF_PREFIX):
 			match registered.type:
 				GDSS.Type.CURSOR, GDSS.Type.TRANSITION_TYPE, GDSS.Type.TRANSITION_FUNC:
 					value = (value as String).to_upper()
