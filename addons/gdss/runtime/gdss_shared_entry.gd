@@ -71,10 +71,14 @@ func full_values(state: String, generation: int) -> Variant:
 	return _full_values.get(state)
 
 
-func store_full_values(state: String, generation: int, values: Dictionary) -> void:
+func store_full_values(state: String, generation: int, values: Dictionary) -> Dictionary:
+	_full_generations.set(state, generation)
+	var previous: Variant = _full_values.get(state)
+	if previous != null and previous == values:
+		return previous
 	values.make_read_only()
 	_full_values.set(state, values)
-	_full_generations.set(state, generation)
+	return values
 
 
 func styled_props() -> Dictionary:

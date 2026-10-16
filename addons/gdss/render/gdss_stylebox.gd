@@ -327,7 +327,8 @@ func _apply_theme_prop(prop: GdssProp, control: Variant, node_type: GdssNodeType
 		_applied_node_props = _writable(_applied_node_props)
 	else:
 		_applied_overrides = _writable(_applied_overrides)
-	_live_applied.erase(prop.name)
+	if _live_applied.has(prop.name):
+		_live_applied.erase(prop.name)
 	if GdssThemeApplier.apply(prop, control, node_type, val, _applied_overrides, _applied_node_props):
 		_refresh_font_transform(control, node_type)
 
@@ -1370,8 +1371,7 @@ func _adopt_shared_vals(entry: Dictionary, state: String) -> Dictionary:
 			for prop: GdssProp in live:
 				var value: Variant = _live_value(prop, entry, state)
 				built.set(prop.name, value if value != null else prop.get_default_value())
-			_shared.store_full_values(state, GDSS._globals_generation, built)
-			values = built
+			values = _shared.store_full_values(state, GDSS._globals_generation, built)
 	if not is_same(values, _style_vals_cache):
 		_style_vals_cache = values
 		_style_revision += 1

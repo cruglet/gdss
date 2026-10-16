@@ -158,7 +158,7 @@ func get_props_by_name() -> Dictionary[String, GdssProp]:
 
 
 func get_default_events() -> PackedStringArray:
-	return ["item_rect_changed", "visibility_changed"]
+	return []
 
 
 func bind_canvas_item(canvas_item: Node) -> void:
