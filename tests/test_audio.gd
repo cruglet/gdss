@@ -41,8 +41,8 @@ func run(t: TC) -> void:
 		return
 	_check_declaration(t)
 	_check_validation(t)
-	_check_playback(t)
-	_check_resting_block(t)
+	await _check_playback(t)
+	await _check_resting_block(t)
 	GDSS.sfx_enabled = true
 	t.restore_theme()
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(TONE_PATH))
@@ -80,7 +80,7 @@ func _check_validation(t: TC) -> void:
 func _check_playback(t: TC) -> void:
 	t.apply_fixture(FIXTURE)
 	GDSS.sfx_enabled = true
-	var button: Button = t.make_styled_button()
+	var button: Button = await t.make_drawn_button()
 	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(button)
 	t.check(stylebox != null, "the button binds")
 	t.check(_streams().is_empty(), "binding alone plays nothing")
@@ -101,7 +101,7 @@ func _check_playback(t: TC) -> void:
 
 func _check_resting_block(t: TC) -> void:
 	t.apply_fixture(FIXTURE_RESTING)
-	var button: Button = t.make_styled_button()
+	var button: Button = await t.make_drawn_button()
 	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(button)
 	_clear_voices()
 	stylebox.current_state = "hover"

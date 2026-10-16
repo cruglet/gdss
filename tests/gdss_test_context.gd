@@ -76,6 +76,12 @@ func make_styled_button(text: String = "btn") -> Button:
 	return button
 
 
+func make_drawn_button(text: String = "btn") -> Button:
+	var button: Button = make_styled_button(text)
+	await await_frames(1)
+	return button
+
+
 func add_styled(node: Node) -> Node:
 	holder.add_child(node)
 	return node

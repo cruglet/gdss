@@ -45,7 +45,7 @@ func run(t: TC) -> void:
 	_check_config(t)
 	t.apply_fixture(FIXTURE)
 	_check_durations(t)
-	_check_instant_transitions(t)
+	await _check_instant_transitions(t)
 	_check_blur_quality(t)
 	_check_transforms(t)
 	_check_gpu_panels(t)
@@ -92,7 +92,7 @@ func _check_durations(t: TC) -> void:
 
 func _check_instant_transitions(t: TC) -> void:
 	GDSS.animations_enabled = false
-	var instant: Button = t.make_styled_button()
+	var instant: Button = await t.make_drawn_button()
 	var instant_box: GdssStylebox = GdssNodeBinder.get_primary_stylebox(instant)
 	instant.disabled = true
 	GDSS.refresh(instant)
@@ -102,7 +102,7 @@ func _check_instant_transitions(t: TC) -> void:
 	GdssNodeBinder.unbind(instant)
 	instant.free()
 	GDSS.animations_enabled = true
-	var animated: Button = t.make_styled_button()
+	var animated: Button = await t.make_drawn_button()
 	var animated_box: GdssStylebox = GdssNodeBinder.get_primary_stylebox(animated)
 	animated.disabled = true
 	GDSS.refresh(animated)
@@ -110,7 +110,7 @@ func _check_instant_transitions(t: TC) -> void:
 	GdssNodeBinder.unbind(animated)
 	animated.free()
 	GDSS.animation_speed_scale = 0.0
-	var scaled: Button = t.make_styled_button()
+	var scaled: Button = await t.make_drawn_button()
 	var scaled_box: GdssStylebox = GdssNodeBinder.get_primary_stylebox(scaled)
 	scaled.disabled = true
 	GDSS.refresh(scaled)

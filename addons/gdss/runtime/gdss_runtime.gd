@@ -38,6 +38,7 @@ func _ready() -> void:
 			GDSS.set_scheme(default_scheme)
 	_last_modified = GdssStorage.get_latest_modified()
 	get_tree().node_added.connect(_on_node_added)
+	get_tree().node_removed.connect(_on_node_removed)
 	_bind_tree.bind(get_tree().root).call_deferred()
 	if Engine.is_editor_hint() and OS.is_debug_build() and Engine.has_singleton(&"EditorInterface"):
 		var fs: Object = Engine.get_singleton(&"EditorInterface").call(&"get_resource_filesystem")
@@ -240,8 +241,23 @@ func _bind_tree(node: Node) -> void:
 
 
 func _on_node_added(node: Node) -> void:
-	if node is CanvasItem or node is Window:
-		_try_bind(node)
+	if not (node is CanvasItem or node is Window):
+		return
+	if GdssStylesheet.has_descendant_rules and not Engine.is_editor_hint() and GdssNodeBinder.is_bound(node):
+		GdssNodeBinder.reposition(node)
+	_try_bind(node)
+
+
+func _on_node_removed(node: Node) -> void:
+	if not GdssNodeBinder.is_bound(node):
+		return
+	if not Engine.is_editor_hint():
+		for stylebox: GdssStylebox in GdssNodeBinder.get_styleboxes(node):
+			stylebox._free_gpu_ci()
+	if node.is_queued_for_deletion():
+		GdssNodeBinder.purge(node.get_instance_id())
+	else:
+		_pending_purge.set(node.get_instance_id(), 0)
 
 
 func _try_bind(canvas_item: Node) -> void:
@@ -257,9 +273,6 @@ func _try_bind(canvas_item: Node) -> void:
 		return
 	GdssNodeBinder.bind(canvas_item, true, node_type)
 	node_type.update_state(canvas_item)
-	var exit_cb: Callable = _on_styled_node_exited.bind(canvas_item.get_instance_id())
-	if not canvas_item.tree_exited.is_connected(exit_cb):
-		canvas_item.tree_exited.connect(exit_cb)
 	if canvas_item.has_signal(&"visibility_changed"):
 		var vis_cb: Callable = _on_styled_visibility_changed.bind(canvas_item)
 		if not canvas_item.visibility_changed.is_connected(vis_cb):
@@ -284,17 +297,6 @@ func _disconnect_node_signals(canvas_item: Node) -> void:
 	var primary: GdssStylebox = GdssNodeBinder.get_primary_stylebox(canvas_item)
 	if primary != null:
 		primary._clear_event_signals(canvas_item)
-
-
-func _on_styled_node_exited(id: int) -> void:
-	var obj: Object = instance_from_id(id)
-	if not is_instance_valid(obj):
-		GdssNodeBinder.purge(id)
-		return
-	if (obj as Node).is_queued_for_deletion():
-		GdssNodeBinder.purge(id)
-		return
-	_pending_purge.set(id, 0)
 
 
 func _on_styled_visibility_changed(canvas_item: Node) -> void:

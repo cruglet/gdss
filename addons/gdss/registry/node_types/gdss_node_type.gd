@@ -162,19 +162,37 @@ func get_default_events() -> PackedStringArray:
 
 
 func bind_canvas_item(canvas_item: Node) -> void:
-	var events: PackedStringArray = get_events()
-	events.append_array(get_default_events())
-	for event: String in events:
+	if _syncs_on_draw():
+		if not canvas_item.is_connected(&"draw", _sync_state_on_draw):
+			canvas_item.connect(&"draw", _sync_state_on_draw, CONNECT_APPEND_SOURCE_OBJECT)
+		return
+	for event: String in _state_events():
 		if not canvas_item.is_connected(event, _update_state):
 			canvas_item.connect(event, _update_state, CONNECT_APPEND_SOURCE_OBJECT)
 
 
 func unbind_canvas_item(canvas_item: Node) -> void:
-	var events: PackedStringArray = get_events()
-	events.append_array(get_default_events())
-	for event: String in events:
+	if canvas_item.is_connected(&"draw", _sync_state_on_draw):
+		canvas_item.disconnect(&"draw", _sync_state_on_draw)
+	for event: String in _state_events():
 		if canvas_item.has_signal(event) and canvas_item.is_connected(event, _update_state):
 			canvas_item.disconnect(event, _update_state)
+
+
+func _state_events() -> PackedStringArray:
+	var events: PackedStringArray = get_events()
+	events.append_array(get_default_events())
+	return events
+
+
+func _syncs_on_draw() -> bool:
+	return not is_static and not Engine.is_editor_hint() and not get_events().is_empty()
+
+
+func _sync_state_on_draw(canvas_item: Node) -> void:
+	var stylebox: GdssStylebox = GdssNodeBinder.get_stylebox(canvas_item)
+	if stylebox != null:
+		stylebox.queue_state_sync(self)
 
 
 const _TRANSFORM_PROP_NAMES: PackedStringArray = [

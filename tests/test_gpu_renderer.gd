@@ -41,6 +41,21 @@ func run(t: TC) -> void:
 	RenderingServer.free_rid(ci)
 	button.free()
 	await _check_redraw_skip(t)
+	_check_tree_exit_release(t)
+
+
+func _check_tree_exit_release(t: TC) -> void:
+	t.apply_fixture(FIXTURE_STATES)
+	var button: Button = t.make_styled_button()
+	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(button)
+	var ci: RID = RenderingServer.canvas_item_create()
+	stylebox.draw(ci, Rect2(0, 0, 120, 40))
+	t.check(stylebox._gpu.canvas_item.is_valid(), "a drawn panel owns a GPU canvas item")
+	t.holder.remove_child(button)
+	t.check(not stylebox._gpu.canvas_item.is_valid(), "leaving the tree releases the GPU canvas item")
+	t.check(GdssNodeBinder.is_bound(button), "a node that only left the tree stays bound")
+	t.holder.add_child(button)
+	RenderingServer.free_rid(ci)
 
 
 func _check_redraw_skip(t: TC) -> void:

@@ -105,6 +105,7 @@ var ref: Node:
 
 
 var _seeding: bool = false
+var _first_drawn_frame: int = -1
 var current_state: String = "":
 	set(s):
 		if s == current_state:
@@ -118,7 +119,7 @@ var current_state: String = "":
 				_sync_active_state.call_deferred()
 			return
 		var previous: String = current_state
-		if not previous.is_empty():
+		if not previous.is_empty() and _was_rendered():
 			_start_transition(previous, s)
 			_play_sfx(s)
 		current_state = s
@@ -157,38 +158,28 @@ func _notification(what: int) -> void:
 
 
 func _connect_ref_signals(v: Node) -> void:
-	if Engine.is_editor_hint():
-		if not v.is_connected("renamed", _on_ref_renamed):
-			v.connect("renamed", _on_ref_renamed)
-		if not v.is_connected("tree_entered", _on_ref_tree_entered):
-			v.connect("tree_entered", _on_ref_tree_entered)
-		if not v.is_connected("tree_exiting", _on_ref_tree_exiting):
-			v.connect("tree_exiting", _on_ref_tree_exiting)
-		var interp: GdssStylesheet = GdssStylesheet.get_instance()
-		if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
-			interp.parsed_changed.connect(_on_parsed_changed)
-	else:
-		if not v.is_connected("tree_entered", _on_ref_tree_entered_rt):
-			v.connect("tree_entered", _on_ref_tree_entered_rt)
-		if not v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
-			v.connect("tree_exiting", _on_ref_tree_exiting_rt)
+	if not Engine.is_editor_hint():
+		return
+	if not v.is_connected("renamed", _on_ref_renamed):
+		v.connect("renamed", _on_ref_renamed)
+	if not v.is_connected("tree_entered", _on_ref_tree_entered):
+		v.connect("tree_entered", _on_ref_tree_entered)
+	if not v.is_connected("tree_exiting", _on_ref_tree_exiting):
+		v.connect("tree_exiting", _on_ref_tree_exiting)
+	var interp: GdssStylesheet = GdssStylesheet.get_instance()
+	if is_instance_valid(interp) and not interp.parsed_changed.is_connected(_on_parsed_changed):
+		interp.parsed_changed.connect(_on_parsed_changed)
 
 
 func _disconnect_ref_signals(v: Node) -> void:
-	if not is_instance_valid(v):
+	if not Engine.is_editor_hint() or not is_instance_valid(v):
 		return
-	if Engine.is_editor_hint():
-		if v.is_connected("renamed", _on_ref_renamed):
-			v.disconnect("renamed", _on_ref_renamed)
-		if v.is_connected("tree_entered", _on_ref_tree_entered):
-			v.disconnect("tree_entered", _on_ref_tree_entered)
-		if v.is_connected("tree_exiting", _on_ref_tree_exiting):
-			v.disconnect("tree_exiting", _on_ref_tree_exiting)
-	else:
-		if v.is_connected("tree_entered", _on_ref_tree_entered_rt):
-			v.disconnect("tree_entered", _on_ref_tree_entered_rt)
-		if v.is_connected("tree_exiting", _on_ref_tree_exiting_rt):
-			v.disconnect("tree_exiting", _on_ref_tree_exiting_rt)
+	if v.is_connected("renamed", _on_ref_renamed):
+		v.disconnect("renamed", _on_ref_renamed)
+	if v.is_connected("tree_entered", _on_ref_tree_entered):
+		v.disconnect("tree_entered", _on_ref_tree_entered)
+	if v.is_connected("tree_exiting", _on_ref_tree_exiting):
+		v.disconnect("tree_exiting", _on_ref_tree_exiting)
 
 
 func _classify_nonstyle(node_type: GdssNodeType, entry: Dictionary, state: String) -> void:
@@ -232,10 +223,6 @@ func _on_ref_tree_entered() -> void:
 		GdssNodeBinder.apply_mode_tree.call_deferred(_ref_node)
 
 
-func _on_ref_tree_entered_rt() -> void:
-	_repositioned()
-
-
 func _repositioned() -> void:
 	if ref == null or not GdssStylesheet.has_descendant_rules:
 		return
@@ -246,10 +233,6 @@ func _on_ref_tree_exiting() -> void:
 	_free_gpu_ci()
 	if is_instance_valid(_ref_node) and _ref_node.is_inside_tree():
 		_ref_path = _ref_node.get_path()
-
-
-func _on_ref_tree_exiting_rt() -> void:
-	_free_gpu_ci()
 
 
 func _invalidate_entry_cache() -> void:
@@ -507,6 +490,18 @@ func _safe_redraw() -> void:
 		(node as CanvasItem).queue_redraw()
 	else:
 		emit_changed()
+
+
+func _was_rendered() -> bool:
+	return _first_drawn_frame != -1 and Engine.get_process_frames() > _first_drawn_frame
+
+
+func queue_state_sync(node_type: GdssNodeType) -> void:
+	if _state_sync_queued or not ref is CanvasItem:
+		return
+	if node_type.resolve_state(ref as CanvasItem) != current_state:
+		_state_sync_queued = true
+		_sync_active_state.call_deferred()
 
 
 func _sync_active_state() -> void:
@@ -1423,11 +1418,8 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 	var node_type: GdssNodeType = _resolve_gdss_node()
 	if node_type == null:
 		return
-	if not Engine.is_editor_hint() and ref is CanvasItem and _slot_state.is_empty() and not node_type.is_static and not _state_sync_queued:
-		var active: String = node_type.resolve_state(ref as CanvasItem)
-		if active != current_state:
-			_state_sync_queued = true
-			_sync_active_state.call_deferred()
+	if _first_drawn_frame == -1:
+		_first_drawn_frame = Engine.get_process_frames()
 	var entry: Dictionary = _resolve_entry()
 	var state: String = _get_state()
 	var vals: Dictionary = _build_style_vals(node_type, entry, state)
