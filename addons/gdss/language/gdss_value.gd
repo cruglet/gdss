@@ -21,6 +21,14 @@ const VARIATIONS_KEY: String = "_variations"
 const DESCENDANTS_KEY: String = "_descendants"
 const VARS_KEY: String = "_vars"
 const ANCESTOR_STATE_PREFIX: String = "@"
+const LEGACY_EVENTS: Dictionary[String, String] = {
+	"on_pressed": "pressed",
+	"on_focus": "focus_entered",
+	"on_blur": "focus_exited",
+	"on_mouse_entered": "mouse_entered",
+	"on_mouse_exited": "mouse_exited",
+	"on_toggled": "toggled",
+}
 
 
 static func merge_scoped_time(existing: Variant, incoming: Variant) -> Variant:

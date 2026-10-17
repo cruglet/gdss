@@ -258,7 +258,7 @@ static func _parse_block(tokens: Array[String], pos: int, result: Dictionary, pa
 				close += 1
 			if not parent_selector.is_empty() and close + 1 < tokens.size() and tokens.get(close + 1) == "{":
 				_ensure_selector(result, parent_selector, known_states)
-				pos = _parse_props_into(tokens, close + 2, result, parent_selector, token + "()", known_states)
+				pos = _parse_props_into(tokens, close + 2, result, parent_selector, GdssValue.LEGACY_EVENTS.get(token, token) + "()", known_states)
 			else:
 				pos = close + 1
 			continue

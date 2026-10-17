@@ -10,6 +10,11 @@ Button {
 	:disabled {
 		bg_color: "#505050"
 	}
+	Sticky {
+		:focus_pressed {
+			bg_color: "#00ff00"
+		}
+	}
 }
 LineEdit {
 	bg_color: "#202020"
@@ -35,6 +40,15 @@ func run(t: TC) -> void:
 	button.button_pressed = true
 	await t.await_frames(1)
 	t.check_eq(_state(button), "pressed", "a code toggle syncs the state")
+	button.grab_focus()
+	await t.await_frames(2)
+	t.check_eq(_state(button), "pressed", "a focused toggle falls back to pressed without a focus_pressed rule")
+	GDSS.add_class(button, "Sticky")
+	await t.await_frames(2)
+	t.check_eq(_state(button), "focus_pressed", "a focused toggle uses focus_pressed once a rule defines it")
+	GDSS.remove_class(button, "Sticky")
+	button.release_focus()
+	await t.await_frames(1)
 	var flat: Button = t.make_styled_button()
 	flat.flat = true
 	await t.await_frames(1)
