@@ -3,6 +3,14 @@ extends EditorPlugin
 
 
 const GDSS_EDITOR: PackedScene = preload("uid://bh4sv3ta53fmk")
+const ADDON_ROOT: String = "res://addons/gdss"
+const LEGACY_PATHS: PackedStringArray = [
+	"core", "db", "plugins", "editor/handlers", "documentation.gd", "runtime.gd", "issues.txt",
+	"editor/ActionCopy.svg", "editor/Doc.svg", "editor/Map.svg",
+	"editor/gdss_completion_provider.gd", "editor/gdss_highlight_provider.gd", "editor/gdss_outline.gd",
+	"editor/gdss_references_panel.gd", "editor/gdss_rename_dialog.gd", "editor/gdss_resource_panel.gd",
+	"editor/gdss_symbols.gd", "editor/gdss_theme_properties.gd", "editor/gdss_theme_properties_dialog.gd",
+]
 
 static var _inst: EditorPlugin
 
@@ -21,6 +29,9 @@ var _loading_scene: bool = false
 
 func _enter_tree() -> void:
 	_inst = self
+	if _remove_legacy_files():
+		_prompt_reload.call_deferred("GDSS removed files left over from an older version,\nplease reload the project to finish updating.")
+		return
 	var registry: GdssRegistry = GDSS.get_registry()
 	if registry != null and registry.node_list.is_empty():
 		registry.repopulate()
@@ -186,10 +197,30 @@ func _reapply_overrides_deferred() -> void:
 	GdssNodeBinder.reapply_overrides()
 
 
-func _prompt_reload() -> void:
+func _remove_legacy_files() -> bool:
+	var removed: bool = false
+	for legacy: String in LEGACY_PATHS:
+		for path: String in [legacy, legacy + ".uid", legacy + ".import"]:
+			var full: String = ADDON_ROOT.path_join(path)
+			if FileAccess.file_exists(full) or DirAccess.dir_exists_absolute(full):
+				_remove_path(full)
+				removed = removed or not path.ends_with(".uid")
+	return removed
+
+
+func _remove_path(path: String) -> void:
+	if DirAccess.dir_exists_absolute(path):
+		for child: String in DirAccess.get_directories_at(path):
+			_remove_path(path.path_join(child))
+		for file: String in DirAccess.get_files_at(path):
+			DirAccess.remove_absolute(path.path_join(file))
+	DirAccess.remove_absolute(path)
+
+
+func _prompt_reload(message: String = "GDSS has been enabled for the first time,\nplease reload the project to use it.\n(You may have to enable the plugin again)") -> void:
 	var dialog: ConfirmationDialog = ConfirmationDialog.new()
 	dialog.title = "GDSS Reload Recommended"
-	dialog.dialog_text = "GDSS has been enabled for the first time,\nplease reload the project to use it.\n(You may have to enable the plugin again)"
+	dialog.dialog_text = message
 	dialog.ok_button_text = "Reload Now"
 	dialog.cancel_button_text = "Later"
 	dialog.exclusive = false

@@ -79,6 +79,7 @@ func _extract(version: String) -> void:
 		return
 	var marker: String = "/addons/gdss/"
 	var written: int = 0
+	var shipped: Dictionary[String, bool] = {}
 	for entry: String in reader.get_files():
 		if entry.ends_with("/"):
 			continue
@@ -89,6 +90,7 @@ func _extract(version: String) -> void:
 		if relative.is_empty():
 			continue
 		var destination: String = ADDON_ROOT.path_join(relative)
+		shipped.set(destination, true)
 		DirAccess.make_dir_recursive_absolute(destination.get_base_dir())
 		var file: FileAccess = FileAccess.open(destination, FileAccess.WRITE)
 		if file == null:
@@ -101,7 +103,18 @@ func _extract(version: String) -> void:
 	if written == 0:
 		install_completed.emit(false, "The archive did not contain the addon files.")
 		return
+	_remove_unshipped(ADDON_ROOT, shipped)
 	install_completed.emit(true, "Updated to %s (%d files replaced). Reload the project to apply." % [version, written])
+
+
+func _remove_unshipped(dir_path: String, shipped: Dictionary[String, bool]) -> void:
+	for child: String in DirAccess.get_directories_at(dir_path):
+		_remove_unshipped(dir_path.path_join(child), shipped)
+	for file: String in DirAccess.get_files_at(dir_path):
+		if not shipped.has(dir_path.path_join(file)):
+			DirAccess.remove_absolute(dir_path.path_join(file))
+	if DirAccess.get_files_at(dir_path).is_empty() and DirAccess.get_directories_at(dir_path).is_empty():
+		DirAccess.remove_absolute(dir_path)
 
 
 func _compare_versions(a: String, b: String) -> int:
