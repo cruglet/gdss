@@ -104,6 +104,7 @@ static func refresh(canvas_item: Node) -> void:
 		var stylebox: GdssStylebox = slots.get(state)
 		if stylebox != null:
 			stylebox.reapply()
+	sync_event_signals(canvas_item)
 	if canvas_item is CanvasItem:
 		(canvas_item as CanvasItem).queue_redraw()
 	if GdssStylesheet.has_descendant_rules and not _refreshing_descendants:
@@ -121,6 +122,7 @@ static func reposition(node: Node) -> void:
 		stylebox._invalidate_entry_cache()
 	for stylebox: GdssStylebox in styleboxes:
 		stylebox._apply_overrides(false)
+	sync_event_signals(node)
 	if node is CanvasItem:
 		(node as CanvasItem).queue_redraw()
 
@@ -134,9 +136,16 @@ static func _refresh_descendants(node: Node) -> void:
 		for stylebox: GdssStylebox in styleboxes:
 			stylebox._apply_overrides()
 			stylebox.emit_changed()
+		sync_event_signals(child)
 		if child is CanvasItem:
 			(child as CanvasItem).queue_redraw()
 		_refresh_descendants(child)
+
+
+static func sync_event_signals(node: Node) -> void:
+	var primary: GdssStylebox = get_primary_stylebox(node)
+	if primary != null:
+		primary._sync_event_signals(node)
 
 
 static func refresh_vars(canvas_item: Node) -> void:
@@ -332,6 +341,7 @@ static func unbind(canvas_item: Node) -> void:
 		if stylebox == null:
 			continue
 		stylebox._kill_tween()
+		stylebox._clear_event_signals(canvas_item)
 		stylebox._reset_node_props(node_type, control, false)
 		stylebox._free_gpu_ci()
 		if is_instance_valid(interp) and interp.parsed_changed.is_connected(stylebox._on_parsed_changed):

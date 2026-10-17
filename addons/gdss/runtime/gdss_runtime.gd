@@ -172,7 +172,7 @@ func _refresh_all_styleboxes() -> void:
 			continue
 		stylebox.reapply()
 		if stylebox == GdssNodeBinder.get_primary_stylebox(item):
-			_connect_event_signals(item)
+			GdssNodeBinder.sync_event_signals(item)
 		if item is CanvasItem:
 			(item as CanvasItem).queue_redraw()
 
@@ -266,42 +266,10 @@ func _try_bind(canvas_item: Node) -> void:
 		return
 	if not GDSS.resolve_mode(canvas_item):
 		if GdssNodeBinder.is_bound(canvas_item):
-			_disconnect_node_signals(canvas_item)
 			GdssNodeBinder.unbind(canvas_item)
 		else:
 			GdssNodeBinder.detach_foreign_styleboxes(canvas_item, node_type)
 		return
 	GdssNodeBinder.bind(canvas_item, true, node_type)
 	node_type.update_state(canvas_item)
-	if canvas_item.has_signal(&"visibility_changed"):
-		var vis_cb: Callable = _on_styled_visibility_changed.bind(canvas_item)
-		if not canvas_item.visibility_changed.is_connected(vis_cb):
-			canvas_item.visibility_changed.connect(vis_cb)
-			var primary: GdssStylebox = GdssNodeBinder.get_primary_stylebox(canvas_item)
-			if primary != null:
-				primary._last_visible = canvas_item.visible
-	_connect_event_signals(canvas_item)
-
-
-func _connect_event_signals(canvas_item: Node) -> void:
-	var primary: GdssStylebox = GdssNodeBinder.get_primary_stylebox(canvas_item)
-	if primary != null:
-		primary._sync_event_signals(canvas_item)
-
-
-func _disconnect_node_signals(canvas_item: Node) -> void:
-	if canvas_item.has_signal(&"visibility_changed"):
-		var vis_cb: Callable = _on_styled_visibility_changed.bind(canvas_item)
-		if canvas_item.visibility_changed.is_connected(vis_cb):
-			canvas_item.visibility_changed.disconnect(vis_cb)
-	var primary: GdssStylebox = GdssNodeBinder.get_primary_stylebox(canvas_item)
-	if primary != null:
-		primary._clear_event_signals(canvas_item)
-
-
-func _on_styled_visibility_changed(canvas_item: Node) -> void:
-	if not is_instance_valid(canvas_item):
-		return
-	var stylebox: GdssStylebox = GdssNodeBinder.get_primary_stylebox(canvas_item)
-	if stylebox != null:
-		stylebox._on_node_visibility_changed()
+	GdssNodeBinder.sync_event_signals(canvas_item)

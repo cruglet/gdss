@@ -87,6 +87,7 @@ var ref: Node:
 			return _ref_node_rt if is_instance_valid(_ref_node_rt) else null
 	set(v):
 		_gdss_node = null
+		_events_synced_for = null
 		var old: Node = _ref_node if Engine.is_editor_hint() else _ref_node_rt
 		if old != null and old != v:
 			_disconnect_ref_signals(old)
@@ -139,6 +140,7 @@ var _live_applied: Dictionary = _NONE
 var _style_revision: int = 0
 
 var _self_toggle: bool = false
+var _events_synced_for: Variant = null
 var _last_visible: bool = true
 
 
@@ -689,9 +691,13 @@ func _play_sfx(state_key: String) -> void:
 
 func _sync_event_signals(node: Node) -> void:
 	var entry: Dictionary = _resolve_entry()
-	for sig: String in _event_callables.keys():
-		if not entry.has(sig + "()"):
-			_disconnect_event_signal(node, sig)
+	if is_same(entry, _events_synced_for):
+		return
+	_events_synced_for = entry
+	if not _event_callables.is_empty():
+		for sig: String in _event_callables.keys():
+			if not entry.has(sig + "()"):
+				_disconnect_event_signal(node, sig)
 	for key: String in entry:
 		var sig: String = key.trim_suffix("()")
 		if key.ends_with("()") and not _event_callables.has(sig) and node.has_signal(sig):
@@ -702,11 +708,25 @@ func _sync_event_signals(node: Node) -> void:
 			node.connect(sig, cb)
 			_event_callables = _writable(_event_callables)
 			_event_callables.set(sig, cb)
+	_sync_visibility_signal(node, entry.has("on_show()") or entry.has("on_hide()"))
 
 
 func _clear_event_signals(node: Node) -> void:
+	_events_synced_for = null
 	for sig: String in _event_callables.keys():
 		_disconnect_event_signal(node, sig)
+	_sync_visibility_signal(node, false)
+
+
+func _sync_visibility_signal(node: Node, wanted: bool) -> void:
+	if not node is Control or node.is_connected(&"visibility_changed", _on_node_visibility_changed) == wanted:
+		return
+	if not wanted:
+		node.disconnect(&"visibility_changed", _on_node_visibility_changed)
+		return
+	_self_toggle = false
+	_last_visible = (node as Control).visible
+	node.connect(&"visibility_changed", _on_node_visibility_changed)
 
 
 func _disconnect_event_signal(node: Node, sig: String) -> void:
