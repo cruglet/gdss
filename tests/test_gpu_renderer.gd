@@ -31,17 +31,41 @@ func run(t: TC) -> void:
 	stylebox.draw(ci, Rect2(0, 0, 120, 40))
 	var renderer: GdssGpuRenderer = stylebox._gpu
 	t.check(renderer != null and renderer.canvas_item.is_valid(), "a GPU draw creates the renderer and its canvas item")
-	t.check(renderer._fade_tween != null, "a new bg_texture fades in")
+	t.check(renderer._fade.tween != null, "a new bg_texture fades in")
 	await t.await_seconds(0.25)
-	t.check(renderer._fade_tween == null, "a finished fade drops its tween so the renderer can be freed")
+	t.check(renderer._fade == null or renderer._fade.tween == null, "a finished fade drops its tween so the renderer can be freed")
 	var weak: WeakRef = weakref(renderer)
 	stylebox._gpu = null
 	renderer = null
 	t.check(weak.get_ref() == null, "a dropped renderer is freed instead of kept alive by its fade tween")
 	RenderingServer.free_rid(ci)
 	button.free()
+	await _check_fade_lifecycle(t)
 	await _check_redraw_skip(t)
 	_check_tree_exit_release(t)
+
+
+func _check_fade_lifecycle(t: TC) -> void:
+	var node: Control = Control.new()
+	t.holder.add_child(node)
+	var ci: RID = RenderingServer.canvas_item_create()
+	var renderer: GdssGpuRenderer = GdssGpuRenderer.new(func() -> void: pass)
+	renderer.draw(ci, Rect2(0, 0, 120, 40), {"bg_color": Color.RED}, node, 0.1, 0)
+	t.check(renderer._fade == null, "a panel without bg_texture never creates a fade")
+	var icon: Texture2D = load("res://meta/icon.png") as Texture2D
+	renderer.draw(ci, Rect2(0, 0, 120, 40), {"bg_texture": icon}, node, 0.1, 1)
+	t.check(renderer._fade != null and renderer._fade.tween != null, "a bg_texture creates a running fade")
+	await t.await_seconds(0.2)
+	var fade: WeakRef = weakref(renderer._fade)
+	renderer.draw(ci, Rect2(0, 0, 120, 40), {}, node, 0.1, 2)
+	t.check(renderer._fade.tween != null, "removing the texture fades it out")
+	await t.await_seconds(0.2)
+	renderer.draw(ci, Rect2(0, 0, 120, 40), {}, node, 0.1, 3)
+	t.check(renderer._fade == null, "a fade that settles on no texture is dropped")
+	t.check(fade.get_ref() == null, "the dropped fade is freed")
+	renderer.release()
+	RenderingServer.free_rid(ci)
+	node.free()
 
 
 func _check_tree_exit_release(t: TC) -> void:

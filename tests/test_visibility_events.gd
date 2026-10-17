@@ -42,7 +42,7 @@ func run(t: TC) -> void:
 	await t.await_seconds(0.35)
 	t.check(not button.visible, "the node hides once on_hide finishes")
 	button.visible = true
-	t.check(GdssNodeBinder.get_primary_stylebox(button)._tween != null, "showing plays on_show")
+	t.check(GdssNodeBinder.get_primary_stylebox(button)._transition != null, "showing plays on_show")
 	await t.await_seconds(0.35)
 	GDSS.remove_class(button, "Popping")
 	t.check(not _gdss_listens(button, &"visibility_changed"), "removing the class drops the visibility hook")

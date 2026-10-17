@@ -46,7 +46,7 @@ func run(t: TC) -> void:
 	fresh.disabled = true
 	GDSS.refresh(fresh)
 	t.check_eq(fresh_box.current_state, "disabled", "a never-drawn button takes its state")
-	t.check(fresh_box._tween == null, "a never-drawn button does not animate into its state")
+	t.check(fresh_box._transition == null, "a never-drawn button does not animate into its state")
 	var line_edit: LineEdit = LineEdit.new()
 	t.holder.add_child(line_edit)
 	await t.await_frames(1)

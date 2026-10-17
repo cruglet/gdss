@@ -96,8 +96,7 @@ func _check_instant_transitions(t: TC) -> void:
 	var instant_box: GdssStylebox = GdssNodeBinder.get_primary_stylebox(instant)
 	instant.disabled = true
 	GDSS.refresh(instant)
-	t.check(instant_box._tween == null, "no tween starts while animations are off")
-	t.check(instant_box._tweened_values.is_empty(), "no tweened values are tracked")
+	t.check(instant_box._transition == null, "no transition state exists while animations are off")
 	t.check_eq(instant_box._get_val("bg_color"), Color("#ff0000"), "the state value applies instantly")
 	GdssNodeBinder.unbind(instant)
 	instant.free()
@@ -106,7 +105,7 @@ func _check_instant_transitions(t: TC) -> void:
 	var animated_box: GdssStylebox = GdssNodeBinder.get_primary_stylebox(animated)
 	animated.disabled = true
 	GDSS.refresh(animated)
-	t.check(animated_box._tween != null, "a tween starts once animations are back on")
+	t.check(animated_box._transition != null, "a tween starts once animations are back on")
 	GdssNodeBinder.unbind(animated)
 	animated.free()
 	GDSS.animation_speed_scale = 0.0
@@ -114,7 +113,7 @@ func _check_instant_transitions(t: TC) -> void:
 	var scaled_box: GdssStylebox = GdssNodeBinder.get_primary_stylebox(scaled)
 	scaled.disabled = true
 	GDSS.refresh(scaled)
-	t.check(scaled_box._tween == null, "a zero speed scale skips the tween too")
+	t.check(scaled_box._transition == null, "a zero speed scale skips the tween too")
 	GdssNodeBinder.unbind(scaled)
 	scaled.free()
 	GDSS.animation_speed_scale = 1.0

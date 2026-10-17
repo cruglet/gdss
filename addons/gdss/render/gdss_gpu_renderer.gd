@@ -21,19 +21,7 @@ var _quad: Rect2 = Rect2()
 var _xform: Transform2D = Transform2D.IDENTITY
 var _emitted: bool = false
 var _warned_clip: bool = false
-var _fill_tint: Color = Color.WHITE
-var _fill_scroll: Vector2 = Vector2.ZERO
-var _fill_scale: Vector2 = Vector2.ZERO
-var _fill_texture: Texture2D = null
-var _fill_aspect: bool = false
-var _fill_repeat: bool = false
-var _fill_nearest: bool = false
-var _fill_natural: bool = false
-var _fade_texture: Texture2D = null
-var _fade_target: Texture2D = null
-var _fade_value: float = 1.0
-var _fade_tween: Tween
-var _node: Node = null
+var _fade: GdssTextureFade = null
 var _drawn_revision: int = -1
 var _drawn_rect: Rect2 = Rect2()
 var _drawn_generation: int = -1
@@ -109,8 +97,7 @@ func _ensure_canvas_item(to_canvas_item: RID, want_blur: bool = false) -> void:
 		parent_item = to_canvas_item
 
 
-func _in_clip_group() -> bool:
-	var node: Node = _node
+func _in_clip_group(node: Node) -> bool:
 	while node:
 		if node is CanvasGroup:
 			return true
@@ -198,11 +185,10 @@ static func _shader_for(blur: bool) -> Shader:
 
 func is_current(to_canvas_item: RID, rect: Rect2, revision: int) -> bool:
 	return _emitted and parent_item == to_canvas_item and revision == _drawn_revision and rect == _drawn_rect \
-		and _drawn_generation == GDSS._redraw_generation and _fade_tween == null
+		and _drawn_generation == GDSS._redraw_generation and (_fade == null or _fade.tween == null)
 
 
 func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_duration: float, revision: int, animating: bool = false) -> void:
-	_node = node
 	_params = {}
 	_drawn_revision = revision
 	_drawn_rect = rect
@@ -212,11 +198,11 @@ func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_d
 	var border_src: Variant = at_blur_quality(border_base(border_raw))
 	var border_sides: Array = border_side_colors(border_raw)
 	var want_blur: bool = bg is GdssBlur or border_src is GdssBlur
-	if want_blur and _in_clip_group():
+	if want_blur and _in_clip_group(node):
 		want_blur = false
 		if not _warned_clip:
 			_warned_clip = true
-			push_warning("[GDSS] Blur disabled on %s: a clip_children or CanvasGroup ancestor renders its children into the backbuffer, so the engine binds a solid white screen texture and the blur would draw pure white. Mask without a clip group to keep the blur." % _node)
+			push_warning("[GDSS] Blur disabled on %s: a clip_children or CanvasGroup ancestor renders its children into the backbuffer, so the engine binds a solid white screen texture and the blur would draw pure white. Mask without a clip group to keep the blur." % node)
 	_ensure_canvas_item(to_canvas_item, want_blur)
 	var shadow: Vector4 = Vector4(vals.get("shadow", Vector4i.ZERO))
 	var shadow_offset: Vector2 = vals.get("shadow_offset", Vector2.ZERO)
@@ -248,16 +234,10 @@ func draw(to_canvas_item: RID, rect: Rect2, vals: Dictionary, node: Node, fade_d
 	_set_param(&"u_shadow_offset", shadow_offset)
 	var shadow_src: Variant = vals.get("shadow_color", DEFAULT_SHADOW_COLOR)
 	_set_param(&"u_shadow_color", shadow_src if shadow_src is Color else DEFAULT_SHADOW_COLOR)
-	var tint_src: Variant = vals.get("bg_tint", Color.WHITE)
-	_fill_tint = tint_src if tint_src is Color else Color.WHITE
-	var scroll_src: Variant = vals.get("bg_scroll", Vector2.ZERO)
-	_fill_scroll = scroll_src if scroll_src is Vector2 else Vector2.ZERO
-	var scale_src: Variant = vals.get("bg_texture_scale", Vector2.ZERO)
-	_fill_scale = scale_src if scale_src is Vector2 else Vector2.ZERO
-	_resolve_fill_texture(vals.get("bg_texture"), bg, fade_duration)
-	_push_fill(bg)
+	if not _push_texture_fill(vals, bg, fade_duration, node):
+		_push_fill(bg)
 	_push_border(border_src, border_sides)
-	_commit_params(animating or _fade_tween != null)
+	_commit_params(animating or (_fade != null and _fade.tween != null))
 	var xform: Transform2D = skew_transform(rect, vals.get("skew_x", 0.0), vals.get("skew_y", 0.0))
 	if not _emitted or quad != _quad or xform != _xform:
 		_quad = quad
@@ -284,71 +264,60 @@ static func at_blur_quality(value: Variant) -> Variant:
 	return value
 
 
-func _resolve_fill_texture(src: Variant, fallback: Variant, duration: float) -> void:
+func _push_texture_fill(vals: Dictionary, bg: Variant, duration: float, node: Node) -> bool:
+	var src: Variant = vals.get("bg_texture")
 	if not (src is GdssTexture or src is Texture2D):
-		src = fallback
-	_fill_texture = null
-	_fill_aspect = false
-	_fill_repeat = false
-	_fill_nearest = false
-	_fill_natural = false
+		src = bg
+	var target: Texture2D = null
+	var aspect: bool = false
+	var natural: bool = false
+	var nearest: bool = false
 	if src is GdssTexture:
 		var wrapped: GdssTexture = src
-		_fill_texture = wrapped.texture
-		_fill_aspect = wrapped.preserve_aspect
-		_fill_repeat = wrapped.repeat
-		_fill_natural = wrapped.repeat
-		_fill_nearest = wrapped.is_nearest()
+		target = wrapped.texture
+		aspect = wrapped.preserve_aspect
+		natural = wrapped.repeat
+		nearest = wrapped.is_nearest()
 	elif src is Texture2D:
-		_fill_texture = src
-	if _fill_scroll != Vector2.ZERO or _fill_scale != Vector2.ZERO:
-		_fill_repeat = true
-	_fill_texture = _fade_to(_fill_texture, duration)
+		target = src
+	var texture: Texture2D = _fade_to(target, duration, node)
+	if texture == null:
+		return false
+	var tint: Variant = vals.get("bg_tint", Color.WHITE)
+	var scroll: Variant = vals.get("bg_scroll", Vector2.ZERO)
+	var scale: Variant = vals.get("bg_texture_scale", Vector2.ZERO)
+	if not scroll is Vector2:
+		scroll = Vector2.ZERO
+	if not scale is Vector2:
+		scale = Vector2.ZERO
+	var repeat: bool = natural or scroll != Vector2.ZERO or scale != Vector2.ZERO
+	_set_param(&"u_fill_mode", 3)
+	_set_param(&"u_tex", null if nearest else texture)
+	_set_param(&"u_tex_nearest", texture if nearest else null)
+	_set_param(&"u_fill_nearest", 1.0 if nearest else 0.0)
+	_set_param(&"u_fill_repeat", 1.0 if repeat else 0.0)
+	_set_param(&"u_fill_natural", 1.0 if natural else 0.0)
+	_set_param(&"u_fill_fade", _fade.value)
+	_set_param(&"u_fill_tint", tint if tint is Color else Color.WHITE)
+	_set_param(&"u_fill_scroll", scroll)
+	_set_param(&"u_fill_scale", scale)
+	_set_param(&"u_fill_aspect", 1.0 if aspect else 0.0)
+	_set_param(&"u_fill_a", bg if bg is Color else Color.TRANSPARENT)
+	return true
 
 
-func _fade_to(target: Texture2D, duration: float) -> Texture2D:
-	if target == _fade_target:
-		return _fade_texture
-	_fade_target = target
-	if _fade_tween != null and _fade_tween.is_valid():
-		_fade_tween.kill()
-	if duration <= 0.0 or not is_instance_valid(_node) or not _node.is_inside_tree():
-		_fade_texture = target
-		_fade_value = 1.0
-		return _fade_texture
-	if target != null and target != _fade_texture:
-		_fade_texture = target
-		_fade_value = 0.0
-	_fade_tween = (Engine.get_main_loop() as SceneTree).create_tween()
-	_fade_tween.tween_method(func(v: float) -> void:
-		_fade_value = v
-		_redraw.call()
-	, _fade_value, 1.0 if target != null else 0.0, duration)
-	_fade_tween.finished.connect(func() -> void:
-		_fade_tween = null
-		if _fade_target == null:
-			_fade_texture = null
-			_fade_value = 1.0
-			_redraw.call()
-	)
-	return _fade_texture
+func _fade_to(target: Texture2D, duration: float, node: Node) -> Texture2D:
+	if _fade == null:
+		if target == null:
+			return null
+		_fade = GdssTextureFade.new()
+	var texture: Texture2D = _fade.texture if target == _fade.target else _fade.fade_to(target, duration, node, _redraw)
+	if texture == null and _fade.tween == null:
+		_fade = null
+	return texture
 
 
 func _push_fill(bg: Variant) -> void:
-	if _fill_texture != null:
-		_set_param(&"u_fill_mode", 3)
-		_set_param(&"u_tex", null if _fill_nearest else _fill_texture)
-		_set_param(&"u_tex_nearest", _fill_texture if _fill_nearest else null)
-		_set_param(&"u_fill_nearest", 1.0 if _fill_nearest else 0.0)
-		_set_param(&"u_fill_repeat", 1.0 if _fill_repeat else 0.0)
-		_set_param(&"u_fill_natural", 1.0 if _fill_natural else 0.0)
-		_set_param(&"u_fill_fade", _fade_value)
-		_set_param(&"u_fill_tint", _fill_tint)
-		_set_param(&"u_fill_scroll", _fill_scroll)
-		_set_param(&"u_fill_scale", _fill_scale)
-		_set_param(&"u_fill_aspect", 1.0 if _fill_aspect else 0.0)
-		_set_param(&"u_fill_a", bg if bg is Color else Color.TRANSPARENT)
-		return
 	if bg is GdssGradient:
 		var grad: GdssGradient = bg as GdssGradient
 		_set_param(&"u_fill_a", grad.color_a)

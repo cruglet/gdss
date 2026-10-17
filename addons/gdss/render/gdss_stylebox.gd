@@ -22,7 +22,11 @@ func _transition_candidates(from_state: String, to_state: String) -> PackedStrin
 	var animatable: Dictionary = _get_animatable_props()
 	var entry: Dictionary = _resolve_entry()
 	var names: Dictionary[String, bool] = {}
-	for source: Variant in [entry.get(from_state), entry.get(to_state), _tweened_values, _tweened_args]:
+	var sources: Array = [entry.get(from_state), entry.get(to_state)]
+	if _transition != null:
+		sources.append(_transition.values)
+		sources.append(_transition.args)
+	for source: Variant in sources:
 		if not source is Dictionary:
 			continue
 		for prop_name: String in source as Dictionary:
@@ -35,7 +39,6 @@ var _slot_state: String = ""
 
 var _ref_path: NodePath = NodePath()
 var _ref_node: Node = null
-var _ref_node_rt: Node = null
 var _applying: bool = false
 
 var _entry_cache: Dictionary = _NONE
@@ -59,49 +62,35 @@ var _gpu: GdssGpuRenderer = null
 var _style_vals_cache: Dictionary = _NONE
 var _style_dynamic: Array[GdssProp] = _NO_PROPS
 var _style_vals_state: String = "￿"
-var _style_vals_tween: Dictionary = _NONE
-var _style_dynamic_tween: Array[GdssProp] = _NO_PROPS
-var _style_tween_state: String = "￿"
-var _style_tween_session: int = -1
-var _tween_session: int = 0
 var _nonstyle_dynamic: Array[GdssProp] = _NO_PROPS
 var _nonstyle_state: String = "￿"
 var _event_callables: Dictionary = _NONE
 
 var ref: Node:
 	get:
-		if Engine.is_editor_hint():
-			if is_instance_valid(_ref_node):
-				return _ref_node
-			if _ref_path.is_empty():
-				return null
-			var tree: SceneTree = Engine.get_main_loop() as SceneTree
-			if tree == null:
-				return null
-			var resolved: Node = tree.root.get_node_or_null(_ref_path)
-			if is_instance_valid(resolved):
-				_ref_node = resolved
-				_connect_ref_signals(_ref_node)
-			return resolved
-		else:
-			return _ref_node_rt if is_instance_valid(_ref_node_rt) else null
+		if is_instance_valid(_ref_node):
+			return _ref_node
+		if not Engine.is_editor_hint() or _ref_path.is_empty():
+			return null
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		if tree == null:
+			return null
+		var resolved: Node = tree.root.get_node_or_null(_ref_path)
+		if is_instance_valid(resolved):
+			_ref_node = resolved
+			_connect_ref_signals(_ref_node)
+		return resolved
 	set(v):
 		_gdss_node = null
 		_events_synced_for = null
-		var old: Node = _ref_node if Engine.is_editor_hint() else _ref_node_rt
-		if old != null and old != v:
-			_disconnect_ref_signals(old)
+		if _ref_node != null and _ref_node != v:
+			_disconnect_ref_signals(_ref_node)
+		_ref_node = v
 		if v == null:
-			_ref_node = null
-			_ref_node_rt = null
 			_ref_path = NodePath()
 			return
-		if Engine.is_editor_hint():
-			_ref_node = v
-			if v.is_inside_tree():
-				_ref_path = v.get_path()
-		else:
-			_ref_node_rt = v
+		if Engine.is_editor_hint() and v.is_inside_tree():
+			_ref_path = v.get_path()
 		_connect_ref_signals(v)
 
 
@@ -130,9 +119,7 @@ var current_state: String = "":
 			_safe_redraw()
 
 
-var _tweened_values: Dictionary = _NONE
-var _tweened_args: Dictionary = _NONE
-var _tween: Tween = null
+var _transition: GdssTransitionState = null
 var _state_sync_queued: bool = false
 var _applied_node_props: Dictionary = _NONE
 var _applied_overrides: Dictionary = _NONE
@@ -146,9 +133,8 @@ var _last_visible: bool = true
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
-		if _tween != null:
-			_tween.kill()
-			_tween = null
+		if _transition != null and _transition.tween != null:
+			_transition.tween.kill()
 		if not Engine.is_editor_hint():
 			return
 		var interp: GdssStylesheet = GdssStylesheet.get_instance()
@@ -259,10 +245,8 @@ func _invalidate_entry_cache_self() -> void:
 	_style_vals_state = "￿"
 	_style_vals_cache = _NONE
 	_style_dynamic = _NO_PROPS
-	_style_tween_state = "￿"
-	_style_tween_session = -1
-	_style_vals_tween = _NONE
-	_style_dynamic_tween = _NO_PROPS
+	if _transition != null:
+		_transition.style_state = "￿"
 	_nonstyle_state = "￿"
 	_nonstyle_dynamic = _NO_PROPS
 
@@ -335,13 +319,21 @@ static func _writable(source: Dictionary) -> Dictionary:
 
 
 func _set_tweened(prop_name: String, value: Variant) -> void:
-	_tweened_values = _writable(_tweened_values)
-	_tweened_values.set(prop_name, value)
+	_ensure_transition().values.set(prop_name, value)
 
 
 func _set_tweened_args(prop_name: String, args: Array[Variant]) -> void:
-	_tweened_args = _writable(_tweened_args)
-	_tweened_args.set(prop_name, args)
+	_ensure_transition().args.set(prop_name, args)
+
+
+func _ensure_transition() -> GdssTransitionState:
+	if _transition == null:
+		_transition = GdssTransitionState.new()
+	return _transition
+
+
+func _tweened(prop_name: String, fallback: Variant) -> Variant:
+	return _transition.values.get(prop_name, fallback) if _transition != null else fallback
 
 
 func _reset_node_props(node_type: GdssNodeType, control: Variant, skip_tweened: bool) -> void:
@@ -349,7 +341,7 @@ func _reset_node_props(node_type: GdssNodeType, control: Variant, skip_tweened: 
 		return
 	var props_by_name: Dictionary = node_type.get_props_by_name()
 	for prop_name: String in _applied_node_props.keys():
-		if skip_tweened and _tweened_values.has(prop_name):
+		if skip_tweened and _transition != null and _transition.values.has(prop_name):
 			continue
 		var prop: GdssProp = props_by_name.get(prop_name)
 		if prop != null:
@@ -386,8 +378,7 @@ func _apply_overrides_unwrapped(node_type: GdssNodeType, control: Variant, clear
 	for prop: GdssProp in node_type.get_enabled_props():
 		if prop.category == GdssProp.Category.STYLE:
 			if prop.name == "padding":
-				var pad_raw: Variant = _tweened_values.get(prop.name,
-					_get_val_cached(prop.name, entry, state, prop.get_default_value()))
+				var pad_raw: Variant = _tweened(prop.name, _get_val_cached(prop.name, entry, state, prop.get_default_value()))
 				_apply_padding(Vector4(pad_raw if pad_raw != null else prop.get_default_value()))
 			continue
 		if is_secondary_slot or not styled.has(prop.name):
@@ -422,11 +413,11 @@ func _apply_single_override(prop: GdssProp, val: Variant) -> void:
 
 
 func _kill_tween() -> void:
-	if _tween != null:
-		_tween.kill()
-		_tween = null
-	_tweened_values = _NONE
-	_tweened_args = _NONE
+	if _transition == null:
+		return
+	if _transition.tween != null:
+		_transition.tween.kill()
+	_transition = null
 
 
 func reapply() -> void:
@@ -558,14 +549,13 @@ func _start_transition(from_state: String, to_state: String, timing_state: Strin
 			on_finished.call()
 		return
 	
-	if _tween:
-		_tween.kill()
-	_tween = pending_tween
-	_tween_session += 1
-	_tween.finished.connect(func() -> void:
-		_tween = null
-		_tweened_values = _NONE
-		_tweened_args = _NONE
+	var transition: GdssTransitionState = _ensure_transition()
+	if transition.tween != null:
+		transition.tween.kill()
+	transition.tween = pending_tween
+	transition.style_state = "￿"
+	pending_tween.finished.connect(func() -> void:
+		_transition = null
 		if ref != null:
 			_apply_overrides()
 			_safe_redraw()
@@ -585,7 +575,9 @@ func _tween_method_args(tween: Tween, prop: GdssProp, from_state: String, to_sta
 	var method: GdssMethod = GDSS._get_gdss_methods().get(method_name)
 	if method == null or method.get_tweenable_args().is_empty():
 		return false
-	var from_args: Array[Variant] = _tweened_args.get(prop.name, _resolve_method_args(from_raw as Dictionary))
+	var from_args: Array[Variant] = _resolve_method_args(from_raw as Dictionary)
+	if _transition != null and _transition.args.has(prop.name):
+		from_args = _transition.args.get(prop.name)
 	var to_args: Array[Variant] = _resolve_method_args(to_raw as Dictionary)
 	tween.tween_method(_step_method_tween.bind(prop.name, method, from_args, to_args), 0.0, 1.0, duration)
 	return true
@@ -602,7 +594,7 @@ func _step_method_tween(t: float, prop_name: String, method: GdssMethod, from_ar
 
 func _tween_value(tween: Tween, prop: GdssProp, from_state: String, to_state: String, duration: float) -> bool:
 	var fallback: Variant = GdssTransition.tween_fallback(prop)
-	var from_value: Variant = _tweened_values.get(prop.name, _get_parsed_val(prop.name, from_state, fallback))
+	var from_value: Variant = _tweened(prop.name, _get_parsed_val(prop.name, from_state, fallback))
 	var pair: Array = GdssTransition.tween_pair(prop.type, from_value, _get_parsed_val(prop.name, to_state, fallback), fallback)
 	if pair.is_empty():
 		return false
@@ -1027,7 +1019,7 @@ func _capture_animatable() -> Dictionary:
 	var state: String = _get_state()
 	var animatable: Dictionary = _get_animatable_props()
 	for prop_name: String in animatable:
-		if _tweened_values.has(prop_name):
+		if _transition != null and _transition.values.has(prop_name):
 			continue
 		var prop: GdssProp = animatable.get(prop_name)
 		var val: Variant = _get_parsed_val(prop_name, state, prop.get_default_value())
@@ -1086,8 +1078,8 @@ func _refresh_font_transform(control: Variant, node_type: GdssNodeType) -> void:
 		return
 	var entry: Dictionary = _resolve_entry()
 	var state: String = _get_state()
-	var skew: Variant = _tweened_values.get("char_skew", _get_val_cached("char_skew", entry, state, Vector2.ZERO))
-	var embolden: Variant = _tweened_values.get("char_embolden", _get_val_cached("char_embolden", entry, state, 0.0))
+	var skew: Variant = _tweened("char_skew", _get_val_cached("char_skew", entry, state, Vector2.ZERO))
+	var embolden: Variant = _tweened("char_embolden", _get_val_cached("char_embolden", entry, state, 0.0))
 	GdssThemeApplier.apply_font_transform(control, node_type,
 		skew if skew is Vector2 else Vector2.ZERO,
 		float(embolden) if embolden is int or embolden is float else 0.0)
@@ -1281,14 +1273,14 @@ func _resolve_sentinel(raw: Variant, fallback: Variant) -> Variant:
 func _get_val(key: String, fallback: Variant = null) -> Variant:
 	if ref == null:
 		return fallback
-	if _tweened_values.has(key):
-		return _tweened_values.get(key)
+	if _transition != null and _transition.values.has(key):
+		return _transition.values.get(key)
 	return _get_val_cached(key, _resolve_entry(), _get_state(), fallback)
 
 
 func _get_val_cached(key: String, entry: Dictionary, state: String, fallback: Variant) -> Variant:
-	if _tweened_values.has(key):
-		return _tweened_values.get(key)
+	if _transition != null and _transition.values.has(key):
+		return _transition.values.get(key)
 	if entry.is_empty():
 		return fallback
 	var raw: Variant = null
@@ -1323,26 +1315,26 @@ func _get_raw_parsed_val(key: String, state: String) -> Variant:
 
 
 func _build_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String) -> Dictionary:
-	if not _tweened_values.is_empty():
+	if _transition != null and not _transition.values.is_empty():
 		_style_revision += 1
-		if _style_tween_state != state or _style_tween_session != _tween_session:
-			_style_tween_state = state
-			_style_tween_session = _tween_session
-			_style_vals_tween = {}
-			_style_dynamic_tween = []
+		var transition: GdssTransitionState = _transition
+		if transition.style_state != state:
+			transition.style_state = state
+			transition.style_values = {}
+			transition.style_live = []
 			for prop: GdssProp in node_type.get_style_props():
 				var fv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-				_style_vals_tween.set(prop.name, fv if fv != null else prop.get_default_value())
+				transition.style_values.set(prop.name, fv if fv != null else prop.get_default_value())
 				if GdssValue.is_live(GdssCascade.raw_value(entry, state, prop.name)):
-					_style_dynamic_tween.append(prop)
-			return _style_vals_tween
-		for prop: GdssProp in _style_dynamic_tween:
+					transition.style_live.append(prop)
+			return transition.style_values
+		for prop: GdssProp in transition.style_live:
 			var dv: Variant = _get_val_cached(prop.name, entry, state, prop.get_default_value())
-			_style_vals_tween.set(prop.name, dv if dv != null else prop.get_default_value())
-		for key: String in _tweened_values:
-			if _style_vals_tween.has(key):
-				_style_vals_tween.set(key, _tweened_values.get(key))
-		return _style_vals_tween
+			transition.style_values.set(prop.name, dv if dv != null else prop.get_default_value())
+		for key: String in transition.values:
+			if transition.style_values.has(key):
+				transition.style_values.set(key, transition.values.get(key))
+		return transition.style_values
 	if _shared != null:
 		if not _shared.style_static.has(state):
 			_share_style_vals(node_type, entry, state)
@@ -1422,7 +1414,7 @@ func _share_style_vals(node_type: GdssNodeType, entry: Dictionary, state: String
 
 
 func _live_value(prop: GdssProp, entry: Dictionary, state: String) -> Variant:
-	if _tweened_values.has(prop.name) or _shared == null or not _shared.is_global_only(state, prop.name):
+	if (_transition != null and _transition.values.has(prop.name)) or _shared == null or not _shared.is_global_only(state, prop.name):
 		return _get_val_cached(prop.name, entry, state, prop.get_default_value())
 	var shared_values: Dictionary = _shared.global_values(state, GDSS._globals_generation)
 	if shared_values.has(prop.name):
@@ -1451,7 +1443,7 @@ func _draw(to_canvas_item: RID, rect: Rect2) -> void:
 		if _gpu == null:
 			_gpu = GdssGpuRenderer.new(_safe_redraw)
 		if not _gpu.is_current(to_canvas_item, rect, _style_revision):
-			_gpu.draw(to_canvas_item, rect, vals, ref, GDSS.scaled_duration(_resolve_time("bg_texture", _get_state())), _style_revision, not _tweened_values.is_empty())
+			_gpu.draw(to_canvas_item, rect, vals, ref, GDSS.scaled_duration(_resolve_time("bg_texture", _get_state())), _style_revision, _transition != null and not _transition.values.is_empty())
 		return
 	_free_gpu_ci()
 	GdssCpuRenderer.draw(to_canvas_item, rect, vals)
